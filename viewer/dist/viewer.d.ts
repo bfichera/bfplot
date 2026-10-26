@@ -67,6 +67,7 @@ export declare class MPlotViewer extends EventTarget {
     private setMode;
     private toggleCompareMode;
     private configureComparisonTarget;
+    private selectComparisonArtist;
     private refreshComparisonControls;
     private openComparison;
     private renderMounted;
@@ -86,6 +87,7 @@ export declare class MPlotViewer extends EventTarget {
     private boundToPlot;
     private updateCoordinates;
     private clearHover;
+    private nearestLine;
     private showTooltip;
     private project3d;
     private markActiveAxis;

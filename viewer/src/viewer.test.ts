@@ -41,6 +41,24 @@ describe("MPlotViewer", () => {
     viewer.destroy();
   });
 
+  it("selects a line when the plot overlay receives the pointer", async () => {
+    const host = window.document.createElement("div");
+    window.document.body.append(host);
+    const viewer = new MPlotViewer(host, document);
+    await viewer.render();
+    const chart = host.querySelector<SVGSVGElement>(".mplot-axis svg")!;
+    Object.defineProperty(chart, "getBoundingClientRect", {
+      value: () => ({ left: 0, top: 0, width: 640, height: 360, right: 640, bottom: 360, x: 0, y: 0, toJSON: () => ({}) }),
+    });
+
+    host.querySelector<HTMLButtonElement>('[data-action="compare"]')!.click();
+    chart.dispatchEvent(pointer("pointerdown", { bubbles: true, clientX: 351, clientY: 165 }));
+
+    expect(host.querySelector('[data-artist-id="line"]')?.getAttribute("aria-pressed")).toBe("true");
+    expect(host.querySelector<HTMLButtonElement>(".mplot-open-comparison")?.disabled).toBe(false);
+    viewer.destroy();
+  });
+
   it("renders named figure navigation in the left rail", async () => {
     const host = window.document.createElement("div");
     window.document.body.append(host);

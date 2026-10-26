@@ -125,10 +125,10 @@ describe("large plot collections", () => {
       await viewer.render();
 
       host.querySelector<HTMLButtonElement>('[data-action="compare"]')!.click();
-      host.querySelector<SVGGElement>('[data-artist-id="line-0"]')!.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+      host.querySelector<SVGGElement>('[data-artist-id="line-0"]')!.dispatchEvent(new KeyboardEvent("keydown", { bubbles: true, key: "Enter" }));
       host.querySelector<HTMLButtonElement>('[data-figure-id="f2"]')!.click();
       await vi.waitFor(() => expect(host.querySelector('[data-artist-id="line-2"]')).not.toBeNull());
-      host.querySelector<SVGGElement>('[data-artist-id="line-2"]')!.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+      host.querySelector<SVGGElement>('[data-artist-id="line-2"]')!.dispatchEvent(new KeyboardEvent("keydown", { bubbles: true, key: "Enter" }));
       expect(host.querySelector(".mplot-comparison-status")?.textContent).toContain("2 lines");
 
       host.querySelector<HTMLButtonElement>(".mplot-open-comparison")!.click();
@@ -155,10 +155,10 @@ describe("large plot collections", () => {
       const host = document.createElement("div"), viewer = new MPlotViewer(host, incompatible);
       await viewer.render();
       host.querySelector<HTMLButtonElement>('[data-action="compare"]')!.click();
-      host.querySelector<SVGGElement>('[data-artist-id="line-0"]')!.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+      host.querySelector<SVGGElement>('[data-artist-id="line-0"]')!.dispatchEvent(new KeyboardEvent("keydown", { bubbles: true, key: "Enter" }));
       host.querySelector<HTMLButtonElement>('[data-figure-id="f2"]')!.click();
       await vi.waitFor(() => expect(host.querySelector('[data-artist-id="line-2"]')).not.toBeNull());
-      host.querySelector<SVGGElement>('[data-artist-id="line-2"]')!.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+      host.querySelector<SVGGElement>('[data-artist-id="line-2"]')!.dispatchEvent(new KeyboardEvent("keydown", { bubbles: true, key: "Enter" }));
       expect(host.querySelector(".mplot-comparison-status")?.textContent).toContain("Cannot compare linear/log");
       expect(host.querySelector('[data-artist-id="line-2"]')?.getAttribute("aria-pressed")).toBe("false");
       viewer.destroy();

@@ -736,16 +736,23 @@ export class MPlotViewer extends EventTarget {
                 return;
             event.preventDefault();
             event.stopPropagation();
-            const result = this.comparison.toggle(this.model.document, artist.id);
-            group.classList.toggle("mplot-line-selected", result.selected);
-            group.setAttribute("aria-pressed", String(result.selected));
-            this.refreshComparisonControls();
+            this.selectComparisonArtist(artist.id);
         };
-        group.addEventListener("click", select);
         group.addEventListener("keydown", (event) => {
             if (event.key === "Enter" || event.key === " ")
                 select(event);
         });
+    }
+    selectComparisonArtist(artistId) {
+        const result = this.comparison.toggle(this.model.document, artistId);
+        this.element.querySelectorAll("[data-artist-id]")
+            .forEach((group) => {
+            if (group.dataset.artistId !== artistId)
+                return;
+            group.classList.toggle("mplot-line-selected", result.selected);
+            group.setAttribute("aria-pressed", String(result.selected));
+        });
+        this.refreshComparisonControls();
     }
     refreshComparisonControls() {
         const status = this.element.querySelector(".mplot-comparison-status");
@@ -898,11 +905,25 @@ export class MPlotViewer extends EventTarget {
         const finish = (event, cancel = false) => { if (!start)
             return; const pointer = this.pointer(view, event), p = this.boundToPlot(view, pointer.x, pointer.y); if (!cancel && this.mode === "zoom" && Math.hypot(p.x - start.x, p.y - start.y) > 4)
             this.model.setViewport(view.axis.id, { ...start.viewport, x: [view.x.invert(Math.min(start.x, p.x)), view.x.invert(Math.max(start.x, p.x))], y: [view.y.invert(Math.max(start.y, p.y)), view.y.invert(Math.min(start.y, p.y))] }); start = undefined; brush?.remove(); brush = undefined; };
-        view.svg.addEventListener("pointerdown", (event) => { this.activeAxisId = view.axis.id; this.markActiveAxis(); const p = this.pointer(view, event); if (!this.inPlot(view, p.x, p.y))
-            return; start = { ...p, viewport: structuredClone(this.model.viewports.get(view.axis.id)), xScale: view.x, yScale: view.y }; view.svg.setPointerCapture(event.pointerId); if (this.mode === "zoom") {
-            brush = svg("rect", { x: p.x, y: p.y, width: 0, height: 0, class: "mplot-brush mplot-brush--zoom" });
-            view.overlay.append(brush);
-        } });
+        view.svg.addEventListener("pointerdown", (event) => {
+            this.activeAxisId = view.axis.id;
+            this.markActiveAxis();
+            const p = this.pointer(view, event);
+            if (!this.inPlot(view, p.x, p.y))
+                return;
+            if (this.compareMode) {
+                const artistId = this.nearestLine(view, p.x, p.y, 12);
+                if (artistId)
+                    this.selectComparisonArtist(artistId);
+                return;
+            }
+            start = { ...p, viewport: structuredClone(this.model.viewports.get(view.axis.id)), xScale: view.x, yScale: view.y };
+            view.svg.setPointerCapture(event.pointerId);
+            if (this.mode === "zoom") {
+                brush = svg("rect", { x: p.x, y: p.y, width: 0, height: 0, class: "mplot-brush mplot-brush--zoom" });
+                view.overlay.append(brush);
+            }
+        });
         view.svg.addEventListener("pointermove", (event) => { const p = this.pointer(view, event); this.updateCoordinates(view, p.x, p.y); if (!start) {
             this.showTooltip(view, p.x, p.y);
             return;
@@ -955,6 +976,26 @@ export class MPlotViewer extends EventTarget {
     boundToPlot(view, x, y) { const bounds = this.plotBounds(view); return { x: Math.max(bounds.left, Math.min(bounds.right, x)), y: Math.max(bounds.top, Math.min(bounds.bottom, y)) }; }
     updateCoordinates(view, px, py) { view.readout.textContent = this.inPlot(view, px, py) ? `x = ${formatTick(view.x.invert(px), view.axis.xscale, this.dateFormat(view, "x"))} · y = ${formatTick(view.y.invert(py), view.axis.yscale, this.dateFormat(view, "y"))}` : "x — · y —"; }
     clearHover(view) { view.host.querySelector(".mplot-tooltip")?.remove(); view.readout.textContent = "x — · y —"; }
+    nearestLine(view, px, py, maximumDistance) {
+        let nearest;
+        for (const artist of this.model.document.artists.filter((candidate) => candidate.axes_id === view.axis.id && candidate.type === "mplot.line" && candidate.props.visible !== false)) {
+            const data = this.resolvedData.get(artist.id) ?? artist.data;
+            const points = pairs(data.x, data.y).map(([x, y]) => [view.x(x), view.y(y)]);
+            for (let index = 1; index < points.length; index++) {
+                const distance = pointSegmentDistance(px, py, points[index - 1], points[index]);
+                if (distance <= maximumDistance && (!nearest || distance < nearest.distance)) {
+                    nearest = { id: artist.id, distance };
+                }
+            }
+            if (points.length === 1) {
+                const distance = Math.hypot(points[0][0] - px, points[0][1] - py);
+                if (distance <= maximumDistance && (!nearest || distance < nearest.distance)) {
+                    nearest = { id: artist.id, distance };
+                }
+            }
+        }
+        return nearest?.id;
+    }
     showTooltip(view, px, py) { let best; for (const artist of this.model.document.artists.filter((item) => item.axes_id === view.axis.id)) {
         const data = this.resolvedData.get(artist.id) ?? artist.data, values = pairs(data.x, data.y), stride = Math.max(1, Math.floor(values.length / 5000));
         for (let offset = 0; offset < values.length; offset += stride) {
@@ -1075,6 +1116,14 @@ export class MPlotViewer extends EventTarget {
     figureAxisIds(figure) { return (figure.axes ?? this.model.document.axes.filter((axis) => !axis.figure_id || axis.figure_id === figure.id)).map((axis) => typeof axis === "string" ? axis : axis.id); }
     applyTheme() { const values = { "--mplot-bg": this.theme.background, "--mplot-panel": this.theme.panel, "--mplot-fg": this.theme.foreground, "--mplot-muted": this.theme.muted, "--mplot-grid": this.theme.grid, "--mplot-accent": this.theme.accent, "font-family": this.theme.fontFamily }; for (const [key, value] of Object.entries(values))
         this.element.style.setProperty(key, value); }
+}
+function pointSegmentDistance(x, y, start, end) {
+    const dx = end[0] - start[0], dy = end[1] - start[1];
+    const lengthSquared = dx * dx + dy * dy;
+    const projection = lengthSquared === 0
+        ? 0
+        : Math.max(0, Math.min(1, ((x - start[0]) * dx + (y - start[1]) * dy) / lengthSquared));
+    return Math.hypot(x - (start[0] + projection * dx), y - (start[1] + projection * dy));
 }
 const safeId = (value) => value.replace(/[^a-zA-Z0-9_-]/g, "-");
 const serializeSvg = (element) => new XMLSerializer().serializeToString(element);
