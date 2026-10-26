@@ -32,7 +32,7 @@ jobs:
       - run: python -m pip install --upgrade pip build
       - run: python -m pip install -e '.[test]'
       - name: Install viewer dependencies
-        run: if [[ -f viewer/package-lock.json ]]; then npm ci --prefix viewer; else npm install --prefix viewer; fi
+        run: if [[ -f viewer/package-lock.json ]]; then npm ci --prefix viewer; else npm install --prefix viewer --no-package-lock; fi
       - name: Build release candidates
         run: ./scripts/release.sh "${GITHUB_REF_NAME#v}"
       - uses: actions/upload-artifact@v4

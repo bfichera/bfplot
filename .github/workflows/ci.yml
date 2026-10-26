@@ -61,7 +61,7 @@ jobs:
           cache: ${{ hashFiles('viewer/package-lock.json') != '' && 'npm' || '' }}
           cache-dependency-path: viewer/package-lock.json
       - name: Install dependencies
-        run: if [[ -f package-lock.json ]]; then npm ci; else npm install; fi
+        run: if [[ -f package-lock.json ]]; then npm ci; else npm install --no-package-lock; fi
       - run: npm run typecheck
       - run: npm test
       - run: npm run build
