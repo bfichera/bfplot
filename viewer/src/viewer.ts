@@ -116,6 +116,8 @@ export class MPlotViewer extends EventTarget {
     this.dirtyAxes.clear();
     this.element.replaceChildren();
 
+    const shell = document.createElement("div");
+    shell.className = "mplot-shell";
     const header = document.createElement("header");
     header.className = "mplot-header";
     const title = document.createElement("div");
@@ -123,15 +125,11 @@ export class MPlotViewer extends EventTarget {
     title.textContent = this.model.document.title ?? "MPlot";
     header.append(title);
     if (this.options.toolbar !== false) header.append(this.createToolbar());
-    this.element.append(header);
-
-    const shell = document.createElement("div");
-    shell.className = "mplot-shell";
     if (!this.model.document.figures.some((figure) => figure.id === this.activeFigureIdValue)) this.activeFigureIdValue = this.model.document.figures[0]?.id;
-    if (this.model.document.figures.length > 1) shell.append(this.createNavigator());
+    if (this.model.document.figures.length > 1) header.append(this.createNavigator());
     const figuresElement = document.createElement("main");
     figuresElement.className = "mplot-figures";
-    shell.append(figuresElement);
+    shell.append(header, figuresElement);
     this.element.append(shell);
 
     const immediateMounts: Promise<void>[] = [];
@@ -268,21 +266,28 @@ export class MPlotViewer extends EventTarget {
     const navigation = document.createElement("nav");
     navigation.className = "mplot-navigator";
     navigation.setAttribute("aria-label", "Figures");
+    const label = document.createElement("div");
+    label.className = "mplot-navigator-label";
+    label.textContent = "Figures";
     const previous = document.createElement("button");
-    previous.type = "button"; previous.className = "mplot-page-button"; previous.textContent = "Previous"; previous.setAttribute("aria-label", "Previous figure");
+    previous.type = "button"; previous.className = "mplot-page-step"; previous.textContent = "← Previous"; previous.setAttribute("aria-label", "Previous figure");
     const pages = document.createElement("div");
     pages.className = "mplot-page-list";
     this.model.document.figures.forEach((figure, index) => {
       const button = document.createElement("button");
-      button.type = "button"; button.className = "mplot-page-button"; button.dataset.figureId = figure.id; button.textContent = String(index + 1);
+      const number = document.createElement("span"), name = document.createElement("span");
+      number.className = "mplot-page-number"; number.textContent = String(index + 1).padStart(2, "0");
+      name.className = "mplot-page-name"; name.textContent = figure.title ?? `Figure ${index + 1}`;
+      button.type = "button"; button.className = "mplot-page-button"; button.dataset.figureId = figure.id; button.append(number, name);
       button.title = figure.title ?? `Figure ${index + 1}`; button.setAttribute("aria-label", `Show ${button.title}`);
       button.onclick = () => void this.showFigure(figure.id);
       pages.append(button);
     });
     const next = document.createElement("button");
-    next.type = "button"; next.className = "mplot-page-button"; next.textContent = "Next"; next.setAttribute("aria-label", "Next figure");
+    next.type = "button"; next.className = "mplot-page-step"; next.textContent = "Next →"; next.setAttribute("aria-label", "Next figure");
     previous.onclick = () => void this.stepFigure(-1); next.onclick = () => void this.stepFigure(1);
-    navigation.append(previous, pages, next);
+    const steps = document.createElement("div"); steps.className = "mplot-page-steps"; steps.append(previous, next);
+    navigation.append(label, pages, steps);
     queueMicrotask(() => this.updateNavigator());
     return navigation;
   }

@@ -38,6 +38,8 @@ def test_savefig_extracts_broad_artist_set(tmp_path):
     axes[1, 0].fill_between(x, x, x**2)
     axes[1, 1].hist(x)
     axes[1, 2].contourf(np.arange(16).reshape(4, 4))
+    axes[1, 2].set_title("Contours")
+    axes[1, 2].set_xlabel("x")
     axes[1, 2].text(.5, .5, "label")
 
     output = mplot.savefig(tmp_path / "all", figure, provenance=False)
@@ -50,9 +52,15 @@ def test_savefig_extracts_broad_artist_set(tmp_path):
     for axis in document["figures"][0]["axes"]:
         for artist in axis["artists"]:
             assert {"type", "schema_version", "id", "axes_id", "props", "data"} == artist.keys()
-    contour = next(artist for artist in document["figures"][0]["axes"][5]["artists"] if artist["type"] == "mplot.contourf")
+    final_axis = document["figures"][0]["axes"][5]
+    contour = next(artist for artist in final_axis["artists"] if artist["type"] == "mplot.contourf")
+    text = [artist for artist in final_axis["artists"] if artist["type"] == "mplot.text"]
     assert "facecolors" in contour["props"]
     assert _decode_array(output, contour["data"]["path_codes"]).size > 0
+    assert final_axis["title"] == "Contours"
+    assert final_axis["x"]["label"] == "x"
+    assert len(text) == 1
+    assert text[0]["data"]["text"] == "label"
 
 
 def test_savefig_marks_colorbars_as_auxiliary_axes(tmp_path):

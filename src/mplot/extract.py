@@ -141,6 +141,18 @@ def _extract_axes(axes: Any, axes_id: str, context: ExtractionContext) -> dict[s
         }
 
     consumed: set[int] = set()
+    axes_text = {
+        id(item)
+        for item in (
+            axes.title,
+            getattr(axes, "_left_title", None),
+            getattr(axes, "_right_title", None),
+            axes.xaxis.label,
+            axes.yaxis.label,
+            getattr(getattr(axes, "zaxis", None), "label", None),
+        )
+        if item is not None
+    }
     for container in axes.containers:
         extracted, children = _extract_container(container, axes_id, context)
         if extracted:
@@ -153,7 +165,7 @@ def _extract_axes(axes: Any, axes_id: str, context: ExtractionContext) -> dict[s
             consumed.add(id(image))
 
     for artist in axes.get_children():
-        if id(artist) in consumed or not artist.get_visible() or artist is axes.patch or isinstance(artist, Spine):
+        if id(artist) in consumed or id(artist) in axes_text or not artist.get_visible() or artist is axes.patch or isinstance(artist, Spine):
             continue
         extracted = _extract_artist(artist, axes_id, context, is_3d)
         if extracted is not None:

@@ -27,12 +27,24 @@ describe("MPlotViewer", () => {
     const viewer = new MPlotViewer(host, document);
     await viewer.render();
     expect(host.textContent).toContain("Experiment");
+    expect(host.querySelector(".mplot-shell")?.firstElementChild).toBe(host.querySelector(".mplot-header"));
+    expect(host.querySelector(".mplot-header")?.nextElementSibling).toBe(host.querySelector(".mplot-figures"));
     expect(host.querySelector('[data-artist-id="line"] path')).not.toBeNull();
     expect(host.textContent).toContain("Unknown: org.example.missing");
     expect(host.querySelector(".mplot-coordinates")?.textContent).toBe("x — · y —");
     const xLabel = Array.from(host.querySelectorAll(".mplot-label")).find((label) => label.textContent === "time");
     expect(Number(xLabel?.getAttribute("y"))).toBeLessThan(360);
     expect(viewer.exportSVG()).toContain(">Signal</text>");
+    viewer.destroy();
+  });
+
+  it("renders named figure navigation in the left rail", async () => {
+    const host = window.document.createElement("div");
+    window.document.body.append(host);
+    const viewer = new MPlotViewer(host, { ...document, figures: [{ id: "f", title: "Results", axes: ["a"] }, { id: "g", title: "Appendix", axes: [] }] });
+    await viewer.render();
+    expect(Array.from(host.querySelectorAll(".mplot-page-name"), (element) => element.textContent)).toEqual(["Results", "Appendix"]);
+    expect(host.querySelector(".mplot-page-button[aria-current=page] .mplot-page-number")?.textContent).toBe("01");
     viewer.destroy();
   });
 

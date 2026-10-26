@@ -1,295 +1,256 @@
+@font-face {
+  font-family: "CMU Serif";
+  src: url("./fonts/cmu-serif-500-roman.woff2") format("woff2");
+  font-style: normal;
+  font-weight: 400 600;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "CMU Serif";
+  src: url("./fonts/cmu-serif-500-italic.woff2") format("woff2");
+  font-style: italic;
+  font-weight: 400 600;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "CMU Serif";
+  src: url("./fonts/cmu-serif-700-roman.woff2") format("woff2");
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+}
+
 :host,
 .mplot-viewer {
-  --mplot-bg: #f3f1eb;
-  --mplot-panel: #fffefb;
-  --mplot-fg: #171713;
-  --mplot-muted: #5f5e57;
-  --mplot-grid: #d8d5cc;
-  --mplot-accent: #1f5a94;
-  --mplot-selection: #a65a16;
+  --mplot-bg: #ffffff;
+  --mplot-panel: #ffffff;
+  --mplot-fg: #181713;
+  --mplot-muted: #68655d;
+  --mplot-grid: #dddcd7;
+  --mplot-accent: #7b191c;
+  --mplot-selection: #9a5617;
   display: block;
   box-sizing: border-box;
-  min-height: 240px;
+  min-height: 100dvh;
+  overflow-x: clip;
   color: var(--mplot-fg);
   background: var(--mplot-bg);
-  font-family: Charter, "Bitstream Charter", "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
+  font-family: "CMU Serif", "Latin Modern Roman", "Computer Modern", serif;
   font-variant-numeric: lining-nums tabular-nums;
+  -webkit-font-smoothing: antialiased;
 }
 
 .mplot-viewer * { box-sizing: border-box; }
+
+.mplot-shell {
+  display: grid;
+  grid-template-columns: 224px minmax(0, 1fr);
+  min-height: 100dvh;
+  max-width: 1880px;
+  margin: 0 auto;
+}
 
 .mplot-header {
   position: sticky;
   top: 0;
   z-index: 20;
   display: flex;
-  align-items: center;
-  gap: 12px;
-  min-height: 58px;
-  padding: 10px 18px;
-  border-bottom: 1px solid color-mix(in srgb, var(--mplot-fg) 16%, transparent);
-  background: color-mix(in srgb, var(--mplot-panel) 94%, var(--mplot-bg));
-  box-shadow: 0 2px 8px #0000000a;
+  flex-direction: column;
+  align-items: stretch;
+  align-self: start;
+  gap: 28px;
+  height: 100dvh;
+  padding: 38px 24px 28px 30px;
+  border-right: 1px solid #deddd7;
+  background: #fff;
 }
 
 .mplot-title {
-  margin-right: auto;
-  font-size: 16px;
-  font-weight: 600;
-  letter-spacing: .015em;
+  padding-bottom: 20px;
+  border-bottom: 1px solid #27251f;
+  font-size: 21px;
+  font-weight: 500;
+  line-height: 1.1;
+  letter-spacing: .005em;
 }
 
 .mplot-toolbar {
-  display: flex;
-  gap: 2px;
-  padding: 3px;
-  border: 1px solid color-mix(in srgb, var(--mplot-fg) 16%, transparent);
-  border-radius: 4px;
-  background: color-mix(in srgb, var(--mplot-bg) 70%, var(--mplot-panel));
-  font-family: ui-sans-serif, system-ui, sans-serif;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px 8px;
+  order: 3;
+  margin-top: auto;
+  padding-top: 18px;
+  border-top: 1px solid #deddd7;
 }
 
-.mplot-button {
+.mplot-button,
+.mplot-page-step {
   appearance: none;
   border: 0;
-  border-radius: 2px;
+  border-radius: 0;
   background: transparent;
   color: var(--mplot-muted);
-  padding: 6px 9px;
   cursor: pointer;
-  font: inherit;
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: .025em;
+  font: 400 12px/1.25 "CMU Serif", serif;
+  text-align: left;
 }
 
-.mplot-button:hover {
-  color: var(--mplot-fg);
-  background: color-mix(in srgb, var(--mplot-panel) 70%, transparent);
-}
-
-.mplot-button[aria-pressed=true] {
-  color: var(--mplot-panel);
-  background: var(--mplot-fg);
-  box-shadow: 0 1px 2px #0002;
-}
-
-.mplot-button:focus-visible {
-  outline: 2px solid var(--mplot-accent);
-  outline-offset: 1px;
-}
+.mplot-button { padding: 5px 2px; }
+.mplot-button:hover, .mplot-page-step:hover:not(:disabled) { color: var(--mplot-accent); }
+.mplot-button[aria-pressed=true] { color: var(--mplot-accent); font-weight: 700; }
+.mplot-button[aria-pressed=true]::before { content: "· "; }
+.mplot-button:focus-visible, .mplot-page-button:focus-visible, .mplot-page-step:focus-visible, .mplot-export-scope:focus-visible { outline: 1px solid var(--mplot-accent); outline-offset: 2px; }
 
 .mplot-export-scope {
-  max-width: 112px;
+  grid-column: 1 / -1;
+  width: 100%;
+  margin: 5px 0 2px;
   border: 0;
-  border-left: 1px solid color-mix(in srgb, var(--mplot-fg) 14%, transparent);
+  border-bottom: 1px solid #aaa79e;
+  border-radius: 0;
   background: transparent;
   color: var(--mplot-muted);
-  padding: 0 5px;
-  font: 10px ui-sans-serif, system-ui, sans-serif;
+  padding: 5px 0;
+  font: 400 11px "CMU Serif", serif;
 }
-
-.mplot-shell {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-}
-
-.mplot-shell:has(.mplot-navigator) { align-items: start; }
 
 .mplot-navigator {
-  position: sticky;
-  top: 58px;
-  z-index: 15;
   display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  padding: 8px 16px;
-  border-bottom: 1px solid color-mix(in srgb, var(--mplot-fg) 12%, transparent);
-  background: color-mix(in srgb, var(--mplot-bg) 94%, var(--mplot-panel));
-  font: 11px ui-sans-serif, system-ui, sans-serif;
+  min-height: 0;
+  flex-direction: column;
+  gap: 12px;
+  order: 2;
 }
 
-.mplot-page-list { display: flex; gap: 4px; }
-.mplot-page-button { appearance: none; min-width: 28px; border: 1px solid color-mix(in srgb, var(--mplot-fg) 16%, transparent); border-radius: 3px; background: var(--mplot-panel); color: var(--mplot-muted); cursor: pointer; padding: 5px 8px; font: inherit; }
-.mplot-page-button:hover:not(:disabled) { color: var(--mplot-accent); border-color: var(--mplot-accent); }
-.mplot-page-button[aria-current=page] { color: var(--mplot-panel); border-color: var(--mplot-fg); background: var(--mplot-fg); }
-.mplot-page-button:disabled { cursor: default; opacity: .38; }
+.mplot-navigator-label {
+  color: var(--mplot-muted);
+  font-size: 10px;
+  letter-spacing: .16em;
+  text-transform: uppercase;
+}
+
+.mplot-page-list { display: grid; gap: 1px; }
+.mplot-page-button {
+  appearance: none;
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr);
+  gap: 8px;
+  width: 100%;
+  border: 0;
+  border-left: 1px solid transparent;
+  border-radius: 0;
+  background: transparent;
+  color: var(--mplot-muted);
+  cursor: pointer;
+  padding: 6px 0 6px 10px;
+  font: 400 12px/1.15 "CMU Serif", serif;
+  text-align: left;
+}
+.mplot-page-number { color: #99958c; font-size: 10px; letter-spacing: .04em; }
+.mplot-page-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mplot-page-button:hover { color: var(--mplot-accent); }
+.mplot-page-button[aria-current=page] { border-left-color: var(--mplot-accent); color: var(--mplot-fg); font-weight: 700; }
+.mplot-page-button[aria-current=page] .mplot-page-number { color: var(--mplot-accent); }
+.mplot-page-steps { display: flex; justify-content: space-between; padding: 8px 0 0 10px; }
+.mplot-page-step { padding: 3px 0; font-size: 10px; }
+.mplot-page-step:disabled { visibility: hidden; }
 
 .mplot-figures {
-  display: grid;
   min-width: 0;
-  gap: 18px;
-  padding: 20px;
+  padding: 46px clamp(30px, 5vw, 88px) 70px;
+  background: #fff;
 }
 
 .mplot-figure {
   position: relative;
-  overflow: hidden;
-  border: 1px solid color-mix(in srgb, var(--mplot-fg) 20%, transparent);
-  border-radius: 3px;
-  background: var(--mplot-panel);
-  box-shadow: 0 1px 2px #00000012, 0 12px 32px #0000000a;
+  overflow: visible;
+  width: min(100%, 1320px);
+  margin: 0 auto;
+  background: transparent;
 }
 
 .mplot-figure-header {
+  position: relative;
   display: flex;
   align-items: baseline;
-  gap: 10px;
+  justify-content: center;
   min-height: 42px;
-  padding: 12px 16px 6px;
+  margin-bottom: 20px;
+  padding-bottom: 11px;
+  border-bottom: 1px solid #27251f;
 }
 
 .mplot-figure-title {
-  flex: 1;
   margin: 0;
-  font-size: 14px;
-  font-weight: 600;
-  letter-spacing: .01em;
+  font-size: 18px;
+  font-weight: 500;
+  letter-spacing: .005em;
   text-align: center;
 }
 
-.mplot-figure-count { color: var(--mplot-muted); font: 10px ui-sans-serif, system-ui, sans-serif; }
+.mplot-figure-count { position: absolute; right: 0; color: var(--mplot-muted); font-size: 10px; font-style: italic; }
 .mplot-figure-canvas { position: relative; width: 100%; aspect-ratio: var(--mplot-figure-ratio, 1.333); min-height: 320px; }
 
-.mplot-axis {
-  position: absolute;
-  min-width: 0;
-  min-height: 0;
-  padding: 0;
-  border: 1px solid transparent;
-  touch-action: none;
-}
-
-.mplot-axis--active { border-color: color-mix(in srgb, var(--mplot-accent) 28%, transparent); }
-.mplot-axis--pending { display: grid; place-items: center; border: 1px dashed color-mix(in srgb, var(--mplot-muted) 22%, transparent); background: color-mix(in srgb, var(--mplot-bg) 18%, transparent); }
+.mplot-axis { position: absolute; min-width: 0; min-height: 0; padding: 0; border: 0; touch-action: none; }
+.mplot-axis--pending { display: grid; place-items: center; background: #fafaf8; }
 .mplot-axis-placeholder { color: var(--mplot-muted); font-size: 12px; font-style: italic; }
 
-.mplot-colorbar { position: absolute; display: grid; color: var(--mplot-fg); font: 10px ui-sans-serif, system-ui, sans-serif; pointer-events: none; }
+.mplot-colorbar { position: absolute; display: grid; color: var(--mplot-fg); font: 10px "CMU Serif", serif; pointer-events: none; }
 .mplot-colorbar--vertical { grid-template-columns: minmax(8px, 1fr) auto auto; gap: 5px; }
 .mplot-colorbar--horizontal { grid-template-rows: minmax(8px, 1fr) auto auto; gap: 4px; }
-.mplot-colorbar-gradient { min-width: 8px; min-height: 8px; border: 1px solid color-mix(in srgb, var(--mplot-fg) 55%, transparent); }
+.mplot-colorbar-gradient { min-width: 8px; min-height: 8px; border: .75px solid #25241f; }
 .mplot-colorbar-ticks { position: relative; min-width: 38px; min-height: 100%; }
 .mplot-colorbar--horizontal .mplot-colorbar-ticks { min-width: 100%; min-height: 16px; }
 .mplot-colorbar-tick { position: absolute; white-space: nowrap; }
 .mplot-colorbar--vertical .mplot-colorbar-tick { left: 0; bottom: var(--mplot-colorbar-position); transform: translateY(50%); }
 .mplot-colorbar--horizontal .mplot-colorbar-tick { top: 0; left: var(--mplot-colorbar-position); transform: translateX(-50%); }
-.mplot-colorbar-label { align-self: center; white-space: nowrap; }
+.mplot-colorbar-label { align-self: center; white-space: nowrap; font-style: italic; }
 .mplot-colorbar--vertical .mplot-colorbar-label { writing-mode: vertical-rl; transform: rotate(180deg); }
 
-.mplot-axis svg {
-  display: block;
-  width: 100%;
-  height: 100%;
-  min-height: 0;
-  overflow: visible;
-  user-select: none;
-  shape-rendering: geometricPrecision;
-  text-rendering: optimizeLegibility;
-}
-
-.mplot-grid-line {
-  stroke: var(--mplot-grid);
-  stroke-width: .75;
-  stroke-dasharray: 1.5 2.5;
-  vector-effect: non-scaling-stroke;
-}
-
-.mplot-axis-frame {
-  stroke: var(--mplot-fg);
-  stroke-width: 1;
-  vector-effect: non-scaling-stroke;
-}
-
-.mplot-tick {
-  fill: var(--mplot-fg);
-  font-size: 10.5px;
-}
-
-.mplot-label {
-  fill: var(--mplot-fg);
-  font-size: 12px;
-  font-style: italic;
-}
-
-.mplot-axis-title {
-  fill: var(--mplot-fg);
-  font-size: 13px;
-  font-weight: 600;
-  letter-spacing: .01em;
-}
-
+.mplot-axis svg { display: block; width: 100%; height: 100%; min-height: 0; overflow: visible; user-select: none; shape-rendering: geometricPrecision; text-rendering: geometricPrecision; font-family: "CMU Serif", serif; }
+.mplot-grid-line { stroke: var(--mplot-grid); stroke-width: .65; stroke-dasharray: none; vector-effect: non-scaling-stroke; }
+.mplot-axis-frame { stroke: var(--mplot-fg); stroke-width: .8; vector-effect: non-scaling-stroke; }
+.mplot-tick { fill: var(--mplot-fg); font-size: 10.5px; }
+.mplot-label { fill: var(--mplot-fg); font-size: 12px; font-style: italic; }
+.mplot-axis-title { fill: var(--mplot-fg); font-size: 13px; font-weight: 700; }
 .mplot-hit { fill: transparent; cursor: crosshair; }
 
-.mplot-tooltip {
-  position: absolute;
-  z-index: 4;
-  padding: 6px 8px;
-  border: 1px solid color-mix(in srgb, var(--mplot-fg) 24%, transparent);
-  border-radius: 2px;
-  background: color-mix(in srgb, var(--mplot-panel) 96%, transparent);
-  box-shadow: 0 4px 14px #0002;
-  font: 11px ui-monospace, SFMono-Regular, Menlo, monospace;
-  white-space: nowrap;
-  pointer-events: none;
-  transform: translate(8px, -100%);
-}
-
-.mplot-coordinates {
-  position: absolute;
-  left: 22px;
-  bottom: 9px;
-  z-index: 3;
-  min-width: 160px;
-  color: var(--mplot-muted);
-  font: 10.5px ui-monospace, SFMono-Regular, Menlo, monospace;
-  letter-spacing: .01em;
-  pointer-events: none;
-}
-
-.mplot-brush {
-  fill: color-mix(in srgb, var(--mplot-accent) 10%, transparent);
-  stroke: var(--mplot-accent);
-  stroke-width: 1;
-  stroke-dasharray: 4 3;
-  vector-effect: non-scaling-stroke;
-}
-
-.mplot-brush--zoom { stroke-dasharray: 5 3; }
-.mplot-brush--select { fill: color-mix(in srgb, var(--mplot-selection) 12%, transparent); stroke: var(--mplot-selection); }
-.mplot-unknown { stroke: var(--mplot-muted); fill: color-mix(in srgb, var(--mplot-muted) 8%, transparent); }
+.mplot-tooltip { position: absolute; z-index: 4; padding: 5px 7px; border: 1px solid #aaa79e; border-radius: 0; background: #fffffff2; box-shadow: 0 3px 12px #0001; font: 11px "CMU Serif", serif; white-space: nowrap; pointer-events: none; transform: translate(8px, -100%); }
+.mplot-coordinates { position: absolute; left: 22px; bottom: 9px; z-index: 3; min-width: 160px; color: var(--mplot-muted); font: 10px "CMU Serif", serif; font-style: italic; pointer-events: none; }
+.mplot-brush { fill: color-mix(in srgb, var(--mplot-accent) 8%, transparent); stroke: var(--mplot-accent); stroke-width: 1; stroke-dasharray: 4 3; vector-effect: non-scaling-stroke; }
+.mplot-brush--select { fill: color-mix(in srgb, var(--mplot-selection) 10%, transparent); stroke: var(--mplot-selection); }
+.mplot-unknown { stroke: var(--mplot-muted); fill: #fafaf8; }
 .mplot-unknown text { fill: var(--mplot-muted); font-size: 12px; }
-
-.mplot-status {
-  position: absolute;
-  right: 14px;
-  bottom: 9px;
-  color: var(--mplot-muted);
-  font: 10px ui-sans-serif, system-ui, sans-serif;
-  pointer-events: none;
-}
-
-.mplot-error { padding: 24px; color: #9c2f2f; }
+.mplot-status { position: absolute; right: 14px; bottom: 9px; color: var(--mplot-muted); font: 10px "CMU Serif", serif; pointer-events: none; }
+.mplot-error { padding: 24px; color: #8b1d21; }
 .mplot-point { transition: opacity .12s, stroke-width .12s; }
 .mplot-point[data-selected=true] { stroke: var(--mplot-selection); stroke-width: 3; }
 .mplot-hidden { display: none !important; }
 
-@media (max-width: 760px) {
-  .mplot-header { align-items: flex-start; flex-wrap: wrap; padding: 10px 12px; }
-  .mplot-toolbar { width: 100%; overflow: auto; }
-  .mplot-button { white-space: nowrap; }
-  .mplot-navigator { top: 98px; overflow-x: auto; justify-content: flex-start; padding: 7px 10px; }
-  .mplot-page-list { flex: none; }
-  .mplot-figures { padding: 10px; }
+@media (max-width: 820px) {
+  .mplot-shell { display: block; }
+  .mplot-header { position: sticky; height: auto; padding: 15px 18px 12px; border-right: 0; border-bottom: 1px solid #deddd7; gap: 12px; }
+  .mplot-title { padding-bottom: 10px; font-size: 18px; }
+  .mplot-navigator { overflow: hidden; }
+  .mplot-navigator-label, .mplot-page-name, .mplot-page-steps { display: none; }
+  .mplot-page-list { display: flex; overflow-x: auto; gap: 12px; }
+  .mplot-page-button { display: block; width: auto; flex: none; border-left: 0; border-bottom: 1px solid transparent; padding: 4px 1px; }
+  .mplot-page-button[aria-current=page] { border-bottom-color: var(--mplot-accent); }
+  .mplot-toolbar { display: flex; order: 3; margin-top: 0; padding-top: 9px; overflow-x: auto; border-top: 1px solid #deddd7; }
+  .mplot-button { flex: none; }
+  .mplot-export-scope { width: auto; min-width: 112px; margin: 0 8px; }
+  .mplot-figures { padding: 28px 14px 40px; }
+  .mplot-figure-header { margin: 0 8px 14px; }
   .mplot-figure-canvas { min-height: 280px; }
 }
 
 @media print {
-  .mplot-toolbar, .mplot-status, .mplot-navigator { display: none; }
-  .mplot-viewer { background: white; }
-  .mplot-header { position: static; border-bottom: 0; }
+  .mplot-header, .mplot-toolbar, .mplot-status, .mplot-navigator { display: none; }
   .mplot-shell { display: block; }
   .mplot-figures { padding: 0; }
-  .mplot-figure { border: 0; box-shadow: none; break-inside: avoid; }
+  .mplot-figure { break-inside: avoid; }
   .mplot-figure[hidden] { display: block; }
 }
