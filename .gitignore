@@ -1,0 +1,10 @@
+/target/
+**/__pycache__/
+*.py[cod]
+.venv/
+node_modules/
+dist/
+.mplot/objects/
+.mplot/cache/
+*.mplot-stream/chunks/
+.DS_Store

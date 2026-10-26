@@ -1,0 +1,4 @@
+* text=auto eol=lf
+*.mplot binary
+*.bin binary
+*.png binary
