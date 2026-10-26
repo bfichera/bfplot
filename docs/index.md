@@ -67,7 +67,7 @@ Matplotlib’s interactive window is lovely. You can zoom into a suspicious bump
 plt.savefig("final_plot_REAL_v2.png")
 ```
 
-That saves the *picture*, but not the useful interactive plot behind it. MPlot preserves the plot structure and numerical arrays too. It also records practical context such as the MPlot, Python, Matplotlib, NumPy, and Zstandard versions; command-line arguments; script path; working directory; platform; and creation time.
+That saves the *picture*, but not the useful interactive plot behind it. MPlot preserves the plot structure and numerical arrays too. It also records practical context such as the MPlot, Python, Matplotlib, NumPy, and Zstandard versions; command-line arguments; script path; working directory; platform; creation time; and, when available, the Git commit that produced the artifact.
 
 !!! note "MPlot 0.9.9 is a release candidate"
     Please try it on real scientific plots and tell us what behaves strangely. The goal is to make 1.0 boring—in the very best, reliable-software sense of the word.

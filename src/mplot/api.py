@@ -73,9 +73,9 @@ def compile(
     with tempfile.TemporaryDirectory(prefix="mplot-") as temporary:
         store = ContentStore(Path(temporary) / "objects")
         artifact_document = lower_mir(document, store)
-        return materialize_document(
-            output, artifact_document, document.metadata, store, packed=packed
-        )
+        provenance = processing_metadata()
+        provenance.update(document.metadata)
+        return materialize_document(output, artifact_document, provenance, store, packed=packed)
 
 
 def animation(

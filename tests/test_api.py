@@ -89,8 +89,9 @@ def test_savefig_always_records_processing_time(tmp_path):
     output = mplot.savefig(tmp_path / "minimal-metadata", figure, provenance=False)
     manifest = tomllib.loads(output.read_text())
 
-    assert set(manifest["provenance"]) == {"created_utc"}
+    assert set(manifest["provenance"]) == {"created_utc", "git_commit"}
     assert manifest["provenance"]["created_utc"].endswith("Z")
+    assert len(manifest["provenance"]["git_commit"]) == 40
 
 
 def test_savefig_marks_colorbars_as_auxiliary_axes(tmp_path):

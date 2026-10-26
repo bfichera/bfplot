@@ -39,7 +39,7 @@ plt.savefig("my_plot.pdf")
 
 PDFs and PNGs are useful, but they only save the *picture*. MPlot saves the plot structure and numerical arrays too. The result is a real interactive scientific output that you can open later.
 
-MPlot also records useful information about how the output was made, including the MPlot, Python, Matplotlib, NumPy, and Zstandard versions; the command-line arguments; the script path; the working directory; the platform; and the creation time. This metadata does not magically make an analysis reproducible, but it is much nicer than finding `final_plot_REAL_v2.png` six months later and having no idea where it came from.
+MPlot also records useful information about how the output was made, including the MPlot, Python, Matplotlib, NumPy, and Zstandard versions; the command-line arguments; the script path; the working directory; the platform; the creation time; and, when available, the Git commit that produced the artifact. This metadata does not magically make an analysis reproducible, but it is much nicer than finding `final_plot_REAL_v2.png` six months later and having no idea where it came from.
 
 Under the hood, the Python Matplotlib adapter translates a figure into MPlot's language-neutral intermediate representation (MIR), and the compiler turns validated MIR into the content-addressed artifact that Rust validates and serves to the browser viewer. You do not need to care about any of that to call `mplot.savefig()`.
 
@@ -187,7 +187,7 @@ mplot.savefig(
 )
 ```
 
-To omit environment and user details while retaining the artifact's required creation timestamp:
+To omit environment and user details while retaining baseline processing metadata (creation time and the producing Git commit when available):
 
 ```python
 mplot.savefig("anonymous_plot", fig, provenance=False)

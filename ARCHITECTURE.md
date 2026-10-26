@@ -28,7 +28,7 @@ A MIR document contains semantic figure, axes, artist, layout, scale, guide, and
 
 The in-process Python producer uses immutable contiguous NumPy buffers. Other language producers can implement the same typed-buffer contract with native arrays or a portable interchange such as Arrow IPC. MIR never contains artifact object IDs, codecs, paths, or packing details.
 
-MIR validation is mandatory. It checks its version, required processing metadata, unique IDs, axes/artist ownership, parent relationships, colorbar-to-mappable references, and local buffer references. Required processing metadata always includes `created_utc`.
+MIR validation is mandatory. It checks its version, required processing metadata, unique IDs, axes/artist ownership, parent relationships, colorbar-to-mappable references, and local buffer references. Required processing metadata always includes `created_utc`. When the producer runs from a Git worktree, baseline processing metadata also records the producing `git_commit`; Git absence or lookup failure must not prevent artifact creation.
 
 Temporal MIR uses one immutable initial scene plus a restricted timeline of stable-ID updates. Each timestamped update names a figure, axes, or artist target and an allow-listed semantic path such as `["data", "y"]`. Timeline values can reference the same local typed buffers as the initial scene. Arbitrary callbacks and unrestricted JSON Patch operations are not part of the format.
 

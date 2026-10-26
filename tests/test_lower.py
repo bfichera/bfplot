@@ -29,10 +29,26 @@ def test_compile_resolves_all_mir_buffers_and_preserves_metadata(tmp_path) -> No
     output = mplot.compile(mir, tmp_path / "compiled")
     manifest, document = _document_from_split(output)
 
-    assert manifest["provenance"] == {"created_utc": "2026-01-01T00:00:00Z", "producer": "test"}
+    assert manifest["provenance"] == {
+        "created_utc": "2026-01-01T00:00:00Z",
+        "git_commit": mir.metadata["git_commit"],
+        "producer": "test",
+    }
     assert "$buffer" not in json.dumps(document)
     line = document["figures"][0]["axes"][0]["artists"][0]
     assert set(line["data"]["x"]) == {"object", "dtype", "shape", "codec"}
+
+
+def test_compile_adds_missing_baseline_git_metadata(tmp_path) -> None:
+    figure, axes = plt.subplots()
+    axes.plot([0, 1], [2, 3])
+    mir = mplot.translate(figure)
+    del mir.metadata["git_commit"]
+
+    output = mplot.compile(mir, tmp_path / "compiled")
+    manifest, _ = _document_from_split(output)
+
+    assert len(manifest["provenance"]["git_commit"]) == 40
 
 
 def test_explicit_translate_compile_matches_savefig_artifact_document(

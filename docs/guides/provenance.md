@@ -7,6 +7,7 @@ A plot is much more useful when you know where it came from. MPlot records pract
 MPlot 0.9.9 records:
 
 - creation time in UTC;
+- the producing Git commit when the script or working directory is in a Git repository;
 - Python implementation and version;
 - operating system and platform information;
 - MPlot, Matplotlib, NumPy, and Zstandard versions;
@@ -40,7 +41,7 @@ Use short keys and values that another scientist—or future you—can understan
 mplot.savefig("anonymous_plot", fig, provenance=False)
 ```
 
-This is useful for tests and examples where machine-specific metadata would only add noise.
+This omits environment and user details while retaining baseline processing metadata: the creation time and, when available, the producing Git commit.
 
 ## Be careful with private information
 
