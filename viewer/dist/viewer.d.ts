@@ -26,6 +26,8 @@ export declare class MPlotViewer extends EventTarget {
     private intersection?;
     private documentToken;
     private axisTokens;
+    private axisRenders;
+    private dirtyAxes;
     constructor(target: HTMLElement, document: MPlotDocument, options?: ViewerOptions);
     update(document: MPlotDocument): void;
     setTheme(theme: ThemeName | Partial<Theme>): void;
@@ -45,6 +47,7 @@ export declare class MPlotViewer extends EventTarget {
     private setMode;
     private renderMounted;
     private renderAxis;
+    private renderAxisNow;
     private drawAxes;
     private drawUnknown;
     private drawHitArea;

@@ -23,6 +23,11 @@ describe("document normalization",()=>{
     expect(paths.paths).toEqual([[[0,0],[1,1]],[[2,2],[3,3],[4,4]]]);
   });
 
+  it("handles empty extracted contour segments without looping",()=>{
+    const contour=normalizeArtistData("mplot.contour",{segments:ref([0])},{segments:new Float64Array(0)});
+    expect(contour.paths).toEqual([]);
+  });
+
   it("adapts extracted histogram rectangles",()=>{
     const data=normalizeArtistData("mplot.histogram",{},{left:[0,2],bottom:[0,1],width:[1,1],height:[3,4]});
     expect(data.rects).toEqual([[0,0,1,3],[2,1,1,4]]);

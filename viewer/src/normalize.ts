@@ -87,7 +87,12 @@ const arrayShape = (value: unknown): number[] | undefined => {
   return Array.isArray(shape) && shape.every((item) => Number.isInteger(item)) ? shape as number[] : undefined;
 };
 const numbers = (value: unknown): number[] => Array.isArray(value) || ArrayBuffer.isView(value) ? Array.from(value as ArrayLike<unknown>, Number) : [];
-const rows = (value: unknown, width: number): number[][] => { const flat = numbers(value), result: number[][] = []; for (let i = 0; i + width <= flat.length; i += width) result.push(flat.slice(i, i + width)); return result; };
+const rows = (value: unknown, width: number): number[][] => {
+  if (!Number.isSafeInteger(width) || width <= 0) return [];
+  const flat = numbers(value), result: number[][] = [];
+  for (let i = 0; i + width <= flat.length; i += width) result.push(flat.slice(i, i + width));
+  return result;
+};
 
 /** Adapts producer-specific array layouts after object references have been resolved. */
 export function normalizeArtistData(type: string, source: Record<string, unknown>, resolved: ResolvedData): ResolvedData {

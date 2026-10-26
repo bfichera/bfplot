@@ -21,6 +21,8 @@ export class MPlotViewer extends EventTarget {
     intersection;
     documentToken = 0;
     axisTokens = new Map();
+    axisRenders = new Map();
+    dirtyAxes = new Set();
     constructor(target, document, options = {}) {
         super();
         this.element = target;
@@ -47,7 +49,9 @@ export class MPlotViewer extends EventTarget {
             this.resize = new ResizeObserver((entries) => {
                 for (const entry of entries) {
                     const axisId = entry.target.dataset.axesId;
-                    if (axisId && this.views.get(axisId)?.mounted)
+                    const view = axisId ? this.views.get(axisId) : undefined;
+                    const width = Math.max(180, entry.contentRect.width), height = Math.max(150, entry.contentRect.height);
+                    if (view?.mounted && view.figureId === this.activeFigureIdValue && entry.contentRect.width > 0 && entry.contentRect.height > 0 && (Math.abs(width - view.width) > 1 || Math.abs(height - view.height) > 1))
                         void this.renderAxis(axisId);
                 }
             });
@@ -97,6 +101,8 @@ export class MPlotViewer extends EventTarget {
         this.figures.clear();
         this.resolvedData.clear();
         this.axisTokens.clear();
+        this.axisRenders.clear();
+        this.dirtyAxes.clear();
         this.element.replaceChildren();
         const header = document.createElement("header");
         header.className = "mplot-header";
@@ -193,9 +199,9 @@ export class MPlotViewer extends EventTarget {
         host.style.width = `${position[2] * 100}%`;
         host.style.height = `${position[3] * 100}%`;
     }
-    async mountAxis(axisId) {
+    async mountAxis(axisId, force = false) {
         const view = this.views.get(axisId);
-        if (!view || view.mounted)
+        if (!view || view.mounted || (!force && view.figureId !== this.activeFigureIdValue))
             return;
         view.mounted = true;
         view.host.classList.remove("mplot-axis--pending");
@@ -324,50 +330,70 @@ export class MPlotViewer extends EventTarget {
     }
     async renderMounted() { await Promise.all(Array.from(this.views.values()).filter((view) => view.mounted).map((view) => this.renderAxis(view.axis.id))); }
     async renderAxis(axisId) {
+        const pending = this.axisRenders.get(axisId);
+        if (pending) {
+            this.dirtyAxes.add(axisId);
+            return pending;
+        }
+        const operation = (async () => {
+            try {
+                this.dirtyAxes.delete(axisId);
+                await this.renderAxisNow(axisId);
+                this.dirtyAxes.delete(axisId);
+            }
+            finally {
+                this.axisRenders.delete(axisId);
+            }
+        })();
+        this.axisRenders.set(axisId, operation);
+        return operation;
+    }
+    async renderAxisNow(axisId) {
         const view = this.views.get(axisId);
-        if (!view?.mounted)
+        if (!view?.mounted || view.figureId !== this.activeFigureIdValue)
             return;
-        const token = (this.axisTokens.get(axisId) ?? 0) + 1;
+        const token = (this.axisTokens.get(axisId) ?? 0) + 1, documentToken = this.documentToken;
         this.axisTokens.set(axisId, token);
-        const rect = view.host.getBoundingClientRect();
-        view.width = Math.max(180, rect.width || 640);
-        view.height = Math.max(150, rect.height || 360);
+        view.width = Math.max(180, view.host.clientWidth || 640);
+        view.height = Math.max(150, view.host.clientHeight || 360);
         view.margin = compactMargins(view.width, view.height);
-        view.svg.setAttribute("viewBox", `0 0 ${view.width} ${view.height}`);
         const viewport = this.model.viewports.get(axisId) ?? this.model.defaultViewport(view.axis);
         const right = view.width - view.margin.right, bottom = view.height - view.margin.bottom;
         view.x = createScale(view.axis.xscale, viewport.x, [view.margin.left, right]);
         view.y = createScale(view.axis.yscale, viewport.y, [bottom, view.margin.top]);
-        view.plot.replaceChildren();
-        view.overlay.replaceChildren();
-        this.drawAxes(view);
+        const plot = svg("g"), overlay = svg("g"), working = { ...view, plot, overlay };
+        this.drawAxes(working);
         const clipId = `mplot-clip-${safeId(view.axis.id)}`, defs = svg("defs"), clip = svg("clipPath", { id: clipId });
         clip.append(svg("rect", { x: view.margin.left, y: view.margin.top, width: right - view.margin.left, height: bottom - view.margin.top }));
         defs.append(clip);
-        view.plot.prepend(defs);
+        plot.prepend(defs);
         const artists = this.model.document.artists.filter((artist) => artist.axes_id === axisId && artist.props.visible !== false);
         for (const artist of artists) {
             const group = svg("g", { "data-artist-id": artist.id, "clip-path": `url(#${clipId})` });
-            view.plot.append(group);
+            plot.append(group);
             const renderer = this.renderers.get(artist.type);
             if (!renderer) {
-                this.drawUnknown(group, artist, view);
+                this.drawUnknown(group, artist, working);
                 continue;
             }
             try {
-                const data = await this.model.resolveData(artist.data, artist);
-                if (this.axisTokens.get(axisId) !== token || !view.mounted)
+                const data = this.resolvedData.get(artist.id) ?? await this.model.resolveData(artist.data, artist);
+                if (documentToken !== this.documentToken || this.views.get(axisId) !== view || view.figureId !== this.activeFigureIdValue)
                     return;
                 this.resolvedData.set(artist.id, data);
                 const selected = this.selectedIndices(artist.id);
-                await renderer({ ...view, group, artist, data, theme: this.theme, selected, pointBudget: Math.max(500, Math.round(view.width * 4)), project3d: (x, y, z) => this.project3d(view, x, y, z) });
+                await renderer({ ...working, group, artist, data, theme: this.theme, selected, pointBudget: Math.max(500, Math.round(view.width * 4)), project3d: (x, y, z) => this.project3d(view, x, y, z) });
             }
             catch (error) {
-                this.drawUnknown(group, artist, view, error instanceof Error ? error.message : "render failed");
+                this.drawUnknown(group, artist, working, error instanceof Error ? error.message : "render failed");
             }
         }
-        if (this.axisTokens.get(axisId) === token)
-            this.drawHitArea(view);
+        if (documentToken !== this.documentToken || this.views.get(axisId) !== view || view.figureId !== this.activeFigureIdValue || this.axisTokens.get(axisId) !== token)
+            return;
+        this.drawHitArea(working);
+        view.svg.setAttribute("viewBox", `0 0 ${view.width} ${view.height}`);
+        view.plot.replaceChildren(...plot.childNodes);
+        view.overlay.replaceChildren(...overlay.childNodes);
     }
     drawAxes(view) {
         const { left, top, bottom, right } = view.margin, b = view.height - bottom, r = view.width - right;
@@ -531,7 +557,7 @@ export class MPlotViewer extends EventTarget {
         const scope = this.exportScope;
         if (scope === "figures") {
             for (const [index, figure] of this.model.document.figures.entries()) {
-                await this.mountFigure(figure.id);
+                await this.mountFigure(figure.id, true);
                 const filename = `mplot-figure-${index + 1}.${format}`;
                 this.download(format === "svg" ? new Blob([this.exportSVG("figure", figure.id)], { type: "image/svg+xml;charset=utf-8" }) : await this.exportPNG(2, "figure", figure.id), filename);
             }
@@ -544,13 +570,13 @@ export class MPlotViewer extends EventTarget {
         }
         else if (scope === "artifact")
             for (const figure of this.model.document.figures)
-                await this.mountFigure(figure.id);
+                await this.mountFigure(figure.id, true);
         else if (this.activeAxisId)
             await this.mountAxis(this.activeAxisId);
         const filename = `mplot-${scope}.${format}`;
         this.download(format === "svg" ? new Blob([this.exportSVG(scope)], { type: "image/svg+xml;charset=utf-8" }) : await this.exportPNG(2, scope), filename);
     }
-    async mountFigure(figureId) { await Promise.all((this.figures.get(figureId)?.axisIds ?? []).map((axisId) => this.mountAxis(axisId))); }
+    async mountFigure(figureId, force = false) { await Promise.all((this.figures.get(figureId)?.axisIds ?? []).map((axisId) => this.mountAxis(axisId, force))); }
     activeFigureId() { return this.activeFigureIdValue ?? (this.activeAxisId ? this.views.get(this.activeAxisId)?.figureId : this.model.document.figures[0]?.id); }
     download(blob, filename) { const link = document.createElement("a"), url = URL.createObjectURL(blob); link.href = url; link.download = filename; link.click(); setTimeout(() => URL.revokeObjectURL(url), 0); }
     connectLive(url) { this.source?.close(); if (typeof EventSource === "undefined")

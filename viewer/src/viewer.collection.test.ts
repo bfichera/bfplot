@@ -33,6 +33,16 @@ class DeferredIntersectionObserver {
   trigger(element: Element): void { this.callback([{ target: element, isIntersecting: true } as IntersectionObserverEntry], this as unknown as IntersectionObserver); }
 }
 
+class ControlledResizeObserver {
+  static instance: ControlledResizeObserver | undefined;
+  readonly observed: Element[] = [];
+  constructor(private readonly callback: ResizeObserverCallback) { ControlledResizeObserver.instance = this; }
+  observe = (element: Element): void => { this.observed.push(element); };
+  unobserve = (): void => undefined;
+  disconnect = (): void => undefined;
+  trigger(element: Element, width: number, height: number): void { this.callback([{ target: element, contentRect: { width, height } } as ResizeObserverEntry], this as unknown as ResizeObserver); }
+}
+
 describe("large plot collections", () => {
   it("reconstructs saved axes geometry and provides figure navigation", async () => {
     const original = globalThis.IntersectionObserver;
@@ -61,7 +71,7 @@ describe("large plot collections", () => {
       const axis = host.querySelector<HTMLElement>('[data-axes-id="a3"]')!;
       expect(axis.classList.contains("mplot-axis--pending")).toBe(true);
       expect(axis.querySelector("svg")).toBeNull();
-      DeferredIntersectionObserver.instances[0]!.trigger(axis);
+      host.querySelector<HTMLButtonElement>('[data-figure-id="f2"]')!.click();
       await vi.waitFor(() => expect(axis.querySelector("svg")).not.toBeNull());
       expect(axis.classList.contains("mplot-axis--pending")).toBe(false);
       viewer.destroy();
@@ -87,6 +97,24 @@ describe("large plot collections", () => {
       expect(host.querySelector<HTMLElement>(".mplot-header")!.classList.contains("mplot-header")).toBe(true);
       viewer.destroy();
     } finally { globalThis.IntersectionObserver = original; }
+  });
+
+  it("ignores resize churn from hidden figure pages", async () => {
+    const originalIntersection = globalThis.IntersectionObserver, originalResize = globalThis.ResizeObserver;
+    try {
+      globalThis.IntersectionObserver = undefined as unknown as typeof IntersectionObserver;
+      globalThis.ResizeObserver = ControlledResizeObserver as unknown as typeof ResizeObserver;
+      const host = document.createElement("div"), viewer = new MPlotViewer(host, manyPlots());
+      await viewer.render();
+      const firstAxis = host.querySelector<HTMLElement>('[data-axes-id="a1"]')!;
+      const originalPath = firstAxis.querySelector("path")?.getAttribute("d");
+      host.querySelector<HTMLButtonElement>('[data-figure-id="f2"]')!.click();
+      await vi.waitFor(() => expect(host.querySelector('[data-axes-id="a3"] svg')).not.toBeNull());
+      ControlledResizeObserver.instance!.trigger(firstAxis, 0, 0);
+      await Promise.resolve();
+      expect(firstAxis.querySelector("path")?.getAttribute("d")).toBe(originalPath);
+      viewer.destroy();
+    } finally { globalThis.IntersectionObserver = originalIntersection; globalThis.ResizeObserver = originalResize; }
   });
 
   it("exports an individual plot, figure layout, or entire artifact", async () => {

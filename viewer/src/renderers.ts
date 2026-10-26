@@ -104,10 +104,14 @@ const colorChannels = (color: string): [number, number, number] => {
   return [0, 2, 4].map((offset) => Number.parseInt(hex.slice(offset, offset + 2), 16)) as [number, number, number];
 };
 
-const paletteColor = (palette: string[], value: number): [number, number, number] => {
-  const scaled = Math.max(0, Math.min(1, value)) * (palette.length - 1), index = Math.min(palette.length - 2, Math.floor(scaled)), mix = scaled - index;
-  const from = colorChannels(palette[index]!), to = colorChannels(palette[index + 1]!);
-  return from.map((channel, offset) => Math.round(channel + (to[offset]! - channel) * mix)) as [number, number, number];
+const colorTable = (palette: string[]): Uint8Array => {
+  const channels = palette.map(colorChannels), table = new Uint8Array(256 * 3);
+  for (let value = 0; value < 256; value++) {
+    const scaled = value / 255 * (channels.length - 1), index = Math.min(channels.length - 2, Math.floor(scaled)), mix = scaled - index;
+    const from = channels[index]!, to = channels[index + 1]!;
+    for (let channel = 0; channel < 3; channel++) table[value * 3 + channel] = Math.round(from[channel]! + (to[channel]! - from[channel]!) * mix);
+  }
+  return table;
 };
 
 const finiteRange = (values: number[], fallback: [number, number]): [number, number] => {
@@ -125,8 +129,8 @@ const rasterDataUrl = (values: number[], rows: number, columns: number, artist: 
   if (!context) return undefined;
   const configured = numeric(artist.props.clim), [minimum, maximum] = configured.length >= 2 ? [configured[0]!, configured[1]!] : finiteRange(values, [0, 1]);
   const configuredPalette = prop<string[]>(artist, "colors", palettes[String(artist.props.cmap)] ?? palettes.viridis!);
-  const palette = configuredPalette.length >= 2 ? configuredPalette : palettes.viridis!;
-  const pixels = context.createImageData(width, height), lower = artist.props.origin === "lower";
+  const palette = configuredPalette.length >= 2 ? configuredPalette : palettes.viridis!, colors = colorTable(palette);
+  const pixels = context.createImageData(width, height), lower = artist.props.origin === "lower", scale = 255 / (maximum - minimum || 1);
   for (let targetRow = 0; targetRow < height; targetRow++) {
     const sourceRowFromTop = Math.min(rows - 1, Math.floor(targetRow * rows / height));
     const sourceRow = lower ? rows - sourceRowFromTop - 1 : sourceRowFromTop;
@@ -134,8 +138,8 @@ const rasterDataUrl = (values: number[], rows: number, columns: number, artist: 
       const sourceColumn = Math.min(columns - 1, Math.floor(column * columns / width));
       const value = values[sourceRow * columns + sourceColumn]!, offset = (targetRow * width + column) * 4;
       if (!Number.isFinite(value)) { pixels.data[offset + 3] = 0; continue; }
-      const [red, green, blue] = paletteColor(palette, (value - minimum) / (maximum - minimum || 1));
-      pixels.data[offset] = red; pixels.data[offset + 1] = green; pixels.data[offset + 2] = blue; pixels.data[offset + 3] = 255;
+      const color = Math.max(0, Math.min(255, Math.round((value - minimum) * scale))) * 3;
+      pixels.data[offset] = colors[color]!; pixels.data[offset + 1] = colors[color + 1]!; pixels.data[offset + 2] = colors[color + 2]!; pixels.data[offset + 3] = 255;
     }
   }
   context.putImageData(pixels, 0, 0);
@@ -152,11 +156,12 @@ const image: ArtistRenderer = ({ group, artist, data, x, y }) => {
   group.append(svg("image", { href, x: Math.min(x(left!), x(right!)), y: Math.min(y(bottom!), y(top!)), width: Math.abs(x(right!) - x(left!)), height: Math.abs(y(top!) - y(bottom!)), preserveAspectRatio: prop(artist, "aspect", "none"), opacity: prop(artist, "alpha", 1), "image-rendering": artist.props.interpolation === "nearest" ? "pixelated" : undefined }));
 };
 
-const contour = (filled: boolean): ArtistRenderer => ({ group, artist, data, x, y, theme }) => {
-  const levels = (data.paths ?? data.segments ?? data.polygons ?? []) as unknown[];
+const contour = (filled: boolean): ArtistRenderer => ({ group, artist, data, x, y, theme, pointBudget }) => {
+  const levels = (data.paths ?? data.segments ?? data.polygons ?? []) as unknown[], budgetPerPath = Math.max(64, Math.floor(pointBudget / Math.max(1, levels.length)));
   for (const [index, raw] of levels.entries()) {
     const pointList = Array.isArray(raw) ? raw : [];
-    const points = pointList.map((point) => Array.isArray(point) ? [x(Number(point[0])), y(Number(point[1]))] as [number, number] : null).filter((p): p is [number, number] => p !== null);
+    const points = sampled(pointList, budgetPerPath).map((point) => Array.isArray(point) ? [x(Number(point[0])), y(Number(point[1]))] as [number, number] : null).filter((p): p is [number, number] => p !== null);
+    if (points.length < 2) continue;
     group.append(svg("path", { d: pathFrom(points, filled), fill: filled ? cssColor((artist.props.colors as string[] | undefined)?.[index], theme.accent) : "none", "fill-opacity": filled ? prop(artist, "alpha", 0.35) : 0, stroke: cssColor((artist.props.colors as string[] | undefined)?.[index], theme.accent), "stroke-width": prop(artist, "linewidth", 1) }));
   }
 };
