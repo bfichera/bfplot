@@ -38,6 +38,8 @@ class PluginRegistry:
     ) -> Plugin:
         if type_name.startswith("mplot.") or "." not in type_name:
             raise ValueError("plugin artist types must use a non-mplot reverse-DNS name")
+        if any(plugin.type_name == type_name for plugin in self._plugins):
+            raise ValueError(f"plugin artist type is already registered: {type_name}")
         plugin = Plugin(type_name, artist_class, extractor, requirement)
         self._plugins.insert(0, plugin)
         return plugin

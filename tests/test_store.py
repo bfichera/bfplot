@@ -17,6 +17,8 @@ def test_store_is_content_addressed_and_verifies_reads(tmp_path):
     store.path_for(reference).write_bytes(b"corrupt")
     with pytest.raises(ValueError, match="digest mismatch"):
         store.get(reference)
+    with pytest.raises(ValueError, match="existing object digest mismatch"):
+        store.put(b"hello")
 
 
 def test_typed_array_round_trip(tmp_path):

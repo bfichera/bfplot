@@ -19,6 +19,9 @@ def test_plugin_registry_requires_reverse_dns_name():
         registry.register("circle", Circle, lambda artist, context: {})
     with pytest.raises(ValueError):
         registry.register("mplot.circle", Circle, lambda artist, context: {})
+    registry.register("org.example.circle", Circle, lambda artist, context: {})
+    with pytest.raises(ValueError, match="already registered"):
+        registry.register("org.example.circle", Circle, lambda artist, context: {})
 
 
 def test_custom_artist_and_requirement_are_extracted(tmp_path):

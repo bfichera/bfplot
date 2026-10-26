@@ -26,6 +26,8 @@ class ContentStore:
         digest = self.digest(data)
         target = self.path_for(digest)
         if target.exists():
+            if self.digest(target.read_bytes()) != digest:
+                raise ValueError(f"existing object digest mismatch: {digest}")
             return f"sha256:{digest}"
         target.parent.mkdir(parents=True, exist_ok=True)
         fd, temporary = tempfile.mkstemp(prefix=".mplot-", dir=target.parent)
