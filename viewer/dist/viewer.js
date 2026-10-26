@@ -167,9 +167,10 @@ export class MPlotViewer extends EventTarget {
         title.textContent = figure.title ?? `Figure ${index + 1}`;
         const axisIds = this.figureAxisIds(figure);
         const plotAxisIds = axisIds.filter((axisId) => this.model.document.axes.find((axis) => axis.id === axisId)?.role !== "colorbar");
+        const primaryPlotCount = plotAxisIds.filter((axisId) => this.model.document.axes.find((axis) => axis.id === axisId)?.role !== "inset").length;
         const count = document.createElement("span");
         count.className = "mplot-figure-count";
-        count.textContent = `${plotAxisIds.length} ${plotAxisIds.length === 1 ? "plot" : "plots"}`;
+        count.textContent = `${primaryPlotCount} ${primaryPlotCount === 1 ? "plot" : "plots"}`;
         heading.append(title, count);
         const canvas = document.createElement("div");
         canvas.className = "mplot-figure-canvas";
@@ -210,7 +211,7 @@ export class MPlotViewer extends EventTarget {
     }
     createAxis(axis, figureId) {
         const host = document.createElement("article");
-        host.className = "mplot-axis mplot-axis--pending";
+        host.className = `mplot-axis mplot-axis--pending${axis.role === "inset" ? " mplot-axis--inset" : ""}`;
         host.dataset.axesId = axis.id;
         host.setAttribute("aria-label", axis.title ?? `Plot ${axis.id}`);
         host.onclick = () => { this.activeAxisId = axis.id; this.markActiveAxis(); };
@@ -225,11 +226,25 @@ export class MPlotViewer extends EventTarget {
         readout.className = "mplot-coordinates";
         readout.setAttribute("aria-live", "polite");
         readout.textContent = "x — · y —";
+        if (axis.role === "inset")
+            readout.hidden = true;
         const viewport = this.model.viewports.get(axis.id) ?? { x: [0, 1], y: [0, 1] };
         return { axis, figureId, host, svg: chart, plot, overlay, readout, width: 640, height: 360, margin: { left: 64, right: 18, top: 28, bottom: 58 }, x: createScale(axis.xscale, viewport.x, [64, 622]), y: createScale(axis.yscale, viewport.y, [302, 28]), mounted: false };
     }
-    positionAxis(host, axis, index, count) {
+    axisPosition(axis, index, count) {
         const position = axis.position ?? inferredPosition(index, count);
+        if (axis.role !== "inset" || !axis.parent_axes_id)
+            return position;
+        const parent = this.model.document.axes.find((candidate) => candidate.id === axis.parent_axes_id)?.position;
+        if (!parent)
+            return position;
+        const width = Math.min(position[2], parent[2]), height = Math.min(position[3], parent[3]);
+        const left = Math.max(parent[0], Math.min(position[0], parent[0] + parent[2] - width));
+        const bottom = Math.max(parent[1], Math.min(position[1], parent[1] + parent[3] - height));
+        return [left, bottom, width, height];
+    }
+    positionAxis(host, axis, index, count) {
+        const position = this.axisPosition(axis, index, count);
         host.style.left = `${position[0] * 100}%`;
         host.style.top = `${(1 - position[1] - position[3]) * 100}%`;
         host.style.width = `${position[2] * 100}%`;
@@ -403,7 +418,7 @@ export class MPlotViewer extends EventTarget {
         this.axisTokens.set(axisId, token);
         view.width = Math.max(180, view.host.clientWidth || 640);
         view.height = Math.max(150, view.host.clientHeight || 360);
-        view.margin = compactMargins(view.width, view.height);
+        view.margin = view.axis.role === "inset" ? insetMargins(view.width, view.height) : compactMargins(view.width, view.height);
         const viewport = this.model.viewports.get(axisId) ?? this.model.defaultViewport(view.axis);
         const right = view.width - view.margin.right, bottom = view.height - view.margin.bottom;
         view.x = createScale(view.axis.xscale, viewport.x, [view.margin.left, right]);
@@ -445,18 +460,18 @@ export class MPlotViewer extends EventTarget {
     drawAxes(view) {
         const { left, top, bottom, right } = view.margin, b = view.height - bottom, r = view.width - right;
         const tickCount = Math.max(3, Math.floor((r - left) / 110));
-        for (const tick of view.x.ticks(tickCount)) {
+        for (const [tick, label] of this.axisTicks(view, "x", tickCount)) {
             const px = view.x(tick);
             view.plot.append(svg("line", { x1: px, x2: px, y1: top, y2: b, class: "mplot-grid-line" }));
             const text = svg("text", { x: px, y: b + PLOT_TEXT_SIZE + 5, "text-anchor": "middle", "font-size": PLOT_TEXT_SIZE, class: "mplot-tick" });
-            text.textContent = formatTick(tick, view.axis.xscale);
+            text.textContent = label;
             view.plot.append(text);
         }
-        for (const tick of view.y.ticks(Math.max(3, Math.floor((b - top) / 80)))) {
+        for (const [tick, label] of this.axisTicks(view, "y", Math.max(3, Math.floor((b - top) / 80)))) {
             const py = view.y(tick);
             view.plot.append(svg("line", { x1: left, x2: r, y1: py, y2: py, class: "mplot-grid-line" }));
             const text = svg("text", { x: left - 9, y: py + PLOT_TEXT_SIZE * .34, "text-anchor": "end", "font-size": PLOT_TEXT_SIZE, class: "mplot-tick" });
-            text.textContent = formatTick(tick, view.axis.yscale);
+            text.textContent = label;
             view.plot.append(text);
         }
         view.plot.append(svg("path", { d: `M${left},${top}H${r}V${b}H${left}Z`, fill: "none", class: "mplot-axis-frame" }));
@@ -476,6 +491,17 @@ export class MPlotViewer extends EventTarget {
             view.plot.append(text);
         }
     }
+    axisTicks(view, dimension, count) {
+        const metadata = view.axis.props?.[`${dimension}axis`];
+        const scaleType = dimension === "x" ? view.axis.xscale : view.axis.yscale;
+        const scale = dimension === "x" ? view.x : view.y;
+        if (scaleType === "date" && metadata?.ticks?.length)
+            return metadata.ticks.map((tick, index) => [tick, metadata.ticklabels?.[index] || formatTick(tick, "date", metadata.date_format)]);
+        const ticks = scale.ticks(count);
+        const visibleTicks = scaleType === "symlog" && ticks.length > count && ticks.includes(0) ? [ticks[0], 0, ticks.at(-1)] : ticks;
+        return visibleTicks.map((tick) => [tick, formatTick(tick, scaleType)]);
+    }
+    dateFormat(view, dimension) { return view.axis.props?.[`${dimension}axis`]?.date_format; }
     drawUnknown(group, artist, view, reason = "Renderer not installed") { const box = svg("g", { class: "mplot-unknown" }); box.append(svg("rect", { x: view.margin.left + 8, y: view.margin.top + 8, width: Math.min(220, view.width - view.margin.left - 20), height: 40, rx: 2 })); const text = svg("text", { x: view.margin.left + 16, y: view.margin.top + 25 }); text.textContent = `Unknown: ${artist.type}`; const detail = svg("text", { x: view.margin.left + 16, y: view.margin.top + 40 }); detail.textContent = reason; box.append(text, detail); group.append(box); }
     drawHitArea(view) { const { left, top, bottom, right } = view.margin; view.overlay.append(svg("rect", { x: left, y: top, width: view.width - right - left, height: view.height - bottom - top, class: "mplot-hit" })); }
     bindInteractions(view) {
@@ -519,7 +545,7 @@ export class MPlotViewer extends EventTarget {
     plotBounds(view) { return { left: view.margin.left, right: view.width - view.margin.right, top: view.margin.top, bottom: view.height - view.margin.bottom }; }
     inPlot(view, x, y) { const bounds = this.plotBounds(view); return x >= bounds.left && x <= bounds.right && y >= bounds.top && y <= bounds.bottom; }
     boundToPlot(view, x, y) { const bounds = this.plotBounds(view); return { x: Math.max(bounds.left, Math.min(bounds.right, x)), y: Math.max(bounds.top, Math.min(bounds.bottom, y)) }; }
-    updateCoordinates(view, px, py) { view.readout.textContent = this.inPlot(view, px, py) ? `x ${formatTick(view.x.invert(px), view.axis.xscale)} · y ${formatTick(view.y.invert(py), view.axis.yscale)}` : "x — · y —"; }
+    updateCoordinates(view, px, py) { view.readout.textContent = this.inPlot(view, px, py) ? `x = ${formatTick(view.x.invert(px), view.axis.xscale, this.dateFormat(view, "x"))} · y = ${formatTick(view.y.invert(py), view.axis.yscale, this.dateFormat(view, "y"))}` : "x — · y —"; }
     clearHover(view) { view.host.querySelector(".mplot-tooltip")?.remove(); view.readout.textContent = "x — · y —"; }
     selectRect(view, x0, y0, x1, y1) { const left = Math.min(x0, x1), right = Math.max(x0, x1), top = Math.min(y0, y1), bottom = Math.max(y0, y1), points = []; for (const artist of this.model.document.artists.filter((item) => item.axes_id === view.axis.id)) {
         const data = this.resolvedData.get(artist.id) ?? artist.data;
@@ -545,7 +571,7 @@ export class MPlotViewer extends EventTarget {
         tooltip = document.createElement("div");
         tooltip.className = "mplot-tooltip";
         view.host.append(tooltip);
-    } tooltip.style.left = `${px / view.width * 100}%`; tooltip.style.top = `${py / view.height * 100}%`; tooltip.textContent = `${best.artist.props.label ?? best.artist.id} [${best.index}]  x ${formatTick(best.x, view.axis.xscale)} · y ${formatTick(best.y, view.axis.yscale)}`; }
+    } tooltip.style.left = `${px / view.width * 100}%`; tooltip.style.top = `${py / view.height * 100}%`; const rawLabel = best.artist.props.label; const label = typeof rawLabel === "string" && rawLabel && !rawLabel.startsWith("_") ? `${rawLabel} · ` : ""; tooltip.textContent = `${label}x = ${formatTick(best.x, view.axis.xscale, this.dateFormat(view, "x"))} · y = ${formatTick(best.y, view.axis.yscale, this.dateFormat(view, "y"))}`; }
     project3d(view, x, y, z) {
         const viewport = this.model.viewports.get(view.axis.id), zlim = viewport.z ?? [0, 1];
         const normalize = (value, limits) => (value - limits[0]) / (limits[1] - limits[0] || 1) - 0.5;
@@ -592,7 +618,7 @@ export class MPlotViewer extends EventTarget {
             const view = this.views.get(axisId);
             if (!view?.mounted)
                 continue;
-            const position = view.axis.position ?? inferredPosition((figure?.axisIds.indexOf(axisId) ?? 0), figure?.axisIds.length ?? 1), group = svg("g", { transform: `translate(${position[0] * width} ${(1 - position[1] - position[3]) * height}) scale(${position[2] * width / view.width} ${position[3] * height / view.height})` });
+            const position = this.axisPosition(view.axis, figure?.plotAxisIds.indexOf(axisId) ?? 0, figure?.plotAxisIds.length ?? 1), group = svg("g", { transform: `translate(${position[0] * width} ${(1 - position[1] - position[3]) * height}) scale(${position[2] * width / view.width} ${position[3] * height / view.height})` });
             group.append(...Array.from(view.svg.childNodes).map((node) => node.cloneNode(true)));
             root.append(group);
         }
@@ -657,4 +683,5 @@ const serializeSvg = (element) => new XMLSerializer().serializeToString(element)
 const emptySvg = () => `<svg xmlns="${SVG_NS}"/>`;
 function inferredPosition(index, count) { const columns = Math.ceil(Math.sqrt(count)), rows = Math.ceil(count / columns), gap = .04, width = (1 - gap * (columns + 1)) / columns, height = (1 - gap * (rows + 1)) / rows, column = index % columns, row = Math.floor(index / columns); return [gap + column * (width + gap), gap + (rows - row - 1) * (height + gap), width, height]; }
 function compactMargins(width, height) { const compact = width < 300 || height < 210; return compact ? { left: 62, right: 14, top: 34, bottom: 56 } : { left: 78, right: 20, top: 40, bottom: 74 }; }
+function insetMargins(width, height) { return { left: Math.min(30, width * .2), right: 5, top: 20, bottom: Math.min(26, height * .25) }; }
 //# sourceMappingURL=viewer.js.map

@@ -5,4 +5,4 @@ export interface Scale {
     ticks(count?: number): number[];
 }
 export declare function createScale(type: ScaleType | undefined, domain: [number, number], range: [number, number]): Scale;
-export declare function formatTick(value: number, type?: ScaleType): string;
+export declare function formatTick(value: number, type?: ScaleType, dateFormat?: string): string;

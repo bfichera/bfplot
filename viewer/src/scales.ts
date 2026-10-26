@@ -40,6 +40,12 @@ export function createScale(type: ScaleType = "linear", domain: [number, number]
   const scale = ((value: number) => r0 + ((transform(value) - t0) / span) * (r1 - r0)) as Scale;
   scale.invert = (pixel: number) => untransform(t0 + ((pixel - r0) / (r1 - r0 || 1)) * span);
   scale.ticks = (count = 6) => {
+    if (type === "symlog") {
+      const lo = Math.min(d0, d1), hi = Math.max(d0, d1), largest = Math.max(Math.abs(lo), Math.abs(hi));
+      const powers = Array.from({ length: Math.max(0, Math.floor(Math.log10(largest)) + 1) }, (_, index) => 10 ** index);
+      const ticks = [...powers.map((value) => -value).reverse(), 0, ...powers].filter((value) => value >= lo && value <= hi);
+      return d1 < d0 ? ticks.reverse() : ticks;
+    }
     if (type !== "log") return niceTicks([d0, d1], count);
     const lo = Math.ceil(Math.log10(Math.min(d0, d1)));
     const hi = Math.floor(Math.log10(Math.max(d0, d1)));
@@ -49,8 +55,14 @@ export function createScale(type: ScaleType = "linear", domain: [number, number]
   return scale;
 }
 
-export function formatTick(value: number, type: ScaleType = "linear"): string {
-  if (type === "date") return new Date(value).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric", timeZone: "UTC" });
+export function formatTick(value: number, type: ScaleType = "linear", dateFormat = "%b %d"): string {
+  if (type === "date") {
+    dateFormat ||= "%b %d";
+    const date = new Date(value * 86_400_000);
+    const monthShort = new Intl.DateTimeFormat(undefined, { month: "short", timeZone: "UTC" }).format(date);
+    const replacements: Record<string, string> = { "%Y": String(date.getUTCFullYear()), "%m": String(date.getUTCMonth() + 1).padStart(2, "0"), "%b": monthShort, "%d": String(date.getUTCDate()).padStart(2, "0") };
+    return Object.entries(replacements).reduce((text, [token, replacement]) => text.replaceAll(token, replacement), dateFormat);
+  }
   const magnitude = Math.abs(value);
   if ((magnitude !== 0 && magnitude < 1e-3) || magnitude >= 1e5) return value.toExponential(2);
   return new Intl.NumberFormat(undefined, { maximumSignificantDigits: 6 }).format(value);

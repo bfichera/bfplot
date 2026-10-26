@@ -68,6 +68,28 @@ describe("MPlotViewer", () => {
     viewer.destroy();
   });
 
+  it("constrains insets to their parent and excludes them from plot counts", async () => {
+    const host = window.document.createElement("div");
+    window.document.body.append(host);
+    const withInset: MPlotDocument = {
+      ...document,
+      figures: [{ id: "f", title: "Results", axes: ["a", "i"] }],
+      axes: [
+        { ...document.axes[0]!, position: [.1, .1, .7, .7] },
+        { id: "i", figure_id: "f", role: "inset", parent_axes_id: "a", position: [.7, .6, .2, .2], xlim: [0, 1], ylim: [0, 1] },
+      ],
+    };
+    const viewer = new MPlotViewer(host, withInset);
+    await viewer.render();
+    expect(host.querySelector(".mplot-figure-count")?.textContent).toBe("1 plot");
+    const inset = host.querySelector<HTMLElement>('[data-axes-id="i"]')!;
+    expect(inset.classList.contains("mplot-axis--inset")).toBe(true);
+    expect(parseFloat(inset.style.left)).toBeCloseTo(60);
+    expect(parseFloat(inset.style.width)).toBeCloseTo(20);
+    expect(inset.querySelector(".mplot-coordinates")?.hasAttribute("hidden")).toBe(true);
+    viewer.destroy();
+  });
+
   it("shows a visible rectangle while box zooming", async () => {
     const host = window.document.createElement("div");
     window.document.body.append(host);
@@ -83,14 +105,18 @@ describe("MPlotViewer", () => {
     viewer.destroy();
   });
 
-  it("updates the coordinate readout while hovering", async () => {
+  it("updates coordinates and sanitizes private hover labels", async () => {
     const host = window.document.createElement("div");
     window.document.body.append(host);
-    const viewer = new MPlotViewer(host, document);
+    const hoverDocument: MPlotDocument = { ...document, artists: [{ ...document.artists[0]!, props: { label: "_child0" } }] };
+    const viewer = new MPlotViewer(host, hoverDocument);
     await viewer.render();
     const chart = host.querySelector<SVGSVGElement>(".mplot-axis svg")!;
-    chart.dispatchEvent(pointer("pointermove", { bubbles: true, clientX: 200, clientY: 150 }));
-    expect(host.querySelector(".mplot-coordinates")?.textContent).toMatch(/^x .+ · y .+$/);
+    chart.dispatchEvent(pointer("pointermove", { bubbles: true, clientX: 349, clientY: 163 }));
+    expect(host.querySelector(".mplot-coordinates")?.textContent).toMatch(/^x = .+ · y = .+$/);
+    const tooltip = host.querySelector(".mplot-tooltip")?.textContent;
+    expect(tooltip).toMatch(/^x = .+ · y = .+$/);
+    expect(tooltip).not.toContain("_child0");
     viewer.destroy();
   });
 

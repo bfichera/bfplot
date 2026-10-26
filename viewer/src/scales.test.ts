@@ -13,12 +13,13 @@ describe("scales", () => {
     const log = createScale("log", [1, 100], [0, 2]);
     expect(log(10)).toBeCloseTo(1);
     expect(log.invert(1)).toBeCloseTo(10);
-    const symlog = createScale("symlog", [-10, 10], [0, 100]);
+    const symlog = createScale("symlog", [-1_000, 1_000], [0, 100]);
     expect(symlog(0)).toBeCloseTo(50);
+    expect(symlog.ticks()).toEqual([-1_000, -100, -10, -1, 0, 1, 10, 100, 1_000]);
   });
 
   it("formats scientific and date ticks", () => {
     expect(formatTick(1e8)).toContain("e+");
-    expect(formatTick(0, "date")).toMatch(/1970|Jan/);
+    expect(formatTick(20_454, "date", "%b %d")).toBe("Jan 01");
   });
 });

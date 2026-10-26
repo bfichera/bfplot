@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from typing import Any
 
 import matplotlib
+import matplotlib.dates as mdates
 import numpy as np
 from matplotlib import colors
 from matplotlib.artist import Artist
@@ -46,7 +47,7 @@ def _common(artist: Artist) -> dict[str, Any]:
         "visible": bool(artist.get_visible()),
         "alpha": _finite(artist.get_alpha()),
         "zorder": _finite(artist.get_zorder()),
-        "label": artist.get_label() if hasattr(artist, "get_label") else None,
+        "label": (lambda label: label if isinstance(label, str) and not label.startswith("_") else None)(artist.get_label()) if hasattr(artist, "get_label") else None,
     }
     return result
 
@@ -98,9 +99,38 @@ def _extract_figure(figure: Any, figure_id: str, context: ExtractionContext) -> 
         "facecolor": _color(figure.get_facecolor()),
         "axes": [],
     }
+    subplot_axes = {id(axes) for axes in figure.axes if _has_subplotspec(axes)}
     for index, axes in enumerate(figure.axes):
-        result["axes"].append(_extract_axes(axes, f"{figure_id}-axes-{index}", context))
+        extracted_axes = _extract_axes(axes, f"{figure_id}-axes-{index}", context)
+        if id(axes) not in subplot_axes and extracted_axes.get("role") != "colorbar":
+            parent = _inset_parent(axes, figure.axes, subplot_axes)
+            if parent is not None:
+                extracted_axes["role"] = "inset"
+                extracted_axes["parent_axes_id"] = f"{figure_id}-axes-{figure.axes.index(parent)}"
+        result["axes"].append(extracted_axes)
     return result
+
+
+def _has_subplotspec(axes: Any) -> bool:
+    try:
+        return axes.get_subplotspec() is not None
+    except (AttributeError, TypeError):
+        return False
+
+
+def _inset_parent(axes: Any, candidates: list[Any], subplot_axes: set[int]) -> Any | None:
+    left, bottom, width, height = axes.get_position().bounds
+    center = (left + width / 2, bottom + height / 2)
+    parents = []
+    for candidate in candidates:
+        if id(candidate) not in subplot_axes:
+            continue
+        candidate_left, candidate_bottom, candidate_width, candidate_height = candidate.get_position().bounds
+        if candidate_left <= center[0] <= candidate_left + candidate_width and candidate_bottom <= center[1] <= candidate_bottom + candidate_height:
+            overlap_width = max(0.0, min(left + width, candidate_left + candidate_width) - max(left, candidate_left))
+            overlap_height = max(0.0, min(bottom + height, candidate_bottom + candidate_height) - max(bottom, candidate_bottom))
+            parents.append((overlap_width * overlap_height, candidate))
+    return max(parents, key=lambda item: item[0])[1] if parents else None
 
 
 def _extract_axes(axes: Any, axes_id: str, context: ExtractionContext) -> dict[str, Any]:
@@ -176,14 +206,21 @@ def _extract_axes(axes: Any, axes_id: str, context: ExtractionContext) -> dict[s
 def _axis(axes: Any, name: str) -> dict[str, Any]:
     axis = getattr(axes, f"{name}axis")
     lower, upper = getattr(axes, f"get_{name}lim")()
-    return {
+    converter = axis.get_converter() if hasattr(axis, "get_converter") else getattr(axis, "_converter", None)
+    is_date = isinstance(converter, mdates.DateConverter) or isinstance(axis.get_major_locator(), mdates.DateLocator)
+    formatter = axis.get_major_formatter()
+    result = {
         "label": axis.get_label_text(),
-        "scale": getattr(axes, f"get_{name}scale")(),
+        "scale": "date" if is_date else getattr(axes, f"get_{name}scale")(),
         "limits": [_finite(lower), _finite(upper)],
         "inverted": bool(getattr(axes, f"{name}axis_inverted")()),
         "ticks": [_finite(item) for item in axis.get_ticklocs()],
         "ticklabels": [item.get_text() for item in axis.get_ticklabels()],
     }
+    if is_date:
+        result["date_epoch"] = "matplotlib"
+        result["date_format"] = getattr(formatter, "fmt", None) or "%b %d"
+    return result
 
 
 def _extract_container(container: Any, axes_id: str, context: ExtractionContext) -> tuple[dict[str, Any] | None, list[Any]]:
@@ -222,7 +259,7 @@ def _extract_container(container: Any, axes_id: str, context: ExtractionContext)
 def _extract_artist(artist: Any, axes_id: str, context: ExtractionContext, is_3d: bool) -> dict[str, Any] | None:
     class_name = artist.__class__.__name__
     if isinstance(artist, Line2D) and artist.axes is not None:
-        x, y = artist.get_data()
+        x, y = artist.get_data(orig=False)
         if is_3d and hasattr(artist, "get_data_3d"):
             x, y, z = artist.get_data_3d()
             return context.artist("mplot.line3d", axes_id, _line_props(artist), {"x": context.array(x), "y": context.array(y), "z": context.array(z)})

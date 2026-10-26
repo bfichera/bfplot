@@ -43,17 +43,23 @@ function normalizeAxis(rawValue: unknown, figureId: string): Axis {
   } : undefined;
   return {
     id: text(source.id), figure_id: figureId,
-    ...(source.role === "colorbar" && colorbar ? { role: "colorbar" as const, colorbar } : {}),
+    ...(source.role === "colorbar" && colorbar ? { role: "colorbar" as const, colorbar } : source.role === "inset" ? { role: "inset" as const } : {}),
+    ...(text(source.parent_axes_id) ? { parent_axes_id: text(source.parent_axes_id) } : {}),
     ...(text(source.title) ? { title: text(source.title) } : {}),
-    ...(text(x.label) ? { xlabel: text(x.label) } : {}),
-    ...(text(y.label) ? { ylabel: text(y.label) } : {}),
-    ...(text(z.label) ? { zlabel: text(z.label) } : {}),
+    ...(text(source.xlabel ?? x.label) ? { xlabel: text(source.xlabel ?? x.label) } : {}),
+    ...(text(source.ylabel ?? y.label) ? { ylabel: text(source.ylabel ?? y.label) } : {}),
+    ...(text(source.zlabel ?? z.label) ? { zlabel: text(source.zlabel ?? z.label) } : {}),
     ...(xlim ? { xlim } : {}),
     ...(ylim ? { ylim } : {}),
     ...(zlim ? { zlim } : {}),
-    xscale: scale(x.scale), yscale: scale(y.scale), zscale: scale(z.scale), projection,
+    xscale: scale(source.xscale ?? x.scale), yscale: scale(source.yscale ?? y.scale), zscale: scale(source.zscale ?? z.scale), projection,
     ...(position ? { position } : {}),
-    props: { ...normalizeProps(props), ...(source.view && typeof source.view === "object" ? { view: source.view } : {}) },
+    props: {
+      ...normalizeProps(props),
+      ...(source.view && typeof source.view === "object" ? { view: source.view } : {}),
+      xaxis: { ticks: list(source.xticks ?? x.ticks).map(Number), ticklabels: list(source.xticklabels ?? x.ticklabels).map(String), date_epoch: text(source.xdate_epoch ?? x.date_epoch), date_format: text(source.xdate_format ?? x.date_format) },
+      yaxis: { ticks: list(source.yticks ?? y.ticks).map(Number), ticklabels: list(source.yticklabels ?? y.ticklabels).map(String), date_epoch: text(source.ydate_epoch ?? y.date_epoch), date_format: text(source.ydate_format ?? y.date_format) },
+    },
   };
 }
 

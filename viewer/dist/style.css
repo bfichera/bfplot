@@ -195,6 +195,7 @@
 .mplot-figure-canvas { position: relative; width: 100%; aspect-ratio: var(--mplot-figure-ratio, 1.333); min-height: 320px; }
 
 .mplot-axis { position: absolute; min-width: 0; min-height: 0; padding: 0; border: 0; touch-action: none; }
+.mplot-axis--inset { z-index: 2; overflow: hidden; background: #fff; }
 .mplot-axis--pending { display: grid; place-items: center; background: #fafaf8; }
 .mplot-axis-placeholder { color: var(--mplot-muted); font-size: 12px; font-style: italic; }
 

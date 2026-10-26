@@ -420,7 +420,15 @@ fn normalize_python_axes(axes: &mut serde_json::Map<String, serde_json::Value>) 
         let Some(serde_json::Value::Object(axis)) = axes.remove(dimension) else {
             continue;
         };
-        for (source, suffix) in [("label", "label"), ("scale", "scale"), ("limits", "lim")] {
+        for (source, suffix) in [
+            ("label", "label"),
+            ("scale", "scale"),
+            ("limits", "lim"),
+            ("ticks", "ticks"),
+            ("ticklabels", "ticklabels"),
+            ("date_epoch", "date_epoch"),
+            ("date_format", "date_format"),
+        ] {
             if let Some(value) = axis.get(source) {
                 axes.insert(format!("{dimension}{suffix}"), value.clone());
             }

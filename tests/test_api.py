@@ -9,7 +9,9 @@ import zstandard as zstd
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
+import matplotlib.dates as mdates
 import numpy as np
+from datetime import datetime, timedelta
 
 import mplot
 
@@ -78,6 +80,25 @@ def test_savefig_marks_colorbars_as_auxiliary_axes(tmp_path):
     assert colorbar["colorbar"]["label"] == "intensity"
     assert colorbar["colorbar"]["limits"] == [0, 8]
     assert len(colorbar["colorbar"]["colors"]) == 64
+
+
+def test_savefig_preserves_dates_insets_and_public_labels(tmp_path):
+    figure, axes = plt.subplots()
+    dates = [datetime(2026, 1, 1) + timedelta(days=index) for index in range(3)]
+    axes.plot(dates, [1, 2, 3])
+    axes.xaxis.set_major_formatter(mdates.DateFormatter("%b %d"))
+    inset = figure.add_axes([.6, .6, .2, .2])
+    inset.plot([0, 1], [0, 1], label="_child0")
+
+    output = mplot.savefig(tmp_path / "semantic-axes", figure, provenance=False)
+    _, document = _document_from_split(output)
+    primary, extracted_inset = document["figures"][0]["axes"]
+    assert primary["x"]["scale"] == "date"
+    assert primary["x"]["date_format"] == "%b %d"
+    assert primary["x"]["ticklabels"]
+    assert extracted_inset["role"] == "inset"
+    assert extracted_inset["parent_axes_id"] == primary["id"]
+    assert extracted_inset["artists"][0]["props"]["label"] is None
 
 
 def test_savefig_preserves_true_3d_surface_and_wire_geometry(tmp_path):

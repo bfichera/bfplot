@@ -37,6 +37,7 @@ export declare class MPlotViewer extends EventTarget {
     private createFigure;
     private createColorbar;
     private createAxis;
+    private axisPosition;
     private positionAxis;
     private mountAxis;
     private refitAxis;
@@ -50,6 +51,8 @@ export declare class MPlotViewer extends EventTarget {
     private renderAxis;
     private renderAxisNow;
     private drawAxes;
+    private axisTicks;
+    private dateFormat;
     private drawUnknown;
     private drawHitArea;
     private bindInteractions;

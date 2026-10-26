@@ -35,7 +35,8 @@ export interface Colorbar {
 export interface Axis {
   id: string;
   figure_id?: string;
-  role?: "plot" | "colorbar";
+  role?: "plot" | "colorbar" | "inset";
+  parent_axes_id?: string;
   colorbar?: Colorbar;
   title?: string;
   xlabel?: string;
