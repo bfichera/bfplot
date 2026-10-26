@@ -98,10 +98,22 @@
 }
 
 .mplot-button { padding: 5px 2px; }
-.mplot-button:hover, .mplot-page-step:hover:not(:disabled) { color: var(--mplot-accent); }
+.mplot-button:disabled { cursor: default; opacity: .45; }
+.mplot-button:hover:not(:disabled), .mplot-page-step:hover:not(:disabled) { color: var(--mplot-accent); }
 .mplot-button[aria-pressed=true] { color: var(--mplot-accent); font-weight: 700; }
 .mplot-button[aria-pressed=true]::before { content: "· "; }
 .mplot-button:focus-visible, .mplot-page-button:focus-visible, .mplot-page-step:focus-visible, .mplot-export-scope:focus-visible { outline: 1px solid var(--mplot-accent); outline-offset: 2px; }
+
+.mplot-comparison-status {
+  display: none;
+  grid-column: 1 / -1;
+  min-height: 26px;
+  color: var(--mplot-muted);
+  font: italic 10px/1.3 "CMU Serif", serif;
+}
+.mplot-open-comparison { display: none; grid-column: 1 / -1; }
+.mplot-compare-mode .mplot-comparison-status,
+.mplot-compare-mode .mplot-open-comparison { display: block; }
 
 .mplot-export-scope {
   grid-column: 1 / -1;
@@ -207,6 +219,21 @@
 .mplot-figure-canvas { position: relative; width: 100%; aspect-ratio: var(--mplot-figure-ratio, 1.333); min-height: 320px; }
 
 .mplot-axis { position: absolute; min-width: 0; min-height: 0; padding: 0; border: 0; touch-action: none; }
+.mplot-comparison-close { position: absolute; right: 0; }
+.mplot-comparison-page[hidden] { display: none; }
+.mplot-comparison-axis { position: absolute; }
+.mplot-compare-mode .mplot-hit { pointer-events: none; }
+.mplot-comparable-line { pointer-events: none; }
+.mplot-compare-mode .mplot-comparable-line { cursor: pointer; pointer-events: all; }
+.mplot-line-hit { pointer-events: none; }
+.mplot-compare-mode .mplot-line-hit { pointer-events: stroke; }
+.mplot-comparable-line:focus-visible { outline: none; }
+.mplot-compare-mode .mplot-comparable-line:hover path:not(.mplot-line-hit),
+.mplot-comparable-line:focus-visible path:not(.mplot-line-hit) { filter: drop-shadow(0 0 2px var(--mplot-accent)); }
+.mplot-comparable-line.mplot-line-selected path:not(.mplot-line-hit) {
+  filter: drop-shadow(0 0 2px var(--mplot-accent));
+  stroke-width: calc(var(--mplot-selected-width, 1px) + 2px);
+}
 .mplot-axis--inset { z-index: 2; overflow: hidden; background: #fff; }
 .mplot-axis--pending { display: grid; place-items: center; background: #fafaf8; }
 .mplot-axis-placeholder { color: var(--mplot-muted); font-size: 12px; font-style: italic; }

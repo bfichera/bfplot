@@ -1,3 +1,4 @@
+import { fitLineViewport, LineComparison } from "./comparison.js";
 import { plotText } from "./math.js";
 import { ViewerModel } from "./model.js";
 import { builtinRenderers, PLOT_TEXT_SIZE, type ArtistRenderer, type RenderContext } from "./renderers.js";
@@ -44,6 +45,11 @@ export class MPlotViewer extends EventTarget {
   private cameras = new Map<string, { elev: number; azim: number; roll: number; zoom: number }>();
   private contrastLimits = new Map<string, [number, number]>();
   private readonly metadataPageId = "__metadata__";
+  private readonly comparisonPageId = "__comparison__";
+  private readonly comparisonAxisId = "__comparison-axis__";
+  private readonly comparison = new LineComparison();
+  private compareMode = false;
+  private comparisonElement: HTMLElement | undefined;
   private readonly timeline: TimelinePlayer;
 
   constructor(target: HTMLElement, document: MPlotDocument, options: ViewerOptions = {}) {
@@ -86,6 +92,9 @@ export class MPlotViewer extends EventTarget {
   }
 
   update(document: MPlotDocument): void {
+    this.comparison.clear();
+    this.compareMode = false;
+    this.activeFigureIdValue = undefined;
     this.timeline.setDocument(document);
     this.model.setDocument(document);
   }
@@ -98,7 +107,12 @@ export class MPlotViewer extends EventTarget {
   }
 
   reset(axisId?: string): void {
-    const resetView = (view: AxisView) => { for (const artist of this.model.document.artists.filter((candidate) => candidate.axes_id === view.axis.id)) this.contrastLimits.delete(artist.id); if (view.axis.projection === "3d") { this.cameras.delete(view.axis.id); void this.renderAxis(view.axis.id); } else void this.refitAxis(view.axis.id); };
+    const resetView = (view: AxisView) => {
+      if (view.axis.id === this.comparisonAxisId) { void this.renderComparison(); return; }
+      for (const artist of this.model.document.artists.filter((candidate) => candidate.axes_id === view.axis.id)) this.contrastLimits.delete(artist.id);
+      if (view.axis.projection === "3d") { this.cameras.delete(view.axis.id); void this.renderAxis(view.axis.id); }
+      else void this.refitAxis(view.axis.id);
+    };
     if (axisId) { const view = this.views.get(axisId); if (view) resetView(view); return; }
     for (const view of this.views.values()) if (view.mounted) resetView(view);
   }
@@ -135,7 +149,14 @@ export class MPlotViewer extends EventTarget {
     title.textContent = this.model.document.title ?? "MPlot";
     header.append(title);
     if (this.options.toolbar !== false) header.append(this.createToolbar());
-    if (this.activeFigureIdValue !== this.metadataPageId && !this.model.document.figures.some((figure) => figure.id === this.activeFigureIdValue)) this.activeFigureIdValue = this.model.document.figures[0]?.id;
+    if (
+      this.activeFigureIdValue !== this.metadataPageId
+      && this.activeFigureIdValue !== this.comparisonPageId
+      && !this.model.document.figures.some((figure) => figure.id === this.activeFigureIdValue)
+    ) this.activeFigureIdValue = this.model.document.figures[0]?.id;
+    if (this.activeFigureIdValue === this.comparisonPageId && !this.comparison.open) {
+      this.activeFigureIdValue = this.model.document.figures[0]?.id;
+    }
     header.append(this.createNavigator());
     const timelineControls = this.timeline.createControls();
     if (timelineControls) header.append(timelineControls);
@@ -147,6 +168,9 @@ export class MPlotViewer extends EventTarget {
     const immediateMounts: Promise<void>[] = [];
     const metadataPage = this.createMetadataPage();
     metadataPage.hidden = this.activeFigureIdValue !== this.metadataPageId;
+    const comparisonPage = this.comparison.open ? this.createComparisonPage() : undefined;
+    if (comparisonPage) comparisonPage.hidden = this.activeFigureIdValue !== this.comparisonPageId;
+    this.comparisonElement = comparisonPage;
     for (const [figureIndex, figure] of this.model.document.figures.entries()) {
       const figureView = this.createFigure(figure, figureIndex);
       this.figures.set(figure.id, figureView);
@@ -171,9 +195,11 @@ export class MPlotViewer extends EventTarget {
       }
     }
     figuresElement.append(metadataPage);
+    if (comparisonPage) figuresElement.append(comparisonPage);
     if (token !== this.documentToken) return;
     await Promise.all(immediateMounts);
-    if (this.activeFigureIdValue) await this.mountFigure(this.activeFigureIdValue);
+    if (this.activeFigureIdValue === this.comparisonPageId) await this.renderComparison();
+    else if (this.activeFigureIdValue) await this.mountFigure(this.activeFigureIdValue);
   }
 
   private createFigure(figure: Figure, index: number): FigureView {
@@ -365,6 +391,7 @@ export class MPlotViewer extends EventTarget {
     pages.className = "mplot-page-list";
     const pageEntries = [
       ...this.model.document.figures.map((figure, index) => ({ id: figure.id, number: String(index + 1).padStart(2, "0"), name: figure.title ?? `Figure ${index + 1}` })),
+      ...(this.comparison.open ? [{ id: this.comparisonPageId, number: "↔", name: "Comparison" }] : []),
       { id: this.metadataPageId, number: "—", name: "Metadata" },
     ];
     pageEntries.forEach((page) => {
@@ -372,7 +399,7 @@ export class MPlotViewer extends EventTarget {
       const number = document.createElement("span"), name = document.createElement("span");
       number.className = "mplot-page-number"; number.textContent = page.number;
       name.className = "mplot-page-name"; name.textContent = page.name;
-      button.type = "button"; button.className = "mplot-page-button"; button.dataset.pageId = page.id; if (page.id !== this.metadataPageId) button.dataset.figureId = page.id; button.append(number, name);
+      button.type = "button"; button.className = "mplot-page-button"; button.dataset.pageId = page.id; if (!page.id.startsWith("__")) button.dataset.figureId = page.id; button.append(number, name);
       button.title = page.name; button.setAttribute("aria-label", `Show ${page.name}`);
       button.onclick = () => void this.showPage(page.id);
       pages.append(button);
@@ -388,33 +415,123 @@ export class MPlotViewer extends EventTarget {
 
   private async showPage(pageId: string): Promise<void> {
     if (pageId !== this.activeFigureIdValue) this.timeline.pause();
-    if (pageId !== this.metadataPageId && !this.figures.has(pageId)) return;
+    if (pageId === this.comparisonPageId && !this.comparison.open) return;
+    if (![this.metadataPageId, this.comparisonPageId].includes(pageId) && !this.figures.has(pageId)) return;
     this.activeFigureIdValue = pageId;
     for (const [id, figure] of this.figures) figure.element.hidden = id !== pageId;
     const metadata = this.element.querySelector<HTMLElement>(".mplot-metadata-page");
     if (metadata) metadata.hidden = pageId !== this.metadataPageId;
-    if (pageId !== this.metadataPageId) {
+    if (this.comparisonElement) this.comparisonElement.hidden = pageId !== this.comparisonPageId;
+    if (pageId === this.comparisonPageId) {
+      this.activeAxisId = this.comparisonAxisId;
+      await this.renderComparison();
+    } else if (pageId !== this.metadataPageId) {
       const firstAxis = this.figures.get(pageId)?.axisIds[0];
       if (firstAxis) { this.activeAxisId = firstAxis; this.markActiveAxis(); }
     }
     this.updateNavigator();
-    if (pageId !== this.metadataPageId) await this.mountFigure(pageId);
+    if (![this.metadataPageId, this.comparisonPageId].includes(pageId)) await this.mountFigure(pageId);
   }
 
   private async showFigure(figureId: string): Promise<void> { await this.showPage(figureId); }
 
   private stepFigure(offset: number): void {
-    const pages = [...this.model.document.figures.map((figure) => figure.id), this.metadataPageId];
+    const pages = this.pageIds();
     const current = Math.max(0, pages.indexOf(this.activeFigureIdValue ?? ""));
     const next = pages[current + offset]; if (next) void this.showPage(next);
   }
 
   private updateNavigator(): void {
-    const pages = [...this.model.document.figures.map((figure) => figure.id), this.metadataPageId], index = pages.indexOf(this.activeFigureIdValue ?? "");
+    const pages = this.pageIds(), index = pages.indexOf(this.activeFigureIdValue ?? "");
     this.element.querySelectorAll<HTMLButtonElement>(".mplot-page-list [data-page-id]").forEach((button) => button.setAttribute("aria-current", button.dataset.pageId === this.activeFigureIdValue ? "page" : "false"));
     const previous = this.element.querySelector<HTMLButtonElement>('[aria-label="Previous figure"]'), next = this.element.querySelector<HTMLButtonElement>('[aria-label="Next figure"]');
     if (previous) previous.disabled = index <= 0;
     if (next) next.disabled = index < 0 || index >= pages.length - 1;
+  }
+
+  private pageIds(): string[] {
+    return [
+      ...this.model.document.figures.map((figure) => figure.id),
+      ...(this.comparison.open ? [this.comparisonPageId] : []),
+      this.metadataPageId,
+    ];
+  }
+
+  private createComparisonPage(): HTMLElement {
+    const page = document.createElement("section");
+    page.className = "mplot-comparison-page";
+    page.dataset.figureId = this.comparisonPageId;
+
+    const heading = document.createElement("header");
+    heading.className = "mplot-figure-header";
+    const title = document.createElement("h2");
+    title.className = "mplot-figure-title";
+    title.textContent = "Line comparison";
+    const close = document.createElement("button");
+    close.type = "button";
+    close.className = "mplot-button mplot-comparison-close";
+    close.textContent = "Close comparison";
+    close.onclick = () => this.closeComparison();
+    heading.append(title, close);
+
+    const canvas = document.createElement("div");
+    canvas.className = "mplot-figure-canvas mplot-comparison-canvas";
+    canvas.style.setProperty("--mplot-figure-ratio", "1.6");
+    page.append(heading, canvas);
+    return page;
+  }
+
+  private async renderComparison(): Promise<void> {
+    if (!this.comparison.open || !this.comparisonElement) return;
+    const artists = this.comparison.artists(this.model.document);
+    const sourceAxis = this.comparison.sourceAxis(this.model.document);
+    if (!artists.length || !sourceAxis) return;
+
+    let view = this.views.get(this.comparisonAxisId);
+    if (!view) {
+      const axis: Axis = {
+        id: this.comparisonAxisId,
+        title: "Selected lines",
+        ...(sourceAxis.xlabel ? { xlabel: sourceAxis.xlabel } : {}),
+        ...(sourceAxis.ylabel ? { ylabel: sourceAxis.ylabel } : {}),
+        xscale: sourceAxis.xscale ?? "linear",
+        yscale: sourceAxis.yscale ?? "linear",
+      };
+      view = this.createAxis(axis, this.comparisonPageId);
+      view.host.classList.add("mplot-comparison-axis");
+      view.host.style.inset = "0";
+      view.host.style.width = "100%";
+      view.host.style.height = "100%";
+      this.comparisonElement.querySelector(".mplot-comparison-canvas")?.append(view.host);
+      this.views.set(this.comparisonAxisId, view);
+      view.mounted = true;
+      view.host.classList.remove("mplot-axis--pending");
+      view.host.replaceChildren(view.svg, view.readout);
+      if (this.options.interactive !== false) this.bindInteractions(view);
+    }
+
+    const data = await Promise.all(artists.map(async (artist) => {
+      const resolved = this.resolvedData.get(artist.id) ?? await this.model.resolveData(artist.data, artist);
+      this.resolvedData.set(artist.id, resolved);
+      return resolved;
+    }));
+    this.model.viewports.set(
+      this.comparisonAxisId,
+      fitLineViewport(data, view.axis.xscale, view.axis.yscale),
+    );
+    await this.renderAxis(this.comparisonAxisId);
+    this.markActiveAxis();
+  }
+
+  private closeComparison(): void {
+    this.comparison.clear();
+    this.compareMode = false;
+    this.element.classList.remove("mplot-compare-mode");
+    this.views.delete(this.comparisonAxisId);
+    this.model.viewports.delete(this.comparisonAxisId);
+    this.activeAxisId = undefined;
+    this.activeFigureIdValue = this.model.document.figures[0]?.id;
+    void this.render();
   }
 
   private createMetadataPage(): HTMLElement {
@@ -477,12 +594,25 @@ export class MPlotViewer extends EventTarget {
     const toolbar = document.createElement("nav");
     toolbar.className = "mplot-toolbar";
     toolbar.setAttribute("aria-label", "Plot tools");
-    const actions: Array<[string, string, () => void]> = [["Pan", "pan", () => this.setMode("pan")], ["Zoom", "zoom", () => this.setMode("zoom")], ["Reset", "reset", () => this.reset()]];
+    const actions: Array<[string, string, () => void]> = [["Pan", "pan", () => this.setMode("pan")], ["Zoom", "zoom", () => this.setMode("zoom")], ["Reset", "reset", () => this.reset()], ["Compare lines", "compare", () => this.toggleCompareMode()]];
     for (const [label, name, action] of actions) {
       const button = document.createElement("button"); button.type = "button"; button.className = "mplot-button"; button.textContent = label; button.dataset.action = name; button.title = label; button.onclick = action;
       if (["pan", "zoom"].includes(name)) button.setAttribute("aria-pressed", String(this.mode === name));
+      if (name === "compare") button.setAttribute("aria-pressed", String(this.compareMode));
       toolbar.append(button);
     }
+    const comparisonStatus = document.createElement("output");
+    comparisonStatus.className = "mplot-comparison-status";
+    comparisonStatus.setAttribute("aria-live", "polite");
+    comparisonStatus.textContent = this.comparison.message;
+    const openComparison = document.createElement("button");
+    openComparison.type = "button";
+    openComparison.className = "mplot-button mplot-open-comparison";
+    openComparison.dataset.action = "open-comparison";
+    openComparison.textContent = "Open comparison";
+    openComparison.disabled = !this.comparison.active;
+    openComparison.onclick = () => void this.openComparison();
+    toolbar.append(comparisonStatus, openComparison);
     const select = document.createElement("select");
     select.className = "mplot-export-scope";
     select.setAttribute("aria-label", "Export scope");
@@ -503,6 +633,53 @@ export class MPlotViewer extends EventTarget {
     this.element.querySelectorAll<HTMLElement>("[data-action]").forEach((button) => {
       if (["pan", "zoom"].includes(button.dataset.action ?? "")) button.setAttribute("aria-pressed", String(button.dataset.action === mode));
     });
+  }
+
+  private toggleCompareMode(): void {
+    this.compareMode = !this.compareMode;
+    this.element.classList.toggle("mplot-compare-mode", this.compareMode);
+    this.element.querySelector<HTMLElement>('[data-action="compare"]')
+      ?.setAttribute("aria-pressed", String(this.compareMode));
+    this.refreshComparisonControls();
+  }
+
+  private configureComparisonTarget(group: SVGGElement, artist: Artist): void {
+    group.classList.add("mplot-comparable-line");
+    group.classList.toggle("mplot-line-selected", this.comparison.selectedIds.has(artist.id));
+    group.setAttribute("role", "button");
+    group.setAttribute("tabindex", "0");
+    group.setAttribute("aria-pressed", String(this.comparison.selectedIds.has(artist.id)));
+    group.setAttribute("aria-label", `Compare ${String(artist.props.label ?? artist.id)}`);
+    const select = (event: Event) => {
+      if (!this.compareMode || this.activeFigureIdValue === this.comparisonPageId) return;
+      event.preventDefault();
+      event.stopPropagation();
+      const result = this.comparison.toggle(this.model.document, artist.id);
+      group.classList.toggle("mplot-line-selected", result.selected);
+      group.setAttribute("aria-pressed", String(result.selected));
+      this.refreshComparisonControls();
+    };
+    group.addEventListener("click", select);
+    group.addEventListener("keydown", (event) => {
+      if (event.key === "Enter" || event.key === " ") select(event);
+    });
+  }
+
+  private refreshComparisonControls(): void {
+    const status = this.element.querySelector<HTMLOutputElement>(".mplot-comparison-status");
+    if (status) status.textContent = this.comparison.message;
+    const open = this.element.querySelector<HTMLButtonElement>(".mplot-open-comparison");
+    if (open) open.disabled = !this.comparison.active;
+  }
+
+  private async openComparison(): Promise<void> {
+    if (!this.comparison.active) return;
+    this.comparison.open = true;
+    this.exportScope = "axis";
+    this.compareMode = false;
+    this.element.classList.remove("mplot-compare-mode");
+    await this.render();
+    await this.showPage(this.comparisonPageId);
   }
 
   private async renderMounted(): Promise<void> { await Promise.all(Array.from(this.views.values()).filter((view) => view.mounted).map((view) => this.renderAxis(view.axis.id))); }
@@ -537,9 +714,13 @@ export class MPlotViewer extends EventTarget {
     this.drawAxes(working);
     const clipId = `mplot-clip-${safeId(view.axis.id)}`, defs = svg("defs"), clip = svg("clipPath", { id: clipId });
     clip.append(svg("rect", { x: view.margin.left, y: view.margin.top, width: right - view.margin.left, height: bottom - view.margin.top })); defs.append(clip); plot.prepend(defs);
-    const artists = this.model.document.artists.filter((artist) => artist.axes_id === axisId && artist.props.visible !== false);
+    const artists = axisId === this.comparisonAxisId
+      ? this.comparison.artists(this.model.document).filter((artist) => artist.props.visible !== false)
+      : this.model.document.artists.filter((artist) => artist.axes_id === axisId && artist.props.visible !== false);
     for (const artist of artists) {
-      const group = svg("g", { "data-artist-id": artist.id, "clip-path": `url(#${clipId})` }); plot.append(group);
+      const group = svg("g", { "data-artist-id": artist.id, "clip-path": `url(#${clipId})` });
+      if (artist.type === "mplot.line") this.configureComparisonTarget(group, artist);
+      plot.append(group);
       const renderer = this.renderers.get(artist.type);
       if (!renderer) { this.drawUnknown(group, artist, working); continue; }
       try {
@@ -549,6 +730,18 @@ export class MPlotViewer extends EventTarget {
         const contrast = this.contrastLimits.get(artist.id);
         const effectiveArtist = contrast ? { ...artist, props: { ...artist.props, clim: contrast } } : artist;
         await renderer({ ...working, group, artist: effectiveArtist, data, theme: this.theme, pointBudget: Math.max(500, Math.round(view.width * 4)), project3d: (x, y, z) => this.project3d(view, x, y, z) } as RenderContext);
+        if (artist.type === "mplot.line" && axisId !== this.comparisonAxisId) {
+          const path = group.querySelector("path");
+          if (path) {
+            const hitTarget = path.cloneNode(false) as SVGPathElement;
+            hitTarget.classList.add("mplot-line-hit");
+            hitTarget.removeAttribute("stroke-dasharray");
+            hitTarget.setAttribute("stroke", "transparent");
+            hitTarget.setAttribute("stroke-width", "14");
+            hitTarget.setAttribute("pointer-events", "stroke");
+            group.prepend(hitTarget);
+          }
+        }
       } catch (error) { this.drawUnknown(group, artist, working, error instanceof Error ? error.message : "render failed"); }
     }
     if (documentToken !== this.documentToken || this.views.get(axisId) !== view || view.figureId !== this.activeFigureIdValue || this.axisTokens.get(axisId) !== token) return;

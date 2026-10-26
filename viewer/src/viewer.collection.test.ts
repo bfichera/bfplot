@@ -117,6 +117,54 @@ describe("large plot collections", () => {
     } finally { globalThis.IntersectionObserver = originalIntersection; globalThis.ResizeObserver = originalResize; }
   });
 
+  it("selects compatible lines across figures and exports a temporary comparison", async () => {
+    const original = globalThis.IntersectionObserver;
+    try {
+      globalThis.IntersectionObserver = undefined as unknown as typeof IntersectionObserver;
+      const host = document.createElement("div"), viewer = new MPlotViewer(host, manyPlots());
+      await viewer.render();
+
+      host.querySelector<HTMLButtonElement>('[data-action="compare"]')!.click();
+      host.querySelector<SVGGElement>('[data-artist-id="line-0"]')!.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+      host.querySelector<HTMLButtonElement>('[data-figure-id="f2"]')!.click();
+      await vi.waitFor(() => expect(host.querySelector('[data-artist-id="line-2"]')).not.toBeNull());
+      host.querySelector<SVGGElement>('[data-artist-id="line-2"]')!.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+      expect(host.querySelector(".mplot-comparison-status")?.textContent).toContain("2 lines");
+
+      host.querySelector<HTMLButtonElement>(".mplot-open-comparison")!.click();
+      await vi.waitFor(() => expect(host.querySelector(".mplot-comparison-axis svg")).not.toBeNull());
+      expect(host.querySelectorAll(".mplot-comparison-axis [data-artist-id]")).toHaveLength(2);
+      expect(viewer.exportSVG("axis")).toContain('data-artist-id="line-0"');
+      expect(viewer.exportSVG("axis")).toContain('data-artist-id="line-2"');
+      expect(viewer.model.document.artists.map((artist) => artist.axes_id)).toEqual(["a1", "a2", "a3"]);
+
+      host.querySelector<HTMLButtonElement>(".mplot-comparison-close")!.click();
+      await vi.waitFor(() => expect(host.querySelector(".mplot-comparison-page")).toBeNull());
+      expect(host.querySelector('[data-page-id="__comparison__"]')).toBeNull();
+      viewer.destroy();
+    } finally { globalThis.IntersectionObserver = original; }
+  });
+
+  it("rejects lines whose source scale types are incompatible", async () => {
+    const original = globalThis.IntersectionObserver;
+    try {
+      globalThis.IntersectionObserver = undefined as unknown as typeof IntersectionObserver;
+      const incompatible = manyPlots();
+      incompatible.axes[2]!.yscale = "log";
+      incompatible.axes[2]!.ylim = [1, 10];
+      const host = document.createElement("div"), viewer = new MPlotViewer(host, incompatible);
+      await viewer.render();
+      host.querySelector<HTMLButtonElement>('[data-action="compare"]')!.click();
+      host.querySelector<SVGGElement>('[data-artist-id="line-0"]')!.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+      host.querySelector<HTMLButtonElement>('[data-figure-id="f2"]')!.click();
+      await vi.waitFor(() => expect(host.querySelector('[data-artist-id="line-2"]')).not.toBeNull());
+      host.querySelector<SVGGElement>('[data-artist-id="line-2"]')!.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+      expect(host.querySelector(".mplot-comparison-status")?.textContent).toContain("Cannot compare linear/log");
+      expect(host.querySelector('[data-artist-id="line-2"]')?.getAttribute("aria-pressed")).toBe("false");
+      viewer.destroy();
+    } finally { globalThis.IntersectionObserver = original; }
+  });
+
   it("exports an individual plot, figure layout, or entire artifact", async () => {
     const original = globalThis.IntersectionObserver;
     try {
