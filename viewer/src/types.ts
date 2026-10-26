@@ -69,6 +69,23 @@ export interface AxisLink {
   dimensions?: AxisDimension[];
 }
 
+export interface TimelineUpdate {
+  target_kind: "artist" | "axes" | "figure";
+  target: string;
+  path: string[];
+  value: unknown;
+}
+
+export interface TimelineFrame { time: number; updates: TimelineUpdate[]; }
+
+export interface Timeline {
+  version: 1;
+  fps: number;
+  duration: number;
+  loop?: boolean;
+  frames: TimelineFrame[];
+}
+
 export interface MPlotDocument {
   version?: string;
   title?: string;
@@ -76,6 +93,7 @@ export interface MPlotDocument {
   axes: Axis[];
   artists: Artist[];
   links?: AxisLink[];
+  timeline?: Timeline;
   metadata?: Record<string, unknown>;
 }
 

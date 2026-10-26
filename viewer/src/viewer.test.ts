@@ -182,6 +182,37 @@ describe("MPlotViewer", () => {
     viewer.destroy();
   });
 
+  it("plays, seeks, and steps through temporal artist buffers", async () => {
+    const host = window.document.createElement("div");
+    window.document.body.append(host);
+    const animated: MPlotDocument = {
+      ...document,
+      timeline: {
+        version: 1, fps: 2, duration: 1, loop: false,
+        frames: [
+          { time: .5, updates: [{ target_kind: "artist", target: "line", path: ["data", "y"], value: [4, 2, 0] }] },
+          { time: 1, updates: [{ target_kind: "artist", target: "line", path: ["data", "y"], value: [1, 1, 1] }] },
+        ],
+      },
+    };
+    const viewer = new MPlotViewer(host, animated);
+    await viewer.render();
+    expect(host.querySelector(".mplot-timeline")).not.toBeNull();
+    expect(host.querySelector(".mplot-timeline-time")?.textContent).toBe("0.00 / 1.00 s");
+    host.querySelectorAll<HTMLButtonElement>(".mplot-timeline .mplot-button")[2]!.click();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(host.querySelector(".mplot-timeline-time")?.textContent).toBe("0.50 / 1.00 s");
+    expect(viewer.model.document.artists[0]?.data.y).toEqual([4, 2, 0]);
+    host.querySelectorAll<HTMLButtonElement>(".mplot-timeline .mplot-button")[2]!.click();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(viewer.model.document.artists[0]?.data.y).toEqual([1, 1, 1]);
+    const range = host.querySelector<HTMLInputElement>(".mplot-timeline-range")!;
+    range.value = "0"; range.dispatchEvent(new window.Event("input"));
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(viewer.model.document.artists[0]?.data.y).toEqual([0, 2, 4]);
+    viewer.destroy();
+  });
+
   it("keeps repeated semilog wheel zoom inside the positive domain", async () => {
     const host = window.document.createElement("div");
     window.document.body.append(host);

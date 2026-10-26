@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+import math
 from typing import Any
 
 import numpy as np
@@ -148,6 +149,63 @@ def validate_mir(mir: MirDocument) -> None:
     for mappable in mappable_refs:
         if mappable not in artist_ids:
             errors.append(f"dangling colorbar mappable {mappable!r}")
+
+    timeline = mir.document.get("timeline") if isinstance(mir.document, dict) else None
+    if timeline is not None:
+        if not isinstance(timeline, dict):
+            errors.append("document.timeline must be an object")
+        else:
+            if timeline.get("version") != 1:
+                errors.append("document.timeline.version must be 1")
+            fps, duration, frames = timeline.get("fps"), timeline.get("duration"), timeline.get("frames")
+            if not isinstance(fps, (int, float)) or isinstance(fps, bool) or not math.isfinite(fps) or fps <= 0:
+                errors.append("document.timeline.fps must be a positive finite number")
+            if not isinstance(duration, (int, float)) or isinstance(duration, bool) or not math.isfinite(duration) or duration < 0:
+                errors.append("document.timeline.duration must be a non-negative finite number")
+            if not isinstance(frames, list):
+                errors.append("document.timeline.frames must be an array")
+            else:
+                previous_time = 0.0
+                allowed_paths = {
+                    "artist": {"data", "props"},
+                    "axes": {"title", "x", "y", "z", "view", "bounds", "facecolor"},
+                    "figure": {"title", "size_inches", "dpi", "facecolor"},
+                }
+                targets = {"artist": artist_ids, "axes": axes_ids, "figure": ids - axes_ids - artist_ids}
+                for frame_index, frame in enumerate(frames):
+                    location = f"document.timeline.frames[{frame_index}]"
+                    if not isinstance(frame, dict):
+                        errors.append(f"{location} must be an object")
+                        continue
+                    timestamp = frame.get("time")
+                    if not isinstance(timestamp, (int, float)) or isinstance(timestamp, bool) or not math.isfinite(timestamp) or timestamp <= previous_time:
+                        errors.append(f"{location}.time must be finite and strictly increasing")
+                    else:
+                        previous_time = float(timestamp)
+                    updates = frame.get("updates")
+                    if not isinstance(updates, list):
+                        errors.append(f"{location}.updates must be an array")
+                        continue
+                    for update_index, update in enumerate(updates):
+                        update_location = f"{location}.updates[{update_index}]"
+                        if not isinstance(update, dict):
+                            errors.append(f"{update_location} must be an object")
+                            continue
+                        kind, target, path = update.get("target_kind"), update.get("target"), update.get("path")
+                        if kind not in allowed_paths:
+                            errors.append(f"{update_location}.target_kind is unsupported")
+                        elif target not in targets[kind]:
+                            errors.append(f"{update_location}.target is dangling")
+                        if not isinstance(path, list) or not path or not all(isinstance(item, str) and item for item in path):
+                            errors.append(f"{update_location}.path must be a non-empty string array")
+                        elif kind in allowed_paths and path[0] not in allowed_paths[kind]:
+                            errors.append(f"{update_location}.path is not allowed for {kind}")
+                        if "value" not in update:
+                            errors.append(f"{update_location}.value is required")
+                if isinstance(duration, (int, float)) and frames and previous_time != float(duration):
+                    errors.append("document.timeline.duration must equal the final frame time")
+                if isinstance(duration, (int, float)) and not frames and float(duration) != 0:
+                    errors.append("document.timeline.duration must be zero when there are no frames")
 
     referenced_buffers: set[str] = set()
 

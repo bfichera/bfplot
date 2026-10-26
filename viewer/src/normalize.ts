@@ -1,4 +1,4 @@
-import type { ArrayReference, Artist, Axis, Figure, MPlotDocument, ResolvedData, ScaleType } from "./types.js";
+import type { ArrayReference, Artist, Axis, Figure, MPlotDocument, ResolvedData, ScaleType, Timeline } from "./types.js";
 
 type JsonObject = Record<string, unknown>;
 
@@ -104,9 +104,12 @@ export function normalizeDocument(value: unknown): MPlotDocument {
       artists: artists.length,
     },
   };
+  const timelineRaw = record(raw.timeline);
+  const timeline = timelineRaw.version === 1 && Array.isArray(timelineRaw.frames) ? timelineRaw as unknown as Timeline : undefined;
   return {
     figures, axes, artists,
     links: list(raw.links) as NonNullable<MPlotDocument["links"]>,
+    ...(timeline ? { timeline } : {}),
     ...(text(raw.title) ? { title: text(raw.title) } : {}), metadata: baseline,
   };
 }

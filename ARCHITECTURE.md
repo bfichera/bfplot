@@ -30,6 +30,8 @@ The in-process Python producer uses immutable contiguous NumPy buffers. Other la
 
 MIR validation is mandatory. It checks its version, required processing metadata, unique IDs, axes/artist ownership, parent relationships, colorbar-to-mappable references, and local buffer references. Required processing metadata always includes `created_utc`.
 
+Temporal MIR uses one immutable initial scene plus a restricted timeline of stable-ID updates. Each timestamped update names a figure, axes, or artist target and an allow-listed semantic path such as `["data", "y"]`. Timeline values can reference the same local typed buffers as the initial scene. Arbitrary callbacks and unrestricted JSON Patch operations are not part of the format.
+
 ### Compiler
 
 `src/mplot/lower.py` is the MIR compiler boundary. It validates MIR, encodes each local typed buffer into a compressed content-addressed artifact array, and emits the canonical artifact document. It does not import or understand Matplotlib. No unresolved `$buffer` reference may enter an artifact.

@@ -408,6 +408,7 @@ fn viewer_document(
         "artists": artists,
         "links": document.links,
         "selections": document.selections,
+        "timeline": document.timeline,
         "metadata": {
             "artifact": {
                 "format": manifest.format,

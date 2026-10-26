@@ -195,6 +195,29 @@ mplot.savefig("anonymous_plot", fig, provenance=False)
 
 MPlot 0.9.9 records source and working-directory paths, but it does **not** copy your source code into the artifact. Full Git patches and source snapshots are planned work, not a feature we want to pretend already exists.
 
+## Animated plots
+
+Record changes to an existing Matplotlib figure as one interactive temporal artifact:
+
+```python
+import numpy as np
+import matplotlib.pyplot as plt
+import mplot
+
+x = np.linspace(0, 2 * np.pi, 500)
+fig, ax = plt.subplots()
+line, = ax.plot(x, np.sin(x))
+
+with mplot.animation("wave.mplot", fig, fps=30) as recording:
+    for phase in np.linspace(0, 2 * np.pi, 180, endpoint=False):
+        line.set_ydata(np.sin(x + phase))
+        recording.capture()
+```
+
+The artifact stores one initial scene and timestamped semantic updates rather than complete copies of every figure. Its viewer provides playback, frame stepping, scrubbing, looping, and playback speed. Artists and plot structure must remain stable while recording; update existing artist data, styles, and axes state rather than adding, removing, or hiding Matplotlib objects.
+
+For iterable-driven code, `mplot.save_animation(path, figure, frames, update, fps=...)` provides the same pipeline as a convenience function.
+
 ## Live plots
 
 For an analysis that updates over time, save a sequence of frames:

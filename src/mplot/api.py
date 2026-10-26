@@ -18,6 +18,7 @@ from .lower import lower_mir
 from .mir import MirDocument
 from .provenance import collect_provenance, processing_metadata
 from .store import ContentStore
+from .temporal import Animation
 
 
 def _figures(figure: Figure | Iterable[Figure] | None) -> list[Figure]:
@@ -71,6 +72,53 @@ def compile(
         store = ContentStore(Path(temporary) / "objects")
         artifact_document = lower_mir(document, store)
         return materialize_document(output, artifact_document, document.metadata, store, packed=packed)
+
+
+def animation(
+    path: str | Path,
+    figure: Figure | Iterable[Figure] | None = None,
+    *,
+    fps: float = 30,
+    packed: bool | None = None,
+    provenance: bool | dict[str, Any] = True,
+    loop: bool = True,
+) -> Animation:
+    """Record mutable Matplotlib figures into one temporal MPlot artifact."""
+    metadata = _metadata(provenance)
+
+    def translator(source: Figure | Iterable[Figure] | None, frame_metadata: dict[str, Any]) -> MirDocument:
+        return translate_figures(_figures(source), frame_metadata)
+
+    def compiler(document: MirDocument, output: str | Path, packed_value: bool | None) -> Path:
+        return compile(document, output, packed=packed_value)
+
+    return Animation(
+        path, figure, fps=fps, packed=packed, loop=loop,
+        translator=translator, compiler=compiler, metadata=metadata,
+    )
+
+
+def save_animation(
+    path: str | Path,
+    figure: Figure | Iterable[Figure],
+    frames: Iterable[Any],
+    update: Any,
+    *,
+    fps: float = 30,
+    packed: bool | None = None,
+    provenance: bool | dict[str, Any] = True,
+    loop: bool = True,
+) -> Path:
+    """Apply ``update(frame)`` and capture each resulting Matplotlib state."""
+    recording = animation(path, figure, fps=fps, packed=packed, provenance=provenance, loop=loop)
+    try:
+        for frame in frames:
+            update(frame)
+            recording.capture()
+        return recording.close()
+    except BaseException:
+        recording.abort()
+        raise
 
 
 def savefig(

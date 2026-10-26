@@ -27,7 +27,8 @@
         "schema_version": {"type": "integer", "minimum": 1},
         "figures": {"type": "array", "items": {"$ref": "#/$defs/figure"}},
         "links": {"type": "array"},
-        "selections": {"type": "array"}
+        "selections": {"type": "array"},
+        "timeline": {"$ref": "#/$defs/timeline"}
       },
       "additionalProperties": true
     },
@@ -66,6 +67,38 @@
         "data": {"type": "object"}
       },
       "additionalProperties": true
+    },
+    "timeline": {
+      "type": "object",
+      "required": ["version", "fps", "duration", "frames"],
+      "additionalProperties": false,
+      "properties": {
+        "version": {"const": 1},
+        "fps": {"type": "number", "exclusiveMinimum": 0},
+        "duration": {"type": "number", "minimum": 0},
+        "loop": {"type": "boolean"},
+        "frames": {"type": "array", "items": {"$ref": "#/$defs/timelineFrame"}}
+      }
+    },
+    "timelineFrame": {
+      "type": "object",
+      "required": ["time", "updates"],
+      "additionalProperties": false,
+      "properties": {
+        "time": {"type": "number", "exclusiveMinimum": 0},
+        "updates": {"type": "array", "items": {"$ref": "#/$defs/timelineUpdate"}}
+      }
+    },
+    "timelineUpdate": {
+      "type": "object",
+      "required": ["target_kind", "target", "path", "value"],
+      "additionalProperties": false,
+      "properties": {
+        "target_kind": {"enum": ["artist", "axes", "figure"]},
+        "target": {"type": "string", "minLength": 1},
+        "path": {"type": "array", "minItems": 1, "items": {"type": "string", "minLength": 1}},
+        "value": {}
+      }
     },
     "bufferReference": {
       "type": "object",

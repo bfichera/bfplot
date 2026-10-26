@@ -116,6 +116,19 @@
   font: 400 11px "CMU Serif", serif;
 }
 
+.mplot-timeline {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 5px 8px;
+  order: 3;
+  padding-top: 14px;
+  border-top: 1px solid #deddd7;
+}
+.mplot-timeline-range { grid-column: 1 / -1; width: 100%; accent-color: var(--mplot-accent); }
+.mplot-timeline-time { color: var(--mplot-muted); font-size: 10px; font-style: italic; }
+.mplot-playback-rate { border: 0; border-bottom: 1px solid #aaa79e; background: transparent; color: var(--mplot-muted); font: 10px "CMU Serif", serif; }
+.mplot-header:has(.mplot-timeline) .mplot-toolbar { margin-top: 0; }
+
 .mplot-navigator {
   display: flex;
   min-height: 0;

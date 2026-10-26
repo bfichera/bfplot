@@ -31,6 +31,13 @@ export declare class MPlotViewer extends EventTarget {
     private cameras;
     private contrastLimits;
     private readonly metadataPageId;
+    private initialDocument;
+    private timelineTime;
+    private playing;
+    private playbackRate;
+    private playbackStarted;
+    private playbackOrigin;
+    private animationFrame;
     constructor(target: HTMLElement, document: MPlotDocument, options?: ViewerOptions);
     update(document: MPlotDocument): void;
     setTheme(theme: ThemeName | Partial<Theme>): void;
@@ -52,6 +59,13 @@ export declare class MPlotViewer extends EventTarget {
     private updateNavigator;
     private createMetadataPage;
     private metadataTree;
+    private createTimelineControls;
+    private seek;
+    private applyTimelineUpdate;
+    private play;
+    private pause;
+    private stepTimeline;
+    private updateTimelineControls;
     private createToolbar;
     private setMode;
     private renderMounted;

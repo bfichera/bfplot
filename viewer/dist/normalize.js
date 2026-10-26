@@ -116,9 +116,12 @@ export function normalizeDocument(value) {
             artists: artists.length,
         },
     };
+    const timelineRaw = record(raw.timeline);
+    const timeline = timelineRaw.version === 1 && Array.isArray(timelineRaw.frames) ? timelineRaw : undefined;
     return {
         figures, axes, artists,
         links: list(raw.links),
+        ...(timeline ? { timeline } : {}),
         ...(text(raw.title) ? { title: text(raw.title) } : {}), metadata: baseline,
     };
 }

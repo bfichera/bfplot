@@ -116,6 +116,8 @@ pub struct Document {
     pub links: Vec<Value>,
     #[serde(default)]
     pub selections: Vec<Selection>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub timeline: Option<Timeline>,
     #[serde(default, flatten)]
     pub metadata: BTreeMap<String, Value>,
 }
@@ -127,6 +129,7 @@ impl Default for Document {
             figures: Vec::new(),
             links: Vec::new(),
             selections: Vec::new(),
+            timeline: None,
             metadata: BTreeMap::new(),
         }
     }
@@ -185,6 +188,39 @@ pub struct Selection {
     pub id: String,
     #[serde(flatten)]
     pub value: BTreeMap<String, Value>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Timeline {
+    pub version: u32,
+    pub fps: f64,
+    pub duration: f64,
+    #[serde(default = "default_true")]
+    pub r#loop: bool,
+    #[serde(default)]
+    pub frames: Vec<TimelineFrame>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct TimelineFrame {
+    pub time: f64,
+    #[serde(default)]
+    pub updates: Vec<TimelineUpdate>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct TimelineUpdate {
+    pub target_kind: String,
+    pub target: String,
+    pub path: Vec<String>,
+    pub value: Value,
+}
+
+const fn default_true() -> bool {
+    true
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize)]
@@ -250,6 +286,9 @@ pub fn validate_document(document: &Document) -> Vec<ValidationIssue> {
         }
     }
     let mut ids = HashSet::new();
+    let mut figure_ids = HashSet::new();
+    let mut axes_ids = HashSet::new();
+    let mut artist_ids = HashSet::new();
     for (fi, figure) in document.figures.iter().enumerate() {
         unique_id(
             &mut ids,
@@ -257,6 +296,7 @@ pub fn validate_document(document: &Document) -> Vec<ValidationIssue> {
             format!("figures[{fi}].id"),
             &mut issues,
         );
+        figure_ids.insert(figure.id.as_str());
         for (ai, axes) in figure.axes.iter().enumerate() {
             unique_id(
                 &mut ids,
@@ -264,9 +304,11 @@ pub fn validate_document(document: &Document) -> Vec<ValidationIssue> {
                 format!("figures[{fi}].axes[{ai}].id"),
                 &mut issues,
             );
+            axes_ids.insert(axes.id.as_str());
             for (ri, artist) in axes.artists.iter().enumerate() {
                 let path = format!("figures[{fi}].axes[{ai}].artists[{ri}]");
                 unique_id(&mut ids, &artist.id, format!("{path}.id"), &mut issues);
+                artist_ids.insert(artist.id.as_str());
                 if artist.axes_id != axes.id {
                     issues.push(ValidationIssue::new(
                         format!("{path}.axes_id"),
@@ -293,6 +335,93 @@ pub fn validate_document(document: &Document) -> Vec<ValidationIssue> {
             format!("selections[{i}].id"),
             &mut issues,
         );
+    }
+    if let Some(timeline) = &document.timeline {
+        if timeline.version != 1 {
+            issues.push(ValidationIssue::new("timeline.version", "must be 1"));
+        }
+        if !timeline.fps.is_finite() || timeline.fps <= 0.0 {
+            issues.push(ValidationIssue::new(
+                "timeline.fps",
+                "must be positive and finite",
+            ));
+        }
+        if !timeline.duration.is_finite() || timeline.duration < 0.0 {
+            issues.push(ValidationIssue::new(
+                "timeline.duration",
+                "must be non-negative and finite",
+            ));
+        }
+        let mut previous = 0.0;
+        for (frame_index, frame) in timeline.frames.iter().enumerate() {
+            let path = format!("timeline.frames[{frame_index}]");
+            if !frame.time.is_finite() || frame.time <= previous {
+                issues.push(ValidationIssue::new(
+                    format!("{path}.time"),
+                    "must be finite and strictly increasing",
+                ));
+            }
+            previous = frame.time;
+            for (update_index, update) in frame.updates.iter().enumerate() {
+                let update_path = format!("{path}.updates[{update_index}]");
+                if !matches!(update.target_kind.as_str(), "artist" | "axes" | "figure") {
+                    issues.push(ValidationIssue::new(
+                        format!("{update_path}.target_kind"),
+                        "unsupported target kind",
+                    ));
+                }
+                let target_exists = match update.target_kind.as_str() {
+                    "artist" => artist_ids.contains(update.target.as_str()),
+                    "axes" => axes_ids.contains(update.target.as_str()),
+                    "figure" => figure_ids.contains(update.target.as_str()),
+                    _ => false,
+                };
+                if !target_exists {
+                    issues.push(ValidationIssue::new(
+                        format!("{update_path}.target"),
+                        "dangling target for target kind",
+                    ));
+                }
+                let allowed = match update.target_kind.as_str() {
+                    "artist" => matches!(
+                        update.path.first().map(String::as_str),
+                        Some("data" | "props")
+                    ),
+                    "axes" => matches!(
+                        update.path.first().map(String::as_str),
+                        Some("title" | "x" | "y" | "z" | "view" | "bounds" | "facecolor")
+                    ),
+                    "figure" => matches!(
+                        update.path.first().map(String::as_str),
+                        Some("title" | "size_inches" | "dpi" | "facecolor")
+                    ),
+                    _ => false,
+                };
+                if update.path.is_empty() || update.path.iter().any(String::is_empty) || !allowed {
+                    issues.push(ValidationIssue::new(
+                        format!("{update_path}.path"),
+                        "unsupported update path",
+                    ));
+                }
+                validate_refs(&update.value, &format!("{update_path}.value"), &mut issues);
+            }
+        }
+        if timeline
+            .frames
+            .last()
+            .is_some_and(|frame| frame.time != timeline.duration)
+        {
+            issues.push(ValidationIssue::new(
+                "timeline.duration",
+                "must equal the final frame time",
+            ));
+        }
+        if timeline.frames.is_empty() && timeline.duration != 0.0 {
+            issues.push(ValidationIssue::new(
+                "timeline.duration",
+                "must be zero when there are no frames",
+            ));
+        }
     }
     issues
 }
@@ -330,6 +459,17 @@ fn walk_document_refs(document: &Document, mut f: impl FnMut(&ObjectId, String))
                         &mut f,
                     );
                 }
+            }
+        }
+    }
+    if let Some(timeline) = &document.timeline {
+        for (frame_index, frame) in timeline.frames.iter().enumerate() {
+            for (update_index, update) in frame.updates.iter().enumerate() {
+                walk_refs(
+                    &update.value,
+                    &format!("timeline.frames[{frame_index}].updates[{update_index}].value"),
+                    &mut f,
+                );
             }
         }
     }
@@ -445,6 +585,62 @@ mod tests {
             issues
                 .iter()
                 .any(|issue| issue.message.contains("array reference"))
+        );
+    }
+
+    #[test]
+    fn validates_temporal_updates() {
+        let document = Document {
+            figures: vec![Figure {
+                id: "figure".into(),
+                props: BTreeMap::new(),
+                metadata: BTreeMap::new(),
+                axes: vec![Axes {
+                    id: "axes".into(),
+                    props: BTreeMap::new(),
+                    metadata: BTreeMap::new(),
+                    artists: vec![Artist {
+                        artist_type: "mplot.line".into(),
+                        schema_version: 1,
+                        id: "line".into(),
+                        axes_id: "axes".into(),
+                        props: BTreeMap::new(),
+                        data: BTreeMap::new(),
+                    }],
+                }],
+            }],
+            timeline: Some(Timeline {
+                version: 1,
+                fps: 30.0,
+                duration: 0.5,
+                r#loop: true,
+                frames: vec![TimelineFrame {
+                    time: 0.5,
+                    updates: vec![TimelineUpdate {
+                        target_kind: "artist".into(),
+                        target: "line".into(),
+                        path: vec!["data".into(), "y".into()],
+                        value: json!({"object": "not-a-digest", "dtype": "f8", "shape": [2], "codec": "zstd"}),
+                    }],
+                }],
+            }),
+            ..Document::default()
+        };
+        let issues = validate_document(&document);
+        assert!(
+            issues
+                .iter()
+                .any(|issue| issue.path.contains("timeline.frames[0].updates[0].value"))
+        );
+
+        let mut wrong_kind = document;
+        wrong_kind.timeline.as_mut().unwrap().frames[0].updates[0].target_kind = "axes".into();
+        let issues = validate_document(&wrong_kind);
+        assert!(
+            issues
+                .iter()
+                .any(|issue| issue.path.ends_with(".target")
+                    && issue.message.contains("target kind"))
         );
     }
 
