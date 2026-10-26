@@ -1,11 +1,10 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, field
 import math
+from dataclasses import dataclass, field
 from typing import Any
 
 import numpy as np
-
 
 MIR_VERSION = "1.0"
 _SUPPORTED_DTYPE_KINDS = {"b", "i", "u", "f"}
@@ -70,7 +69,9 @@ class MirBuilder:
         return {"$buffer": buffer_id}
 
     def build(self, document: dict[str, Any]) -> MirDocument:
-        result = MirDocument(document=document, buffers=dict(self._buffers), metadata=dict(self.metadata))
+        result = MirDocument(
+            document=document, buffers=dict(self._buffers), metadata=dict(self.metadata)
+        )
         result.validate()
         return result
 
@@ -140,7 +141,9 @@ def validate_mir(mir: MirDocument) -> None:
                     errors.append(f"{artist_location}.axes_id must reference its containing axes")
                 if not isinstance(artist.get("type"), str):
                     errors.append(f"{artist_location}.type must be a string")
-                if not isinstance(artist.get("props"), dict) or not isinstance(artist.get("data"), dict):
+                if not isinstance(artist.get("props"), dict) or not isinstance(
+                    artist.get("data"), dict
+                ):
                     errors.append(f"{artist_location}.props and .data must be objects")
 
     for parent in parent_refs:
@@ -157,10 +160,24 @@ def validate_mir(mir: MirDocument) -> None:
         else:
             if timeline.get("version") != 1:
                 errors.append("document.timeline.version must be 1")
-            fps, duration, frames = timeline.get("fps"), timeline.get("duration"), timeline.get("frames")
-            if not isinstance(fps, (int, float)) or isinstance(fps, bool) or not math.isfinite(fps) or fps <= 0:
+            fps, duration, frames = (
+                timeline.get("fps"),
+                timeline.get("duration"),
+                timeline.get("frames"),
+            )
+            if (
+                not isinstance(fps, (int, float))
+                or isinstance(fps, bool)
+                or not math.isfinite(fps)
+                or fps <= 0
+            ):
                 errors.append("document.timeline.fps must be a positive finite number")
-            if not isinstance(duration, (int, float)) or isinstance(duration, bool) or not math.isfinite(duration) or duration < 0:
+            if (
+                not isinstance(duration, (int, float))
+                or isinstance(duration, bool)
+                or not math.isfinite(duration)
+                or duration < 0
+            ):
                 errors.append("document.timeline.duration must be a non-negative finite number")
             if not isinstance(frames, list):
                 errors.append("document.timeline.frames must be an array")
@@ -171,14 +188,23 @@ def validate_mir(mir: MirDocument) -> None:
                     "axes": {"title", "x", "y", "z", "view", "bounds", "facecolor"},
                     "figure": {"title", "size_inches", "dpi", "facecolor"},
                 }
-                targets = {"artist": artist_ids, "axes": axes_ids, "figure": ids - axes_ids - artist_ids}
+                targets = {
+                    "artist": artist_ids,
+                    "axes": axes_ids,
+                    "figure": ids - axes_ids - artist_ids,
+                }
                 for frame_index, frame in enumerate(frames):
                     location = f"document.timeline.frames[{frame_index}]"
                     if not isinstance(frame, dict):
                         errors.append(f"{location} must be an object")
                         continue
                     timestamp = frame.get("time")
-                    if not isinstance(timestamp, (int, float)) or isinstance(timestamp, bool) or not math.isfinite(timestamp) or timestamp <= previous_time:
+                    if (
+                        not isinstance(timestamp, (int, float))
+                        or isinstance(timestamp, bool)
+                        or not math.isfinite(timestamp)
+                        or timestamp <= previous_time
+                    ):
                         errors.append(f"{location}.time must be finite and strictly increasing")
                     else:
                         previous_time = float(timestamp)
@@ -191,21 +217,37 @@ def validate_mir(mir: MirDocument) -> None:
                         if not isinstance(update, dict):
                             errors.append(f"{update_location} must be an object")
                             continue
-                        kind, target, path = update.get("target_kind"), update.get("target"), update.get("path")
+                        kind, target, path = (
+                            update.get("target_kind"),
+                            update.get("target"),
+                            update.get("path"),
+                        )
                         if kind not in allowed_paths:
                             errors.append(f"{update_location}.target_kind is unsupported")
                         elif target not in targets[kind]:
                             errors.append(f"{update_location}.target is dangling")
-                        if not isinstance(path, list) or not path or not all(isinstance(item, str) and item for item in path):
-                            errors.append(f"{update_location}.path must be a non-empty string array")
+                        if (
+                            not isinstance(path, list)
+                            or not path
+                            or not all(isinstance(item, str) and item for item in path)
+                        ):
+                            errors.append(
+                                f"{update_location}.path must be a non-empty string array"
+                            )
                         elif kind in allowed_paths and path[0] not in allowed_paths[kind]:
                             errors.append(f"{update_location}.path is not allowed for {kind}")
                         if "value" not in update:
                             errors.append(f"{update_location}.value is required")
-                if isinstance(duration, (int, float)) and frames and previous_time != float(duration):
+                if (
+                    isinstance(duration, (int, float))
+                    and frames
+                    and previous_time != float(duration)
+                ):
                     errors.append("document.timeline.duration must equal the final frame time")
                 if isinstance(duration, (int, float)) and not frames and float(duration) != 0:
-                    errors.append("document.timeline.duration must be zero when there are no frames")
+                    errors.append(
+                        "document.timeline.duration must be zero when there are no frames"
+                    )
 
     referenced_buffers: set[str] = set()
 

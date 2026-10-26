@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import matplotlib
+
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
@@ -16,19 +17,25 @@ def test_mir_buffers_are_owned_immutable_copies() -> None:
     reference = builder.buffer(source)
     document = {
         "schema_version": 1,
-        "figures": [{
-            "id": "figure-0",
-            "axes": [{
-                "id": "axes-0",
-                "artists": [{
-                    "id": "artist-0",
-                    "axes_id": "axes-0",
-                    "type": "mplot.line",
-                    "props": {},
-                    "data": {"x": reference},
-                }],
-            }],
-        }],
+        "figures": [
+            {
+                "id": "figure-0",
+                "axes": [
+                    {
+                        "id": "axes-0",
+                        "artists": [
+                            {
+                                "id": "artist-0",
+                                "axes_id": "axes-0",
+                                "type": "mplot.line",
+                                "props": {},
+                                "data": {"x": reference},
+                            }
+                        ],
+                    }
+                ],
+            }
+        ],
         "links": [],
         "selections": [],
     }
@@ -50,9 +57,16 @@ def test_matplotlib_translation_produces_local_typed_buffers() -> None:
     assert mir.mir_version == "1.0"
     assert mir.metadata["created_utc"] == "2026-01-01T00:00:00Z"
     assert mir.buffers
-    assert all(buffer.array.flags.c_contiguous and not buffer.array.flags.writeable for buffer in mir.buffers.values())
-    plot = next(axis for axis in mir.document["figures"][0]["axes"] if axis.get("role") != "colorbar")
-    colorbar = next(axis for axis in mir.document["figures"][0]["axes"] if axis.get("role") == "colorbar")
+    assert all(
+        buffer.array.flags.c_contiguous and not buffer.array.flags.writeable
+        for buffer in mir.buffers.values()
+    )
+    plot = next(
+        axis for axis in mir.document["figures"][0]["axes"] if axis.get("role") != "colorbar"
+    )
+    colorbar = next(
+        axis for axis in mir.document["figures"][0]["axes"] if axis.get("role") == "colorbar"
+    )
     extracted = next(artist for artist in plot["artists"] if artist["type"] == "mplot.image")
     assert set(extracted["data"]["values"]) == {"$buffer"}
     assert colorbar["colorbar"]["mappable"] == extracted["id"]
@@ -77,20 +91,26 @@ def test_mir_validation_rejects_dangling_buffers_and_references() -> None:
     builder = MirBuilder(metadata={"created_utc": "2026-01-01T00:00:00Z"})
     document = {
         "schema_version": 1,
-        "figures": [{
-            "id": "figure-0",
-            "axes": [{
-                "id": "axes-0",
-                "artists": [{
-                    "id": "artist-0",
-                    "axes_id": "wrong-axes",
-                    "type": "mplot.line",
-                    "props": {},
-                    "data": {"x": {"$buffer": "missing"}},
-                }],
-                "colorbar": {"mappable": "missing-artist"},
-            }],
-        }],
+        "figures": [
+            {
+                "id": "figure-0",
+                "axes": [
+                    {
+                        "id": "axes-0",
+                        "artists": [
+                            {
+                                "id": "artist-0",
+                                "axes_id": "wrong-axes",
+                                "type": "mplot.line",
+                                "props": {},
+                                "data": {"x": {"$buffer": "missing"}},
+                            }
+                        ],
+                        "colorbar": {"mappable": "missing-artist"},
+                    }
+                ],
+            }
+        ],
         "links": [],
         "selections": [],
     }

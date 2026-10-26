@@ -10,8 +10,15 @@ export type * from "./types.js";
 import { MPlotViewer, type ViewerOptions } from "./viewer.js";
 import type { MPlotDocument } from "./types.js";
 
-export function createViewer(target: HTMLElement | string, document: MPlotDocument, options?: ViewerOptions): MPlotViewer {
-  const element = typeof target === "string" ? window.document.querySelector<HTMLElement>(target) : target;
+export function createViewer(
+  target: HTMLElement | string,
+  document: MPlotDocument,
+  options?: ViewerOptions,
+): MPlotViewer {
+  const element =
+    typeof target === "string"
+      ? window.document.querySelector<HTMLElement>(target)
+      : target;
   if (!element) throw new Error(`MPlot target not found: ${String(target)}`);
   return new MPlotViewer(element, document, options);
 }

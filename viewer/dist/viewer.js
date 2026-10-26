@@ -3,6 +3,7 @@ import { ViewerModel } from "./model.js";
 import { builtinRenderers, PLOT_TEXT_SIZE } from "./renderers.js";
 import { createScale, formatTick } from "./scales.js";
 import { resolveTheme } from "./theme.js";
+import { TimelinePlayer } from "./timeline.js";
 import { cssColor, pairs, SVG_NS, svg } from "./svg.js";
 export class MPlotViewer extends EventTarget {
     element;
@@ -27,20 +28,14 @@ export class MPlotViewer extends EventTarget {
     cameras = new Map();
     contrastLimits = new Map();
     metadataPageId = "__metadata__";
-    initialDocument;
-    timelineTime = 0;
-    playing = false;
-    playbackRate = 1;
-    playbackStarted = 0;
-    playbackOrigin = 0;
-    animationFrame;
+    timeline;
     constructor(target, document, options = {}) {
         super();
         this.element = target;
         this.options = options;
         this.theme = resolveTheme(options.theme);
-        this.initialDocument = structuredClone(document);
         this.model = new ViewerModel(document, options.arrayResolver);
+        this.timeline = new TimelinePlayer(document, (nextDocument) => this.renderTimelineDocument(nextDocument));
         Object.entries(builtinRenderers).forEach(([type, renderer]) => this.renderers.set(type, renderer));
         this.element.classList.add("mplot-viewer");
         this.element.setAttribute("role", "region");
@@ -77,7 +72,10 @@ export class MPlotViewer extends EventTarget {
             this.connectLive(options.liveUrl);
         void this.render();
     }
-    update(document) { this.pause(); this.initialDocument = structuredClone(document); this.timelineTime = 0; this.model.setDocument(document); }
+    update(document) {
+        this.timeline.setDocument(document);
+        this.model.setDocument(document);
+    }
     setTheme(theme) {
         this.options.theme = theme;
         this.theme = resolveTheme(theme);
@@ -103,7 +101,7 @@ export class MPlotViewer extends EventTarget {
                 resetView(view);
     }
     destroy() {
-        this.pause();
+        this.timeline.pause();
         this.source?.close();
         this.resize?.disconnect();
         this.intersection?.disconnect();
@@ -136,8 +134,9 @@ export class MPlotViewer extends EventTarget {
         if (this.activeFigureIdValue !== this.metadataPageId && !this.model.document.figures.some((figure) => figure.id === this.activeFigureIdValue))
             this.activeFigureIdValue = this.model.document.figures[0]?.id;
         header.append(this.createNavigator());
-        if (this.initialDocument.timeline)
-            header.append(this.createTimelineControls());
+        const timelineControls = this.timeline.createControls();
+        if (timelineControls)
+            header.append(timelineControls);
         const figuresElement = document.createElement("main");
         figuresElement.className = "mplot-figures";
         shell.append(header, figuresElement);
@@ -436,7 +435,7 @@ export class MPlotViewer extends EventTarget {
     }
     async showPage(pageId) {
         if (pageId !== this.activeFigureIdValue)
-            this.pause();
+            this.timeline.pause();
         if (pageId !== this.metadataPageId && !this.figures.has(pageId))
             return;
         this.activeFigureIdValue = pageId;
@@ -527,67 +526,7 @@ export class MPlotViewer extends EventTarget {
         section.append(...nested);
         return section;
     }
-    createTimelineControls() {
-        const timeline = this.initialDocument.timeline;
-        const controls = document.createElement("section");
-        controls.className = "mplot-timeline";
-        controls.setAttribute("aria-label", "Animation timeline");
-        const play = document.createElement("button");
-        play.type = "button";
-        play.className = "mplot-button mplot-play";
-        play.dataset.action = "play";
-        play.textContent = this.playing ? "Pause" : "Play";
-        play.onclick = () => this.playing ? this.pause() : this.play();
-        const previous = document.createElement("button"), next = document.createElement("button");
-        previous.type = next.type = "button";
-        previous.className = next.className = "mplot-button";
-        previous.textContent = "← Frame";
-        next.textContent = "Frame →";
-        previous.onclick = () => void this.stepTimeline(-1);
-        next.onclick = () => void this.stepTimeline(1);
-        const range = document.createElement("input");
-        range.type = "range";
-        range.className = "mplot-timeline-range";
-        range.min = "0";
-        range.max = String(timeline.duration);
-        range.step = "any";
-        range.value = String(this.timelineTime);
-        range.setAttribute("aria-label", "Animation time");
-        range.addEventListener("input", () => {
-            const time = Number(range.value);
-            this.pause();
-            void this.seek(time);
-        });
-        const output = document.createElement("output");
-        output.className = "mplot-timeline-time";
-        output.textContent = `${this.timelineTime.toFixed(2)} / ${timeline.duration.toFixed(2)} s`;
-        const speed = document.createElement("select");
-        speed.className = "mplot-playback-rate";
-        speed.setAttribute("aria-label", "Playback speed");
-        for (const rate of [.25, .5, 1, 1.5, 2]) {
-            const option = document.createElement("option");
-            option.value = String(rate);
-            option.textContent = `${rate}×`;
-            option.selected = rate === this.playbackRate;
-            speed.append(option);
-        }
-        speed.onchange = () => { const wasPlaying = this.playing; this.pause(); this.playbackRate = Number(speed.value); if (wasPlaying)
-            this.play(); };
-        controls.append(play, previous, next, range, output, speed);
-        return controls;
-    }
-    async seek(time) {
-        const timeline = this.initialDocument.timeline;
-        if (!timeline)
-            return;
-        this.timelineTime = Math.max(0, Math.min(timeline.duration, time));
-        const document = structuredClone(this.initialDocument);
-        for (const frame of timeline.frames) {
-            if (frame.time > this.timelineTime)
-                break;
-            for (const update of frame.updates)
-                this.applyTimelineUpdate(document, update);
-        }
+    async renderTimelineDocument(document) {
         this.model.document = document;
         for (const [axesId, view] of this.views) {
             const axis = document.axes.find((candidate) => candidate.id === axesId);
@@ -601,86 +540,7 @@ export class MPlotViewer extends EventTarget {
         }
         this.resolvedData.clear();
         this.axisTokens.clear();
-        this.updateTimelineControls();
         await this.renderMounted();
-    }
-    applyTimelineUpdate(document, update) {
-        const collection = update.target_kind === "artist" ? document.artists : update.target_kind === "axes" ? document.axes : document.figures;
-        const target = collection.find((item) => item.id === update.target);
-        if (!target || !update.path.length)
-            return;
-        let parent = target;
-        for (const part of update.path.slice(0, -1)) {
-            const child = parent[part];
-            if (!child || typeof child !== "object" || Array.isArray(child))
-                return;
-            parent = child;
-        }
-        parent[update.path.at(-1)] = structuredClone(update.value);
-    }
-    play() {
-        const timeline = this.initialDocument.timeline;
-        if (!timeline || this.playing || timeline.duration <= 0)
-            return;
-        if (this.timelineTime >= timeline.duration) {
-            this.timelineTime = 0;
-            void this.seek(0);
-        }
-        this.playing = true;
-        this.playbackStarted = performance.now();
-        this.playbackOrigin = this.timelineTime;
-        this.updateTimelineControls();
-        const tick = (now) => {
-            if (!this.playing)
-                return;
-            const time = this.playbackOrigin + (now - this.playbackStarted) / 1000 * this.playbackRate;
-            if (time >= timeline.duration) {
-                if (timeline.loop !== false && timeline.duration > 0) {
-                    this.playbackStarted = now;
-                    this.playbackOrigin = 0;
-                    void this.seek(0);
-                }
-                else {
-                    void this.seek(timeline.duration);
-                    this.pause();
-                    return;
-                }
-            }
-            else
-                void this.seek(time);
-            this.animationFrame = requestAnimationFrame(tick);
-        };
-        this.animationFrame = requestAnimationFrame(tick);
-    }
-    pause() {
-        this.playing = false;
-        if (this.animationFrame !== undefined)
-            cancelAnimationFrame(this.animationFrame);
-        this.animationFrame = undefined;
-        this.updateTimelineControls();
-    }
-    async stepTimeline(offset) {
-        this.pause();
-        const times = [0, ...(this.initialDocument.timeline?.frames.map((frame) => frame.time) ?? [])];
-        let current = 0;
-        for (let index = 0; index < times.length; index++)
-            if (times[index] <= this.timelineTime + 1e-9)
-                current = index;
-        await this.seek(times[Math.max(0, Math.min(times.length - 1, current + offset))] ?? 0);
-    }
-    updateTimelineControls() {
-        const timeline = this.initialDocument.timeline, controls = this.element.querySelector(".mplot-timeline");
-        if (!timeline || !controls)
-            return;
-        const play = controls.querySelector(".mplot-play"), range = controls.querySelector(".mplot-timeline-range"), output = controls.querySelector(".mplot-timeline-time");
-        if (play) {
-            play.textContent = this.playing ? "Pause" : "Play";
-            play.setAttribute("aria-pressed", String(this.playing));
-        }
-        if (range)
-            range.value = String(this.timelineTime);
-        if (output)
-            output.textContent = `${this.timelineTime.toFixed(2)} / ${timeline.duration.toFixed(2)} s`;
     }
     createToolbar() {
         const toolbar = document.createElement("nav");

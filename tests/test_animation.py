@@ -2,9 +2,10 @@ from __future__ import annotations
 
 import json
 import struct
-import tomllib
 
 import matplotlib
+import tomllib
+
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
@@ -28,28 +29,42 @@ def _packed_document(path):
     return manifest, json.loads(objects[digest])
 
 
+def test_animation_exposes_defensive_initial_mir(tmp_path):
+    figure, axes = plt.subplots()
+    axes.plot([0, 1], [0, 1])
+    recording = mplot.animation(tmp_path / "initial.mplot", figure, provenance=False)
+
+    initial = recording.initial_mir
+    initial.document["figures"].clear()
+
+    assert len(recording.initial_mir.document["figures"]) == 1
+    recording.abort()
+
+
 def test_animation_records_semantic_buffer_updates(tmp_path):
     figure, axes = plt.subplots()
     x = np.linspace(0, 1, 5)
-    line, = axes.plot(x, x)
+    (line,) = axes.plot(x, x)
 
-    with mplot.animation(tmp_path / "wave.mplot", figure, fps=10, provenance=False, loop=False) as recording:
+    with mplot.animation(
+        tmp_path / "wave.mplot", figure, fps=10, provenance=False, loop=False
+    ) as recording:
         line.set_ydata(x**2)
         recording.capture()
         line.set_ydata(x**3)
-        recording.capture(time=.25)
+        recording.capture(time=0.25)
 
     assert recording.result is not None
     manifest, document = _packed_document(recording.result)
     timeline = document["timeline"]
     assert timeline == {
-        "duration": .25,
+        "duration": 0.25,
         "fps": 10.0,
         "frames": timeline["frames"],
         "loop": False,
         "version": 1,
     }
-    assert [frame["time"] for frame in timeline["frames"]] == [.1, .25]
+    assert [frame["time"] for frame in timeline["frames"]] == [0.1, 0.25]
     assert all(frame["updates"] for frame in timeline["frames"])
     update = timeline["frames"][0]["updates"][0]
     assert update["target_kind"] == "artist"
@@ -70,12 +85,12 @@ def test_empty_animation_is_valid_and_has_zero_duration(tmp_path):
 
 def test_animation_rejects_structural_changes_and_bad_times(tmp_path):
     figure, axes = plt.subplots()
-    line, = axes.plot([0, 1], [0, 1])
+    (line,) = axes.plot([0, 1], [0, 1])
     recording = mplot.animation(tmp_path / "invalid", figure, fps=2)
     line.set_ydata([1, 0])
-    recording.capture(time=.5)
+    recording.capture(time=0.5)
     with pytest.raises(ValueError, match="strictly increasing"):
-        recording.capture(time=.5)
+        recording.capture(time=0.5)
     axes.plot([0, 1], [1, 1])
     with pytest.raises(ValueError, match="add or remove artists"):
         recording.capture(time=1)
@@ -83,7 +98,7 @@ def test_animation_rejects_structural_changes_and_bad_times(tmp_path):
 
 def test_animation_records_property_and_axes_updates(tmp_path):
     figure, axes = plt.subplots()
-    line, = axes.plot([0, 1], [0, 1], color="red")
+    (line,) = axes.plot([0, 1], [0, 1], color="red")
     recording = mplot.animation(tmp_path / "properties.mplot", figure, fps=2, provenance=False)
     line.set_color("blue")
     axes.set_title("Updated")
@@ -92,14 +107,22 @@ def test_animation_records_property_and_axes_updates(tmp_path):
 
     _, document = _packed_document(output)
     updates = document["timeline"]["frames"][0]["updates"]
-    assert any(update["target_kind"] == "artist" and update["path"] == ["props", "color"] for update in updates)
-    assert any(update["target_kind"] == "axes" and update["path"] == ["title"] and update["value"] == "Updated" for update in updates)
+    assert any(
+        update["target_kind"] == "artist" and update["path"] == ["props", "color"]
+        for update in updates
+    )
+    assert any(
+        update["target_kind"] == "axes"
+        and update["path"] == ["title"]
+        and update["value"] == "Updated"
+        for update in updates
+    )
 
 
 def test_save_animation_convenience_api(tmp_path):
     figure, axes = plt.subplots()
     x = np.linspace(0, 1, 4)
-    line, = axes.plot(x, x)
+    (line,) = axes.plot(x, x)
 
     output = mplot.save_animation(
         tmp_path / "convenience.mplot",
@@ -111,4 +134,4 @@ def test_save_animation_convenience_api(tmp_path):
     )
 
     _, document = _packed_document(output)
-    assert [frame["time"] for frame in document["timeline"]["frames"]] == [.2, .4]
+    assert [frame["time"] for frame in document["timeline"]["frames"]] == [0.2, 0.4]

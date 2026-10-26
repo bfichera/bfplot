@@ -4,7 +4,6 @@ import math
 from dataclasses import dataclass
 from typing import Any
 
-import matplotlib
 import matplotlib.dates as mdates
 import numpy as np
 from matplotlib import colors
@@ -46,7 +45,11 @@ def _common(artist: Artist) -> dict[str, Any]:
         "visible": bool(artist.get_visible()),
         "alpha": _finite(artist.get_alpha()),
         "zorder": _finite(artist.get_zorder()),
-        "label": (lambda label: label if isinstance(label, str) and not label.startswith("_") else None)(artist.get_label()) if hasattr(artist, "get_label") else None,
+        "label": (
+            lambda label: label if isinstance(label, str) and not label.startswith("_") else None
+        )(artist.get_label())
+        if hasattr(artist, "get_label")
+        else None,
     }
     return result
 
@@ -96,13 +99,17 @@ def translate_figures(figures: list[Any], metadata: dict[str, Any]) -> MirDocume
     """Translate Matplotlib figures into storage-independent MIR."""
     builder = MirBuilder(metadata=metadata)
     context = ExtractionContext(builder)
-    extracted = [_extract_figure(figure, f"figure-{index}", context) for index, figure in enumerate(figures)]
-    return builder.build({
-        "schema_version": 1,
-        "figures": extracted,
-        "links": [],
-        "selections": [],
-    })
+    extracted = [
+        _extract_figure(figure, f"figure-{index}", context) for index, figure in enumerate(figures)
+    ]
+    return builder.build(
+        {
+            "schema_version": 1,
+            "figures": extracted,
+            "links": [],
+            "selections": [],
+        }
+    )
 
 
 def _extract_figure(figure: Any, figure_id: str, context: ExtractionContext) -> dict[str, Any]:
@@ -119,7 +126,9 @@ def _extract_figure(figure: Any, figure_id: str, context: ExtractionContext) -> 
         axes_entries.append((axes, None))
         axes_entries.extend((child, axes) for child in getattr(axes, "child_axes", []))
     subplot_axes = {id(axes) for axes, _ in axes_entries if _has_subplotspec(axes)}
-    axes_ids = {id(axes): f"{figure_id}-axes-{index}" for index, (axes, _) in enumerate(axes_entries)}
+    axes_ids = {
+        id(axes): f"{figure_id}-axes-{index}" for index, (axes, _) in enumerate(axes_entries)
+    }
     for index, (axes, explicit_parent) in enumerate(axes_entries):
         extracted_axes = _extract_axes(axes, axes_ids[id(axes)], context)
         if explicit_parent is not None and extracted_axes.get("role") != "colorbar":
@@ -148,10 +157,21 @@ def _inset_parent(axes: Any, candidates: list[Any], subplot_axes: set[int]) -> A
     for candidate in candidates:
         if id(candidate) not in subplot_axes:
             continue
-        candidate_left, candidate_bottom, candidate_width, candidate_height = candidate.get_position().bounds
-        if candidate_left <= center[0] <= candidate_left + candidate_width and candidate_bottom <= center[1] <= candidate_bottom + candidate_height:
-            overlap_width = max(0.0, min(left + width, candidate_left + candidate_width) - max(left, candidate_left))
-            overlap_height = max(0.0, min(bottom + height, candidate_bottom + candidate_height) - max(bottom, candidate_bottom))
+        candidate_left, candidate_bottom, candidate_width, candidate_height = (
+            candidate.get_position().bounds
+        )
+        if (
+            candidate_left <= center[0] <= candidate_left + candidate_width
+            and candidate_bottom <= center[1] <= candidate_bottom + candidate_height
+        ):
+            overlap_width = max(
+                0.0, min(left + width, candidate_left + candidate_width) - max(left, candidate_left)
+            )
+            overlap_height = max(
+                0.0,
+                min(bottom + height, candidate_bottom + candidate_height)
+                - max(bottom, candidate_bottom),
+            )
             parents.append((overlap_width * overlap_height, candidate))
     return max(parents, key=lambda item: item[0])[1] if parents else None
 
@@ -176,10 +196,14 @@ def _extract_axes(axes: Any, axes_id: str, context: ExtractionContext) -> dict[s
             lower, upper = mappable.get_clim()
             result["colorbar"] = {
                 "orientation": colorbar.orientation,
-                "label": colorbar.ax.get_ylabel() if colorbar.orientation == "vertical" else colorbar.ax.get_xlabel(),
+                "label": colorbar.ax.get_ylabel()
+                if colorbar.orientation == "vertical"
+                else colorbar.ax.get_xlabel(),
                 "limits": [_finite(lower), _finite(upper)],
                 "ticks": [_finite(item) for item in colorbar.get_ticks()],
-                "ticklabels": [item.get_text() for item in colorbar.ax.get_yticklabels()] if colorbar.orientation == "vertical" else [item.get_text() for item in colorbar.ax.get_xticklabels()],
+                "ticklabels": [item.get_text() for item in colorbar.ax.get_yticklabels()]
+                if colorbar.orientation == "vertical"
+                else [item.get_text() for item in colorbar.ax.get_xticklabels()],
                 "cmap": mappable.cmap.name,
                 "colors": [_color(mappable.cmap(value)) for value in np.linspace(0, 1, 64)],
                 "mappable": context.artist_id(mappable),
@@ -218,7 +242,13 @@ def _extract_axes(axes: Any, axes_id: str, context: ExtractionContext) -> dict[s
             consumed.add(id(image))
 
     for artist in axes.get_children():
-        if id(artist) in consumed or id(artist) in axes_text or not artist.get_visible() or artist is axes.patch or isinstance(artist, Spine):
+        if (
+            id(artist) in consumed
+            or id(artist) in axes_text
+            or not artist.get_visible()
+            or artist is axes.patch
+            or isinstance(artist, Spine)
+        ):
             continue
         extracted = _extract_artist(artist, axes_id, context, is_3d)
         if extracted is not None:
@@ -229,8 +259,14 @@ def _extract_axes(axes: Any, axes_id: str, context: ExtractionContext) -> dict[s
 def _axis(axes: Any, name: str) -> dict[str, Any]:
     axis = getattr(axes, f"{name}axis")
     lower, upper = getattr(axes, f"get_{name}lim")()
-    converter = axis.get_converter() if hasattr(axis, "get_converter") else getattr(axis, "_converter", None)
-    is_date = isinstance(converter, mdates.DateConverter) or isinstance(axis.get_major_locator(), mdates.DateLocator)
+    converter = (
+        axis.get_converter()
+        if hasattr(axis, "get_converter")
+        else getattr(axis, "_converter", None)
+    )
+    is_date = isinstance(converter, mdates.DateConverter) or isinstance(
+        axis.get_major_locator(), mdates.DateLocator
+    )
     formatter = axis.get_major_formatter()
     result = {
         "label": axis.get_label_text(),
@@ -246,7 +282,9 @@ def _axis(axes: Any, name: str) -> dict[str, Any]:
     return result
 
 
-def _extract_container(container: Any, axes_id: str, context: ExtractionContext) -> tuple[dict[str, Any] | None, list[Any]]:
+def _extract_container(
+    container: Any, axes_id: str, context: ExtractionContext
+) -> tuple[dict[str, Any] | None, list[Any]]:
     if isinstance(container, ErrorbarContainer):
         data_line, caplines, barcols = container.lines
         if data_line is not None:
@@ -279,19 +317,35 @@ def _extract_container(container: Any, axes_id: str, context: ExtractionContext)
     return None, []
 
 
-def _extract_artist(artist: Any, axes_id: str, context: ExtractionContext, is_3d: bool) -> dict[str, Any] | None:
+def _extract_artist(
+    artist: Any, axes_id: str, context: ExtractionContext, is_3d: bool
+) -> dict[str, Any] | None:
     class_name = artist.__class__.__name__
     if isinstance(artist, Line2D) and artist.axes is not None:
         x, y = artist.get_data(orig=False)
         if is_3d and hasattr(artist, "get_data_3d"):
             x, y, z = artist.get_data_3d()
-            return context.artist("mplot.line3d", axes_id, _line_props(artist), {"x": context.array(x), "y": context.array(y), "z": context.array(z)})
-        return context.artist("mplot.line", axes_id, _line_props(artist), {"x": context.array(x), "y": context.array(y)})
+            return context.artist(
+                "mplot.line3d",
+                axes_id,
+                _line_props(artist),
+                {"x": context.array(x), "y": context.array(y), "z": context.array(z)},
+            )
+        return context.artist(
+            "mplot.line",
+            axes_id,
+            _line_props(artist),
+            {"x": context.array(x), "y": context.array(y)},
+        )
     if isinstance(artist, PathCollection):
         type_name = "mplot.scatter"
         if is_3d and hasattr(artist, "_offsets3d"):
             x, y, z = artist._offsets3d
-            data: dict[str, Any] = {"x": context.array(x), "y": context.array(y), "z": context.array(z)}
+            data: dict[str, Any] = {
+                "x": context.array(x),
+                "y": context.array(y),
+                "z": context.array(z),
+            }
             type_name = "mplot.scatter3d"
         else:
             offsets = np.asarray(artist.get_offsets())
@@ -315,13 +369,24 @@ def _extract_artist(artist: Any, axes_id: str, context: ExtractionContext, is_3d
     if isinstance(artist, PolyCollection):
         return _extract_paths("mplot.patch", artist, axes_id, context)
     if isinstance(artist, LineCollection):
-        return context.artist("mplot.contour", axes_id, _collection_props(artist), {"segments": context.array(np.asarray(artist.get_segments()))})
+        return context.artist(
+            "mplot.contour",
+            axes_id,
+            _collection_props(artist),
+            {"segments": context.array(np.asarray(artist.get_segments()))},
+        )
     if isinstance(artist, AxesImage):
         return _extract_image(artist, axes_id, context)
     if isinstance(artist, Text) and artist.axes is not None and artist.get_text():
         position = artist.get_position()
         data = {"position": [_finite(position[0]), _finite(position[1])], "text": artist.get_text()}
-        props = _common(artist) | {"color": _color(artist.get_color()), "size": float(artist.get_fontsize()), "rotation": float(artist.get_rotation()), "horizontalalignment": artist.get_horizontalalignment(), "verticalalignment": artist.get_verticalalignment()}
+        props = _common(artist) | {
+            "color": _color(artist.get_color()),
+            "size": float(artist.get_fontsize()),
+            "rotation": float(artist.get_rotation()),
+            "horizontalalignment": artist.get_horizontalalignment(),
+            "verticalalignment": artist.get_verticalalignment(),
+        }
         return context.artist("mplot.text", axes_id, props, data)
     if isinstance(artist, Patch) and artist.axes is not None:
         data: dict[str, Any] = {}
@@ -335,16 +400,33 @@ def _extract_artist(artist: Any, axes_id: str, context: ExtractionContext, is_3d
 
 
 def _line_props(line: Any) -> dict[str, Any]:
-    return _common(line) | {"color": _color(line.get_color()), "linewidth": float(line.get_linewidth()), "linestyle": line.get_linestyle(), "marker": line.get_marker(), "markersize": float(line.get_markersize()), "drawstyle": line.get_drawstyle()}
+    return _common(line) | {
+        "color": _color(line.get_color()),
+        "linewidth": float(line.get_linewidth()),
+        "linestyle": line.get_linestyle(),
+        "marker": line.get_marker(),
+        "markersize": float(line.get_markersize()),
+        "drawstyle": line.get_drawstyle(),
+    }
 
 
 def _patch_props(patch: Any) -> dict[str, Any]:
-    return _common(patch) | {"facecolor": _color(patch.get_facecolor()), "edgecolor": _color(patch.get_edgecolor()), "linewidth": float(patch.get_linewidth()), "linestyle": patch.get_linestyle(), "hatch": patch.get_hatch()}
+    return _common(patch) | {
+        "facecolor": _color(patch.get_facecolor()),
+        "edgecolor": _color(patch.get_edgecolor()),
+        "linewidth": float(patch.get_linewidth()),
+        "linestyle": patch.get_linestyle(),
+        "hatch": patch.get_hatch(),
+    }
 
 
 def _collection_props(collection: Any) -> dict[str, Any]:
     result = _common(collection)
-    for name, getter in (("facecolors", "get_facecolors"), ("edgecolors", "get_edgecolors"), ("linewidths", "get_linewidths")):
+    for name, getter in (
+        ("facecolors", "get_facecolors"),
+        ("edgecolors", "get_edgecolors"),
+        ("linewidths", "get_linewidths"),
+    ):
         value = getattr(collection, getter)()
         if len(value):
             result[name] = _finite(value)
@@ -357,7 +439,9 @@ def _collection_props(collection: Any) -> dict[str, Any]:
     return result
 
 
-def _extract_paths(type_name: str, artist: Any, axes_id: str, context: ExtractionContext) -> dict[str, Any]:
+def _extract_paths(
+    type_name: str, artist: Any, axes_id: str, context: ExtractionContext
+) -> dict[str, Any]:
     paths = [path.vertices for path in artist.get_paths()]
     lengths = np.asarray([len(path) for path in paths], dtype=np.int64)
     vertices = np.concatenate(paths) if paths else np.empty((0, 2))
@@ -381,7 +465,9 @@ def _poly3d_faces(artist: Any) -> list[np.ndarray]:
     return []
 
 
-def _extract_3d_paths(type_name: str, paths: list[Any], artist: Any, axes_id: str, context: ExtractionContext) -> dict[str, Any]:
+def _extract_3d_paths(
+    type_name: str, paths: list[Any], artist: Any, axes_id: str, context: ExtractionContext
+) -> dict[str, Any]:
     arrays = [np.asarray(path, dtype=float) for path in paths]
     arrays = [path for path in arrays if path.ndim == 2 and path.shape[1] == 3 and len(path)]
     lengths = np.asarray([len(path) for path in arrays], dtype=np.int64)
@@ -401,13 +487,26 @@ def _extract_contour(artist: Any, axes_id: str, context: ExtractionContext) -> d
     for index, collection in enumerate(collections):
         collection_paths = collection.get_paths()
         paths.extend(collection_paths)
-        path_values.extend([cvalues[index] if index < len(cvalues) else float(index)] * len(collection_paths))
+        path_values.extend(
+            [cvalues[index] if index < len(cvalues) else float(index)] * len(collection_paths)
+        )
     if not paths and hasattr(artist, "get_paths"):
         paths.extend(artist.get_paths())
-        path_values.extend(cvalues[:len(paths)])
+        path_values.extend(cvalues[: len(paths)])
     lengths = np.asarray([len(path.vertices) for path in paths], dtype=np.int64)
     vertices = np.concatenate([path.vertices for path in paths]) if paths else np.empty((0, 2))
-    codes = np.concatenate([path.codes if path.codes is not None else np.full(len(path.vertices), 2, dtype=np.uint8) for path in paths]) if paths else np.empty(0, dtype=np.uint8)
+    codes = (
+        np.concatenate(
+            [
+                path.codes
+                if path.codes is not None
+                else np.full(len(path.vertices), 2, dtype=np.uint8)
+                for path in paths
+            ]
+        )
+        if paths
+        else np.empty(0, dtype=np.uint8)
+    )
     filled = bool(getattr(artist, "filled", False))
     data = {
         "vertices": context.array(vertices),
@@ -418,10 +517,20 @@ def _extract_contour(artist: Any, axes_id: str, context: ExtractionContext) -> d
     }
     props = _collection_props(artist)
     props["cmap"] = artist.cmap.name
-    return context.artist("mplot.contourf" if filled else "mplot.contour", axes_id, props, data, source=artist)
+    return context.artist(
+        "mplot.contourf" if filled else "mplot.contour", axes_id, props, data, source=artist
+    )
 
 
 def _extract_image(image: Any, axes_id: str, context: ExtractionContext) -> dict[str, Any]:
-    data = {"values": context.array(image.get_array()), "extent": [_finite(item) for item in image.get_extent()]}
-    props = _common(image) | {"cmap": image.get_cmap().name, "clim": [_finite(item) for item in image.get_clim()], "origin": image.origin, "interpolation": image.get_interpolation()}
+    data = {
+        "values": context.array(image.get_array()),
+        "extent": [_finite(item) for item in image.get_extent()],
+    }
+    props = _common(image) | {
+        "cmap": image.get_cmap().name,
+        "clim": [_finite(item) for item in image.get_clim()],
+        "origin": image.origin,
+        "interpolation": image.get_interpolation(),
+    }
     return context.artist("mplot.image", axes_id, props, data, source=image)

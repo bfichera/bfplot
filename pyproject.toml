@@ -17,12 +17,23 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-test = ["pytest>=8", "pytest-cov>=5"]
+test = ["pytest>=8", "pytest-cov>=5", "ruff>=0.14"]
 docs = ["mkdocs-material>=9.6,<10"]
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/mplot"]
 
+[tool.hatch.build.targets.wheel.force-include]
+"src/mplot/py.typed" = "mplot/py.typed"
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-ra"
+
+[tool.ruff]
+target-version = "py310"
+line-length = 100
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E4", "E7", "E9", "F", "I"]

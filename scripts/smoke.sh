@@ -23,6 +23,10 @@ if [[ -f pyproject.toml ]]; then
   if [[ -x .venv/bin/python ]]; then
     python_bin=.venv/bin/python
   fi
+  section "Python lint and format"
+  "$python_bin" -m ruff check src tests
+  "$python_bin" -m ruff format --check src tests
+  section "Python tests"
   "$python_bin" -m compileall -q src
   if [[ -d tests ]]; then
     "$python_bin" -m pytest

@@ -2,16 +2,17 @@ from __future__ import annotations
 
 import json
 import struct
-import tomllib
-
-import zstandard as zstd
 
 import matplotlib
+import tomllib
+import zstandard as zstd
+
 matplotlib.use("Agg")
-import matplotlib.pyplot as plt
-import matplotlib.dates as mdates
-import numpy as np
 from datetime import datetime, timedelta
+
+import matplotlib.dates as mdates
+import matplotlib.pyplot as plt
+import numpy as np
 
 import mplot
 
@@ -27,7 +28,9 @@ def _decode_array(path, reference):
     digest = reference["object"].split(":", 1)[1]
     object_path = path.parent / ".mplot" / "objects" / "sha256" / digest[:2] / digest
     raw = zstd.ZstdDecompressor().decompress(object_path.read_bytes())
-    return np.frombuffer(raw, dtype=np.dtype(reference["dtype"]).newbyteorder("<")).reshape(reference["shape"])
+    return np.frombuffer(raw, dtype=np.dtype(reference["dtype"]).newbyteorder("<")).reshape(
+        reference["shape"]
+    )
 
 
 def test_savefig_extracts_broad_artist_set(tmp_path):
@@ -36,21 +39,35 @@ def test_savefig_extracts_broad_artist_set(tmp_path):
     axes[0, 0].plot(x, x**2, marker="o")
     axes[0, 0].scatter(x, x)
     axes[0, 1].imshow(np.arange(9).reshape(3, 3))
-    axes[0, 2].errorbar(x, x, yerr=.1)
+    axes[0, 2].errorbar(x, x, yerr=0.1)
     axes[1, 0].fill_between(x, x, x**2)
     axes[1, 1].hist(x)
     axes[1, 2].contourf(np.arange(16).reshape(4, 4))
     axes[1, 2].set_title("Contours")
     axes[1, 2].set_xlabel("x")
-    axes[1, 2].text(.5, .5, "label")
+    axes[1, 2].text(0.5, 0.5, "label")
 
     output = mplot.savefig(tmp_path / "all", figure, provenance=False)
     assert output.name == "all.mplot.toml"
     manifest, document = _document_from_split(output)
     assert manifest["version"] == "0.9.9"
-    types = {artist["type"] for axis in document["figures"][0]["axes"] for artist in axis["artists"]}
-    assert {"mplot.line", "mplot.scatter", "mplot.image", "mplot.errorbar", "mplot.fill_between", "mplot.histogram", "mplot.contourf", "mplot.text"} <= types
-    assert all(len([artist for artist in axis["artists"] if artist["type"] == "mplot.patch"]) == 0 for axis in document["figures"][0]["axes"])
+    types = {
+        artist["type"] for axis in document["figures"][0]["axes"] for artist in axis["artists"]
+    }
+    assert {
+        "mplot.line",
+        "mplot.scatter",
+        "mplot.image",
+        "mplot.errorbar",
+        "mplot.fill_between",
+        "mplot.histogram",
+        "mplot.contourf",
+        "mplot.text",
+    } <= types
+    assert all(
+        len([artist for artist in axis["artists"] if artist["type"] == "mplot.patch"]) == 0
+        for axis in document["figures"][0]["axes"]
+    )
     for axis in document["figures"][0]["axes"]:
         for artist in axis["artists"]:
             assert {"type", "schema_version", "id", "axes_id", "props", "data"} == artist.keys()
@@ -88,7 +105,10 @@ def test_savefig_marks_colorbars_as_auxiliary_axes(tmp_path):
     plots = [axis for axis in document["figures"][0]["axes"] if axis.get("role") != "colorbar"]
     colorbars = [axis for axis in document["figures"][0]["axes"] if axis.get("role") == "colorbar"]
     assert all(colorbar["artists"] == [] for colorbar in colorbars)
-    assert [colorbar["colorbar"]["orientation"] for colorbar in colorbars] == ["vertical", "vertical"]
+    assert [colorbar["colorbar"]["orientation"] for colorbar in colorbars] == [
+        "vertical",
+        "vertical",
+    ]
     assert [colorbar["colorbar"]["label"] for colorbar in colorbars] == ["intensity", "points"]
     assert colorbars[0]["colorbar"]["limits"] == [0, 8]
     assert colorbars[0]["colorbar"]["mappable"] == plots[0]["artists"][0]["id"]
@@ -104,7 +124,9 @@ def test_savefig_links_filled_contour_colorbar_to_mappable(tmp_path):
     output = mplot.savefig(tmp_path / "contour-colorbar", figure, provenance=False)
     _, document = _document_from_split(output)
     plot = next(axis for axis in document["figures"][0]["axes"] if axis.get("role") != "colorbar")
-    colorbar = next(axis for axis in document["figures"][0]["axes"] if axis.get("role") == "colorbar")
+    colorbar = next(
+        axis for axis in document["figures"][0]["axes"] if axis.get("role") == "colorbar"
+    )
     extracted = next(artist for artist in plot["artists"] if artist["type"] == "mplot.contourf")
 
     assert colorbar["colorbar"]["mappable"] == extracted["id"]
@@ -118,7 +140,7 @@ def test_savefig_preserves_dates_insets_and_public_labels(tmp_path):
     dates = [datetime(2026, 1, 1) + timedelta(days=index) for index in range(3)]
     axes.plot(dates, [1, 2, 3])
     axes.xaxis.set_major_formatter(mdates.DateFormatter("%b %d"))
-    inset = axes.inset_axes([.6, .6, .2, .2])
+    inset = axes.inset_axes([0.6, 0.6, 0.2, 0.2])
     inset.plot([0, 1], [0, 1], label="_child0")
 
     output = mplot.savefig(tmp_path / "semantic-axes", figure, provenance=False)
@@ -144,8 +166,16 @@ def test_savefig_preserves_true_3d_surface_and_wire_geometry(tmp_path):
 
     output = mplot.savefig(tmp_path / "three-dimensional", figure, provenance=False)
     _, document = _document_from_split(output)
-    surface = next(artist for artist in document["figures"][0]["axes"][0]["artists"] if artist["type"] == "mplot.surface3d")
-    wire = next(artist for artist in document["figures"][0]["axes"][1]["artists"] if artist["type"] == "mplot.mesh3d")
+    surface = next(
+        artist
+        for artist in document["figures"][0]["axes"][0]["artists"]
+        if artist["type"] == "mplot.surface3d"
+    )
+    wire = next(
+        artist
+        for artist in document["figures"][0]["axes"][1]["artists"]
+        if artist["type"] == "mplot.mesh3d"
+    )
     surface_vertices = _decode_array(output, surface["data"]["vertices"])
     wire_vertices = _decode_array(output, wire["data"]["vertices"])
     assert surface_vertices.shape[1] == wire_vertices.shape[1] == 3

@@ -1,6 +1,16 @@
 """Script-first, content-addressed interactive scientific plots."""
 
-from .api import Animation, Stream, animation, compile, save_animation, savefig, show, stream, translate
+from .api import (
+    Animation,
+    Stream,
+    animation,
+    compile,
+    save_animation,
+    savefig,
+    show,
+    stream,
+    translate,
+)
 from .mir import MIR_VERSION, MirBuffer, MirDocument, MirValidationError
 
 __all__ = [

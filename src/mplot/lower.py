@@ -10,7 +10,9 @@ from .store import ContentStore
 def lower_mir(mir: MirDocument, store: ContentStore) -> dict[str, Any]:
     """Compile validated MIR into the canonical artifact document schema."""
     mir.validate()
-    encoded = {buffer_id: encode_array(buffer.array, store) for buffer_id, buffer in mir.buffers.items()}
+    encoded = {
+        buffer_id: encode_array(buffer.array, store) for buffer_id, buffer in mir.buffers.items()
+    }
 
     def lower(value: Any) -> Any:
         if isinstance(value, dict):
@@ -29,7 +31,9 @@ def lower_mir(mir: MirDocument, store: ContentStore) -> dict[str, Any]:
 
 def _contains_buffer_reference(value: Any) -> bool:
     if isinstance(value, dict):
-        return "$buffer" in value or any(_contains_buffer_reference(item) for item in value.values())
+        return "$buffer" in value or any(
+            _contains_buffer_reference(item) for item in value.values()
+        )
     if isinstance(value, list):
         return any(_contains_buffer_reference(item) for item in value)
     return False

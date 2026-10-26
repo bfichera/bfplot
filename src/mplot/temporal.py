@@ -2,15 +2,18 @@ from __future__ import annotations
 
 import copy
 import math
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any, TypeAlias
 
 import numpy as np
 from matplotlib.figure import Figure
 
 from .mir import MirBuffer, MirDocument
 
+FigureSource: TypeAlias = Figure | Iterable[Figure] | None
+Translator: TypeAlias = Callable[[FigureSource, dict[str, Any]], MirDocument]
+Compiler: TypeAlias = Callable[[MirDocument, str | Path, bool | None], Path]
 
 _ALLOWED_ARTIST_SECTIONS = {"data", "props"}
 _ALLOWED_AXES_FIELDS = {"title", "x", "y", "z", "view", "bounds", "facecolor"}
@@ -23,13 +26,13 @@ class Animation:
     def __init__(
         self,
         path: str | Path,
-        figure: Figure | Iterable[Figure] | None,
+        figure: FigureSource,
         *,
         fps: float = 30,
         packed: bool | None = None,
         loop: bool = True,
-        translator: Callable[[Figure | Iterable[Figure] | None, dict[str, Any]], MirDocument],
-        compiler: Callable[[MirDocument, str | Path, bool | None], Path],
+        translator: Translator,
+        compiler: Compiler,
         metadata: dict[str, Any],
     ):
         if not math.isfinite(fps) or fps <= 0:
@@ -44,9 +47,10 @@ class Animation:
         self._closed = False
         self._result: Path | None = None
         self._next_time = 1 / self.fps
-        self._previous = translator(figure, metadata)
-        self._document = copy.deepcopy(self._previous.document)
-        self._buffers = dict(self._previous.buffers)
+        self._initial = translator(figure, metadata)
+        self._previous = self._initial
+        self._document = copy.deepcopy(self._initial.document)
+        self._buffers = dict(self._initial.buffers)
         self._next_buffer = len(self._buffers)
         self._frames: list[dict[str, Any]] = []
 
@@ -56,7 +60,17 @@ class Animation:
 
     @property
     def frame_count(self) -> int:
+        """Number of captured timeline frames."""
         return len(self._frames)
+
+    @property
+    def initial_mir(self) -> MirDocument:
+        """A defensive copy of the immutable scene used to start playback."""
+        return MirDocument(
+            document=copy.deepcopy(self._initial.document),
+            buffers=dict(self._initial.buffers),
+            metadata=copy.deepcopy(self._initial.metadata),
+        )
 
     def capture(self, *, time: float | None = None) -> None:
         """Capture the current Matplotlib state at a strictly increasing time."""
@@ -93,7 +107,10 @@ class Animation:
         mir = MirDocument(
             document=self._document,
             buffers=self._buffers,
-            metadata={**self._previous.metadata, "temporal": {"fps": self.fps, "duration": duration, "frames": len(self._frames)}},
+            metadata={
+                **self._previous.metadata,
+                "temporal": {"fps": self.fps, "duration": duration, "frames": len(self._frames)},
+            },
         )
         mir.validate()
         self._result = self._compiler(mir, self.path, self.packed)
@@ -121,18 +138,38 @@ class Animation:
 
         for figure_id, old_figure in old_figures.items():
             new_figure = new_figures[figure_id]
-            self._diff_fields("figure", figure_id, old_figure, new_figure, _ALLOWED_FIGURE_FIELDS, previous, current, updates)
+            self._diff_fields(
+                "figure",
+                figure_id,
+                old_figure,
+                new_figure,
+                _ALLOWED_FIGURE_FIELDS,
+                previous,
+                current,
+                updates,
+            )
             old_axes = {item["id"]: item for item in old_figure["axes"]}
             new_axes = {item["id"]: item for item in new_figure["axes"]}
             if old_axes.keys() != new_axes.keys():
                 raise ValueError("animation cannot add or remove axes")
             for axes_id, old_axis in old_axes.items():
                 new_axis = new_axes[axes_id]
-                self._diff_fields("axes", axes_id, old_axis, new_axis, _ALLOWED_AXES_FIELDS, previous, current, updates)
+                self._diff_fields(
+                    "axes",
+                    axes_id,
+                    old_axis,
+                    new_axis,
+                    _ALLOWED_AXES_FIELDS,
+                    previous,
+                    current,
+                    updates,
+                )
                 old_artists = {item["id"]: item for item in old_axis["artists"]}
                 new_artists = {item["id"]: item for item in new_axis["artists"]}
                 if old_artists.keys() != new_artists.keys():
-                    raise ValueError("animation cannot add or remove artists; update visibility instead")
+                    raise ValueError(
+                        "animation cannot add or remove artists; update visibility instead"
+                    )
                 for artist_id, old_artist in old_artists.items():
                     new_artist = new_artists[artist_id]
                     if old_artist["type"] != new_artist["type"]:
@@ -140,15 +177,21 @@ class Animation:
                     for section in _ALLOWED_ARTIST_SECTIONS:
                         old_values, new_values = old_artist[section], new_artist[section]
                         if old_values.keys() != new_values.keys():
-                            raise ValueError(f"animation cannot add or remove artist {section} fields")
+                            raise ValueError(
+                                f"animation cannot add or remove artist {section} fields"
+                            )
                         for field in old_values:
-                            if not self._equal(old_values[field], new_values[field], previous, current):
-                                updates.append({
-                                    "target_kind": "artist",
-                                    "target": artist_id,
-                                    "path": [section, field],
-                                    "value": self._import_value(new_values[field], current),
-                                })
+                            if not self._equal(
+                                old_values[field], new_values[field], previous, current
+                            ):
+                                updates.append(
+                                    {
+                                        "target_kind": "artist",
+                                        "target": artist_id,
+                                        "path": [section, field],
+                                        "value": self._import_value(new_values[field], current),
+                                    }
+                                )
         return updates
 
     def _diff_fields(
@@ -168,24 +211,39 @@ class Animation:
             if field not in old or field not in new:
                 raise ValueError(f"animation cannot add or remove {target_kind} field {field!r}")
             if not self._equal(old[field], new[field], previous, current):
-                updates.append({
-                    "target_kind": target_kind,
-                    "target": target,
-                    "path": [field],
-                    "value": self._import_value(new[field], current),
-                })
+                updates.append(
+                    {
+                        "target_kind": target_kind,
+                        "target": target,
+                        "path": [field],
+                        "value": self._import_value(new[field], current),
+                    }
+                )
 
     def _equal(self, left: Any, right: Any, left_mir: MirDocument, right_mir: MirDocument) -> bool:
-        if isinstance(left, dict) and set(left) == {"$buffer"} and isinstance(right, dict) and set(right) == {"$buffer"}:
+        if (
+            isinstance(left, dict)
+            and set(left) == {"$buffer"}
+            and isinstance(right, dict)
+            and set(right) == {"$buffer"}
+        ):
             first = left_mir.buffers[left["$buffer"]].array
             second = right_mir.buffers[right["$buffer"]].array
-            return first.dtype == second.dtype and first.shape == second.shape and np.array_equal(first, second, equal_nan=True)
+            return (
+                first.dtype == second.dtype
+                and first.shape == second.shape
+                and np.array_equal(first, second, equal_nan=True)
+            )
         if type(left) is not type(right):
             return False
         if isinstance(left, dict):
-            return left.keys() == right.keys() and all(self._equal(left[key], right[key], left_mir, right_mir) for key in left)
+            return left.keys() == right.keys() and all(
+                self._equal(left[key], right[key], left_mir, right_mir) for key in left
+            )
         if isinstance(left, list):
-            return len(left) == len(right) and all(self._equal(a, b, left_mir, right_mir) for a, b in zip(left, right, strict=True))
+            return len(left) == len(right) and all(
+                self._equal(a, b, left_mir, right_mir) for a, b in zip(left, right, strict=True)
+            )
         return left == right
 
     def _import_value(self, value: Any, source: MirDocument) -> Any:

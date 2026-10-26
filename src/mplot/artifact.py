@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import os
-import shutil
 import struct
 import tempfile
 from pathlib import Path
@@ -36,7 +35,7 @@ def manifest_bytes(document: str, provenance: dict[str, Any]) -> bytes:
     lines = [
         'format = "mplot"',
         'version = "0.9.9"',
-        'schema_version = 1',
+        "schema_version = 1",
         f"document = {_toml_string(document)}",
         "",
         "[provenance]",
@@ -70,7 +69,9 @@ def write_split(path: Path, document: dict[str, Any], provenance: dict[str, Any]
     return path
 
 
-def write_packed(path: Path, document: dict[str, Any], provenance: dict[str, Any], source_store: ContentStore) -> Path:
+def write_packed(
+    path: Path, document: dict[str, Any], provenance: dict[str, Any], source_store: ContentStore
+) -> Path:
     if path.suffix != ".mplot":
         path = path.with_suffix(path.suffix + ".mplot" if path.suffix else ".mplot")
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -106,7 +107,14 @@ def write_packed(path: Path, document: dict[str, Any], provenance: dict[str, Any
     return path
 
 
-def materialize_document(path: Path, document: dict[str, Any], provenance: dict[str, Any], store: ContentStore, *, packed: bool) -> Path:
+def materialize_document(
+    path: Path,
+    document: dict[str, Any],
+    provenance: dict[str, Any],
+    store: ContentStore,
+    *,
+    packed: bool,
+) -> Path:
     if packed:
         return write_packed(path, document, provenance, store)
     final = write_split(path, document, provenance)

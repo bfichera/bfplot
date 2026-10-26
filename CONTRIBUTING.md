@@ -44,17 +44,33 @@ Then run everything:
 $ ./scripts/smoke.sh
 ```
 
-The smoke script checks Rust formatting, tests, and lints; compiles and tests the Python package; and type-checks, tests, and builds the viewer.
+The smoke script checks Rust formatting, tests, and lints; formats, lints, compiles, and tests the Python package; and type-checks, tests, and builds the viewer. It is the same quality gate used by CI.
 
 If you only changed one component, focused tests are faster while you work:
 
 ```console
 $ cargo test --workspace
+$ python -m ruff check src tests
 $ python -m pytest
 $ npm --prefix viewer test
 ```
 
 Run the complete smoke script before submitting the change.
+
+## Code style
+
+Prefer small modules with one clear owner over large files organized only by comments. Public APIs should use precise types and docstrings; implementation details should stay private. Keep format validation at trust boundaries, and express invariants in tests rather than relying on reader intuition.
+
+Formatting is mechanical:
+
+```console
+$ python -m ruff format src tests
+$ cargo fmt --all
+```
+
+Viewer TypeScript follows the existing expanded style: one statement per line, trailing commas in multiline literals, and named helpers for non-trivial DOM behavior. The strict TypeScript compiler is the source of truth for correctness; avoid compressed one-line DOM construction even when it type-checks.
+
+Do not mix broad formatting with an unrelated behavior change. Generated viewer files in `viewer/dist` are rebuilt with `npm --prefix viewer run build`; edit the corresponding source file instead.
 
 ## What makes a good test?
 

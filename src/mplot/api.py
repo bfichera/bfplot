@@ -5,9 +5,9 @@ import shutil
 import subprocess
 import tempfile
 import time
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable
 from pathlib import Path
-from typing import Any
+from typing import Any, TypeVar
 
 import matplotlib.pyplot as plt
 from matplotlib.figure import Figure
@@ -19,6 +19,8 @@ from .mir import MirDocument
 from .provenance import collect_provenance, processing_metadata
 from .store import ContentStore
 from .temporal import Animation
+
+Frame = TypeVar("Frame")
 
 
 def _figures(figure: Figure | Iterable[Figure] | None) -> list[Figure]:
@@ -71,7 +73,9 @@ def compile(
     with tempfile.TemporaryDirectory(prefix="mplot-") as temporary:
         store = ContentStore(Path(temporary) / "objects")
         artifact_document = lower_mir(document, store)
-        return materialize_document(output, artifact_document, document.metadata, store, packed=packed)
+        return materialize_document(
+            output, artifact_document, document.metadata, store, packed=packed
+        )
 
 
 def animation(
@@ -86,23 +90,31 @@ def animation(
     """Record mutable Matplotlib figures into one temporal MPlot artifact."""
     metadata = _metadata(provenance)
 
-    def translator(source: Figure | Iterable[Figure] | None, frame_metadata: dict[str, Any]) -> MirDocument:
+    def translator(
+        source: Figure | Iterable[Figure] | None, frame_metadata: dict[str, Any]
+    ) -> MirDocument:
         return translate_figures(_figures(source), frame_metadata)
 
     def compiler(document: MirDocument, output: str | Path, packed_value: bool | None) -> Path:
         return compile(document, output, packed=packed_value)
 
     return Animation(
-        path, figure, fps=fps, packed=packed, loop=loop,
-        translator=translator, compiler=compiler, metadata=metadata,
+        path,
+        figure,
+        fps=fps,
+        packed=packed,
+        loop=loop,
+        translator=translator,
+        compiler=compiler,
+        metadata=metadata,
     )
 
 
 def save_animation(
     path: str | Path,
     figure: Figure | Iterable[Figure],
-    frames: Iterable[Any],
-    update: Any,
+    frames: Iterable[Frame],
+    update: Callable[[Frame], Any],
     *,
     fps: float = 30,
     packed: bool | None = None,
@@ -152,7 +164,9 @@ def show(
     if open_browser:
         executable = shutil.which("mplot")
         if executable is None:
-            raise RuntimeError("the mplot viewer executable is not installed; use open_browser=False")
+            raise RuntimeError(
+                "the mplot viewer executable is not installed; use open_browser=False"
+            )
         subprocess.Popen([executable, "view", str(artifact)], start_new_session=True)
     return artifact
 
@@ -167,7 +181,11 @@ class Stream:
 
     def __init__(self, path: str | Path, *, provenance: bool | dict[str, Any] = True):
         path = Path(path)
-        self.path = path if path.name.endswith(".mplot-stream") else path.with_name(path.name + ".mplot-stream")
+        self.path = (
+            path
+            if path.name.endswith(".mplot-stream")
+            else path.with_name(path.name + ".mplot-stream")
+        )
         self.frames = self.path / "frames"
         self.provenance = provenance
         self._entries: list[dict[str, Any]] = []
@@ -175,12 +193,22 @@ class Stream:
         self.frames.mkdir(parents=True, exist_ok=True)
         self._write_index()
 
-    def send(self, figure: Figure | Iterable[Figure] | None = None, *, timestamp: float | None = None) -> Path:
+    def send(
+        self, figure: Figure | Iterable[Figure] | None = None, *, timestamp: float | None = None
+    ) -> Path:
         if self._closed:
             raise RuntimeError("stream is closed")
         number = len(self._entries)
-        frame = savefig(self.frames / f"{number:08d}.mplot", figure, packed=True, provenance=self.provenance)
-        self._entries.append({"sequence": number, "timestamp": time.time() if timestamp is None else float(timestamp), "artifact": frame.name})
+        frame = savefig(
+            self.frames / f"{number:08d}.mplot", figure, packed=True, provenance=self.provenance
+        )
+        self._entries.append(
+            {
+                "sequence": number,
+                "timestamp": time.time() if timestamp is None else float(timestamp),
+                "artifact": frame.name,
+            }
+        )
         self._write_index()
         return frame
 
@@ -192,7 +220,11 @@ class Stream:
             self._write_index()
 
     def _write_index(self) -> None:
-        data = json.dumps({"version": "0.9.9", "closed": self._closed, "frames": self._entries}, sort_keys=True, separators=(",", ":")).encode()
+        data = json.dumps(
+            {"version": "0.9.9", "closed": self._closed, "frames": self._entries},
+            sort_keys=True,
+            separators=(",", ":"),
+        ).encode()
         temporary = self.path / ".index.json.tmp"
         temporary.write_bytes(data)
         temporary.replace(self.path / "index.json")

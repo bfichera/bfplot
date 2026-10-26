@@ -7,7 +7,6 @@ import zstandard as zstd
 
 from .store import ContentStore
 
-
 _JSON_DTYPES = {"b", "i", "u", "f"}
 
 
