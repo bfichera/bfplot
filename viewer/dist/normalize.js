@@ -106,7 +106,7 @@ export function normalizeDocument(value) {
     delete metadata.plugins;
     return {
         figures, axes, artists,
-        links: list(raw.links), selections: list(raw.selections),
+        links: list(raw.links),
         ...(text(raw.title) ? { title: text(raw.title) } : {}), metadata,
     };
 }

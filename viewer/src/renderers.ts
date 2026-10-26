@@ -12,7 +12,6 @@ export interface RenderContext {
   width: number;
   height: number;
   theme: Theme;
-  selected: ReadonlySet<number>;
   pointBudget: number;
   project3d(x: number, y: number, z: number): [number, number];
 }
@@ -34,10 +33,11 @@ const line: ArtistRenderer = ({ group, artist, data, x, y, theme, pointBudget })
   group.append(svg("path", { d: pathFrom(points), fill: "none", stroke: cssColor(artist.props.color, theme.accent), "stroke-width": prop(artist, "linewidth", 1.8), "stroke-dasharray": prop(artist, "dasharray", undefined), opacity: prop(artist, "alpha", 1), "vector-effect": "non-scaling-stroke" }));
 };
 
-const scatter: ArtistRenderer = ({ group, artist, data, x, y, theme, selected, pointBudget }) => {
-  const sizes = numeric(data.sizes ?? artist.props.size), colors = Array.isArray(data.colors) ? data.colors : [];
+const scatter: ArtistRenderer = ({ group, artist, data, x, y, theme, pointBudget }) => {
+  const sizes = numeric(data.sizes ?? artist.props.size), colors = Array.isArray(data.colors) ? data.colors : [], facecolors = artist.props.facecolors as unknown[] | undefined;
+  const values = numeric(data.values), mapped = values.length ? scalarColors(values, artist) : [];
   for (const [px, py, index] of sampled(pairs(data.x, data.y), pointBudget)) {
-    const point = svg("circle", { cx: x(px), cy: y(py), r: Math.sqrt(sizes[index] ?? prop(artist, "size", 24)) / 2, fill: cssColor(colors[index] ?? artist.props.color, theme.accent), opacity: prop(artist, "alpha", 0.85), class: "mplot-point", "data-index": index, "data-selected": selected.has(index) ? "true" : "false", tabindex: "-1" });
+    const point = svg("circle", { cx: x(px), cy: y(py), r: Math.sqrt(sizes[index] ?? prop(artist, "size", 24)) / 2, fill: mapped[index] ?? cssColor(colors[index] ?? facecolors?.[index] ?? artist.props.color, theme.accent), opacity: prop(artist, "alpha", 0.85), class: "mplot-point", "data-index": index, tabindex: "-1" });
     group.append(point);
   }
 };
@@ -116,6 +116,19 @@ const colorTable = (palette: string[]): Uint8Array => {
   return table;
 };
 
+const mappedColor = (value: number, limits: [number, number], palette: string[]): string => {
+  const colors = colorTable(palette), fraction = Math.max(0, Math.min(1, (value - limits[0]) / (limits[1] - limits[0] || 1)));
+  const offset = Math.round(fraction * 255) * 3;
+  return `rgb(${colors[offset]}, ${colors[offset + 1]}, ${colors[offset + 2]})`;
+};
+
+const scalarColors = (values: number[], artist: Artist): string[] => {
+  const configured = numeric(artist.props.clim), limits = configured.length >= 2 ? [configured[0]!, configured[1]!] as [number, number] : finiteRange(values, [0, 1]);
+  const configuredPalette = prop<string[]>(artist, "colors", palettes[String(artist.props.cmap)] ?? palettes.viridis!);
+  const palette = configuredPalette.length >= 2 ? configuredPalette : palettes.viridis!;
+  return values.map((value) => mappedColor(value, limits, palette));
+};
+
 const finiteRange = (values: number[], fallback: [number, number]): [number, number] => {
   let minimum = Infinity, maximum = -Infinity;
   for (const value of values) if (Number.isFinite(value)) { minimum = Math.min(minimum, value); maximum = Math.max(maximum, value); }
@@ -177,14 +190,19 @@ const contourPath = (raw: unknown, rawCodes: unknown, x: Scale, y: Scale, budget
 };
 
 const contour = (filled: boolean): ArtistRenderer => ({ group, artist, data, x, y, theme, pointBudget }) => {
-  const levels = (data.paths ?? data.segments ?? data.polygons ?? []) as unknown[], codes = Array.isArray(data.path_codes) ? data.path_codes : [], budgetPerPath = Math.max(64, Math.floor(pointBudget / Math.max(1, levels.length)));
+  const paths = (data.paths ?? data.segments ?? data.polygons ?? []) as unknown[], codes = Array.isArray(data.path_codes) ? data.path_codes : [], budgetPerPath = Math.max(64, Math.floor(pointBudget / Math.max(1, paths.length)));
   const facecolors = artist.props.facecolors as unknown[] | undefined, edgecolors = artist.props.edgecolors as unknown[] | undefined;
-  for (const [index, raw] of levels.entries()) {
+  const values = numeric(data.path_values), levels = numeric(data.levels), configured = numeric(artist.props.clim);
+  const limits = configured.length >= 2 ? [configured[0]!, configured[1]!] as [number, number] : finiteRange(levels, [0, 1]);
+  const configuredPalette = prop<string[]>(artist, "colors", palettes[String(artist.props.cmap)] ?? palettes.viridis!);
+  const palette = configuredPalette.length >= 2 ? configuredPalette : palettes.viridis!;
+  for (const [index, raw] of paths.entries()) {
     const path = contourPath(raw, codes[index], x, y, budgetPerPath, filled);
     if (!path) continue;
-    const fill = cssColor(facecolors?.[index] ?? (artist.props.colors as unknown[] | undefined)?.[index], theme.accent);
-    const stroke = cssColor(edgecolors?.[index] ?? (artist.props.colors as unknown[] | undefined)?.[index], filled ? "none" : theme.accent);
-    group.append(svg("path", { d: path, fill: filled ? fill : "none", "fill-rule": filled ? "evenodd" : undefined, "fill-opacity": filled ? prop(artist, "alpha", 1) : 0, stroke, "stroke-width": numeric(artist.props.linewidths)[index] ?? prop(artist, "linewidth", 1) }));
+    const mapped = values[index] === undefined ? undefined : mappedColor(values[index]!, limits, palette);
+    const fill = mapped ?? cssColor(facecolors?.[index] ?? (artist.props.colors as unknown[] | undefined)?.[index], theme.accent);
+    const stroke = mapped ?? cssColor(edgecolors?.[index] ?? (artist.props.colors as unknown[] | undefined)?.[index], filled ? "none" : theme.accent);
+    group.append(svg("path", { d: path, fill: filled ? fill : "none", "fill-rule": filled ? "evenodd" : undefined, "fill-opacity": filled ? prop(artist, "alpha", 1) : 0, stroke: filled ? "none" : stroke, "stroke-width": numeric(artist.props.linewidths)[index] ?? prop(artist, "linewidth", 1) }));
   }
 };
 
@@ -221,13 +239,13 @@ const line3d: ArtistRenderer = ({ group, artist, data, project3d, theme, pointBu
   group.append(svg("path", { d:pathFrom(points), fill:"none", stroke:cssColor(artist.props.color,theme.accent), "stroke-width":prop(artist,"linewidth",1.8) }));
 };
 
-const scatter3d: ArtistRenderer = ({ group, artist, data, project3d, theme, selected, pointBudget }) => {
-  const xs=numeric(data.x),ys=numeric(data.y),zs=numeric(data.z), indices=sampled(xs.map((_,i)=>i),pointBudget).sort((a,b)=>(zs[a]??0)-(zs[b]??0));
-  for(const i of indices){ if(ys[i]===undefined||zs[i]===undefined) continue; const [cx,cy]=project3d(xs[i]!,ys[i]!,zs[i]!); group.append(svg("circle",{cx,cy,r:prop(artist,"size",4),fill:cssColor(artist.props.color,theme.accent),opacity:prop(artist,"alpha",.85),class:"mplot-point","data-index":i,"data-selected":selected.has(i)?"true":"false"})); }
+const scatter3d: ArtistRenderer = ({ group, artist, data, project3d, theme, pointBudget }) => {
+  const xs=numeric(data.x),ys=numeric(data.y),zs=numeric(data.z), values=numeric(data.values), mapped=values.length?scalarColors(values,artist):[], indices=sampled(xs.map((_,i)=>i),pointBudget).sort((a,b)=>(zs[a]??0)-(zs[b]??0));
+  for(const i of indices){ if(ys[i]===undefined||zs[i]===undefined) continue; const [cx,cy]=project3d(xs[i]!,ys[i]!,zs[i]!); group.append(svg("circle",{cx,cy,r:prop(artist,"size",4),fill:mapped[i]??cssColor(artist.props.color,theme.accent),opacity:prop(artist,"alpha",.85),class:"mplot-point","data-index":i})); }
 };
 
 const surface3d = (filled: boolean): ArtistRenderer => ({ group, artist, data, project3d, theme, pointBudget }) => {
-  const paths = Array.isArray(data.paths) ? data.paths : [], budget = Math.max(1, Math.min(paths.length, pointBudget));
+  const paths = Array.isArray(data.paths) ? data.paths : [], values = numeric(data.values), mapped = values.length ? scalarColors(values, artist) : [], budget = Math.max(1, Math.min(paths.length, pointBudget));
   const indices = sampled(paths.map((_, index) => index), budget);
   for (const index of indices) {
     const raw = paths[index];
@@ -237,7 +255,7 @@ const surface3d = (filled: boolean): ArtistRenderer => ({ group, artist, data, p
     const facecolors = artist.props.facecolors as unknown[] | undefined, edgecolors = artist.props.edgecolors as unknown[] | undefined;
     group.append(svg("path", {
       d: pathFrom(points, filled),
-      fill: filled ? cssColor(facecolors?.[index] ?? artist.props.facecolor ?? artist.props.color, theme.accent) : "none",
+      fill: filled ? mapped[index] ?? cssColor(facecolors?.[index] ?? artist.props.facecolor ?? artist.props.color, theme.accent) : "none",
       "fill-opacity": filled ? prop(artist, "alpha", 0.75) : 0,
       stroke: cssColor(edgecolors?.[index] ?? artist.props.edgecolor ?? artist.props.color, filled ? theme.grid : theme.accent),
       "stroke-width": numeric(artist.props.linewidths)[index] ?? (filled ? 0.35 : 0.8),

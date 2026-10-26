@@ -30,7 +30,6 @@
   --mplot-muted: #68655d;
   --mplot-grid: #dddcd7;
   --mplot-accent: #7b191c;
-  --mplot-selection: #9a5617;
   display: block;
   box-sizing: border-box;
   min-height: 100dvh;
@@ -233,7 +232,6 @@
 .mplot-tooltip { position: absolute; z-index: 4; padding: 5px 7px; border: 1px solid #aaa79e; border-radius: 0; background: #fffffff2; box-shadow: 0 3px 12px #0001; font: 11px "CMU Serif", serif; white-space: nowrap; pointer-events: none; transform: translate(8px, -100%); }
 .mplot-coordinates { position: absolute; left: 22px; bottom: 9px; z-index: 3; min-width: 160px; color: var(--mplot-muted); font: 10px "CMU Serif", serif; font-style: italic; pointer-events: none; }
 .mplot-brush { fill: color-mix(in srgb, var(--mplot-accent) 8%, transparent); stroke: var(--mplot-accent); stroke-width: 1; stroke-dasharray: 4 3; vector-effect: non-scaling-stroke; }
-.mplot-brush--select { fill: color-mix(in srgb, var(--mplot-selection) 10%, transparent); stroke: var(--mplot-selection); }
 .mplot-unknown { stroke: var(--mplot-muted); fill: #fafaf8; }
 .mplot-unknown text { fill: var(--mplot-muted); font-size: 12px; }
 .mplot-status { position: absolute; right: 14px; bottom: 9px; color: var(--mplot-muted); font: 10px "CMU Serif", serif; pointer-events: none; }
@@ -241,13 +239,15 @@
 .mplot-metadata-page { width: min(100%, 1100px); margin: 0 auto; color: var(--mplot-fg); }
 .mplot-metadata-page[hidden] { display: none; }
 .mplot-metadata-body { padding: 10px clamp(8px, 3vw, 44px) 50px; font: 15px/1.5 "CMU Serif", serif; }
-.mplot-metadata-page details { margin: 8px 0 16px; }
-.mplot-metadata-page summary { cursor: pointer; font-weight: 700; }
-.mplot-metadata-page dl { display: grid; grid-template-columns: minmax(130px, .65fr) minmax(0, 1.8fr); gap: 7px 24px; margin: 12px 0 20px 18px; }
+.mplot-metadata-section { margin: 0 0 28px; }
+.mplot-metadata-section .mplot-metadata-section { margin: 22px 0 0; padding-top: 16px; border-top: 1px solid #deddd7; }
+.mplot-metadata-section h3, .mplot-metadata-section h4 { margin: 0 0 10px; font-weight: 700; }
+.mplot-metadata-section h3 { font-size: 17px; }
+.mplot-metadata-section h4 { font-size: 15px; text-transform: capitalize; }
+.mplot-metadata-page dl { display: grid; grid-template-columns: minmax(130px, .65fr) minmax(0, 1.8fr); gap: 7px 24px; margin: 0; }
 .mplot-metadata-page dt { color: var(--mplot-muted); overflow-wrap: anywhere; }
 .mplot-metadata-page dd { margin: 0; overflow-wrap: anywhere; }
-.mplot-point { transition: opacity .12s, stroke-width .12s; }
-.mplot-point[data-selected=true] { stroke: var(--mplot-selection); stroke-width: 3; }
+.mplot-point { transition: opacity .12s; }
 .mplot-hidden { display: none !important; }
 
 @media (max-width: 820px) {

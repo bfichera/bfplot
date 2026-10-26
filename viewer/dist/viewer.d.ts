@@ -71,8 +71,6 @@ export declare class MPlotViewer extends EventTarget {
     private boundToPlot;
     private updateCoordinates;
     private clearHover;
-    private selectRect;
-    private selectedIndices;
     private showTooltip;
     private project3d;
     private markActiveAxis;

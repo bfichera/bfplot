@@ -85,6 +85,23 @@ def test_savefig_marks_colorbars_as_auxiliary_axes(tmp_path):
     assert len(colorbars[0]["colorbar"]["colors"]) == 64
 
 
+def test_savefig_links_filled_contour_colorbar_to_mappable(tmp_path):
+    figure, axes = plt.subplots()
+    contour = axes.contourf(np.arange(16).reshape(4, 4), levels=[0, 4, 8, 12, 16], cmap="viridis")
+    figure.colorbar(contour, ax=axes, label="level")
+
+    output = mplot.savefig(tmp_path / "contour-colorbar", figure, provenance=False)
+    _, document = _document_from_split(output)
+    plot = next(axis for axis in document["figures"][0]["axes"] if axis.get("role") != "colorbar")
+    colorbar = next(axis for axis in document["figures"][0]["axes"] if axis.get("role") == "colorbar")
+    extracted = next(artist for artist in plot["artists"] if artist["type"] == "mplot.contourf")
+
+    assert colorbar["colorbar"]["mappable"] == extracted["id"]
+    path_values = _decode_array(output, extracted["data"]["path_values"])
+    path_lengths = _decode_array(output, extracted["data"]["path_lengths"])
+    assert len(path_values) == len(path_lengths) > 0
+
+
 def test_savefig_preserves_dates_insets_and_public_labels(tmp_path):
     figure, axes = plt.subplots()
     dates = [datetime(2026, 1, 1) + timedelta(days=index) for index in range(3)]

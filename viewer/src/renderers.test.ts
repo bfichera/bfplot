@@ -9,7 +9,7 @@ const artist = { type: "mplot.line", schema_version: 1, id: "line", axes_id: "ax
 const context = (group: SVGGElement, type: string, data: Record<string, unknown>, props: Record<string, unknown> = {}) => ({
   group, artist: { ...artist, type, props }, data,
   x: createScale("linear", [-3, 3], [0, 600]), y: createScale("linear", [-3, 3], [600, 0]),
-  width: 600, height: 600, theme: themes.light, selected: new Set<number>(), pointBudget: 2_000,
+  width: 600, height: 600, theme: themes.light, pointBudget: 2_000,
   project3d: (x: number, y: number, z: number) => [300 + x * 80 + z * 20, 300 - y * 80 - z * 20] as [number, number],
 });
 
@@ -24,9 +24,21 @@ describe("artist rendering", () => {
     expect(contours.querySelector("path")?.getAttribute("d")).toContain("L500.00,400.00 M200.00,300.00");
     expect(contours.querySelector("path")?.getAttribute("fill")).toBe("#abcdef");
     expect(contours.querySelector("path")?.getAttribute("fill-rule")).toBe("evenodd");
+    const recolored = svg("g");
+    builtinRenderers["mplot.contourf"]!(context(recolored, "mplot.contourf", { paths: [[[-2, -1], [0, 2], [2, -1]]], path_values: [7], levels: [0, 10] }, { facecolors: ["#abcdef"], cmap: "viridis", clim: [5, 10] }));
+    expect(recolored.querySelector("path")?.getAttribute("fill")).not.toBe("#abcdef");
+    expect(recolored.querySelector("path")?.getAttribute("fill")).toBe("rgb(43, 120, 140)");
     const lines = svg("g");
     builtinRenderers["mplot.line"]!(context(lines, "mplot.line", { x: [-1, 0, 1], y: [0, 1, 0] }));
     expect(lines.querySelector("path")?.getAttribute("d")).toContain("L300.00,200.00");
+  });
+
+  it("maps scalar scatter colors through the effective color limits", () => {
+    const original = svg("g"), contrasted = svg("g");
+    builtinRenderers["mplot.scatter"]!(context(original, "mplot.scatter", { x: [0, 1, 2], y: [0, 1, 2], values: [0, .5, 1] }, { cmap: "viridis", clim: [0, 1] }));
+    builtinRenderers["mplot.scatter"]!(context(contrasted, "mplot.scatter", { x: [0, 1, 2], y: [0, 1, 2], values: [0, .5, 1] }, { cmap: "viridis", clim: [0, .75] }));
+    expect(contrasted.querySelectorAll("circle")[1]?.getAttribute("fill")).not.toBe(original.querySelectorAll("circle")[1]?.getAttribute("fill"));
+    expect(Array.from(contrasted.querySelectorAll("circle"), (point) => point.getAttribute("fill"))).toEqual(["rgb(68, 1, 84)", "rgb(74, 182, 112)", "rgb(253, 231, 37)"]);
   });
 
   it("renders TeX annotations as native MathML", () => {
@@ -72,7 +84,7 @@ describe("large data rendering", () => {
     const group = svg("g"), values = Array.from({ length: 100_000 }, (_, index) => index);
     builtinRenderers["mplot.line"]!({
       group, artist, data: { x: values, y: values }, x: createScale("linear", [0, 100_000], [0, 800]), y: createScale("linear", [0, 100_000], [600, 0]),
-      width: 800, height: 600, theme: themes.light, selected: new Set(), pointBudget: 1_000, project3d: (x, y) => [x, y],
+      width: 800, height: 600, theme: themes.light, pointBudget: 1_000, project3d: (x, y) => [x, y],
     });
     const path = group.querySelector("path")?.getAttribute("d") ?? "";
     expect((path.match(/[ML]/g) ?? [])).toHaveLength(1_000);
@@ -82,7 +94,7 @@ describe("large data rendering", () => {
     const group = svg("g"), values = Array.from({ length: 100_000 }, (_, index) => index);
     builtinRenderers["mplot.scatter"]!({
       group, artist: { ...artist, type: "mplot.scatter" }, data: { x: values, y: values }, x: createScale("linear", [0, 100_000], [0, 800]), y: createScale("linear", [0, 100_000], [600, 0]),
-      width: 800, height: 600, theme: themes.light, selected: new Set(), pointBudget: 1_000, project3d: (x, y) => [x, y],
+      width: 800, height: 600, theme: themes.light, pointBudget: 1_000, project3d: (x, y) => [x, y],
     });
     expect(group.querySelectorAll("circle")).toHaveLength(1_000);
   });
@@ -94,7 +106,7 @@ describe("large data rendering", () => {
     const group = svg("g"), values = Array.from({ length: 175_000 }, (_, index) => index % 251);
     builtinRenderers["mplot.image"]!({
       group, artist: { ...artist, type: "mplot.image", props: { cmap: "cividis", clim: [0, 250], origin: "lower" } }, data: { values, shape: [350, 500], extent: [0, 500, 0, 350] }, x: createScale("linear", [0, 500], [0, 800]), y: createScale("linear", [0, 350], [600, 0]),
-      width: 800, height: 600, theme: themes.light, selected: new Set(), pointBudget: 1_000, project3d: (x, y) => [x, y],
+      width: 800, height: 600, theme: themes.light, pointBudget: 1_000, project3d: (x, y) => [x, y],
     });
     expect(group.querySelectorAll("image")).toHaveLength(1);
     expect(group.querySelectorAll("rect")).toHaveLength(0);

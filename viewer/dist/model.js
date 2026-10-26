@@ -34,7 +34,6 @@ function dataValues(data, dimension) {
 export class ViewerModel extends EventTarget {
     document;
     viewports = new Map();
-    selections = new Map();
     resolver;
     dataCache = new Map();
     activeResolutions = 0;
@@ -126,10 +125,6 @@ export class ViewerModel extends EventTarget {
             target.y = [...source.y];
         else if (source.z)
             target.z = [...source.z];
-    }
-    setSelection(id, points) {
-        this.selections.set(id, points.map((point) => ({ artistId: point.artistId, indices: [...point.indices] })));
-        this.dispatchEvent(new CustomEvent("selection", { detail: { id, points } }));
     }
     async resolveData(data, artist) {
         const entries = await Promise.all(Object.entries(data).map(async ([key, value]) => [key, await this.resolveValue(value)]));

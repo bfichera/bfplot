@@ -94,7 +94,7 @@ export function normalizeDocument(value: unknown): MPlotDocument {
   delete metadata.plugins;
   return {
     figures, axes, artists,
-    links: list(raw.links) as NonNullable<MPlotDocument["links"]>, selections: list(raw.selections) as NonNullable<MPlotDocument["selections"]>,
+    links: list(raw.links) as NonNullable<MPlotDocument["links"]>,
     ...(text(raw.title) ? { title: text(raw.title) } : {}), metadata,
   };
 }

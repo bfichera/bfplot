@@ -60,12 +60,6 @@ export interface AxisLink {
     dimension?: AxisDimension | AxisDimension[];
     dimensions?: AxisDimension[];
 }
-export interface SelectionDefinition {
-    id: string;
-    axes?: string[];
-    mode?: "point" | "rect" | "lasso";
-    indices?: Record<string, number[]>;
-}
 export interface MPlotDocument {
     version?: string;
     title?: string;
@@ -73,22 +67,12 @@ export interface MPlotDocument {
     axes: Axis[];
     artists: Artist[];
     links?: AxisLink[];
-    selections?: SelectionDefinition[];
     metadata?: Record<string, unknown>;
 }
 export interface Viewport {
     x: [number, number];
     y: [number, number];
     z?: [number, number];
-}
-export interface PointSelection {
-    artistId: string;
-    indices: number[];
-}
-export interface MPlotSelectionEventDetail {
-    selectionId: string;
-    axesId: string;
-    points: PointSelection[];
 }
 export type ResolvedData = Record<string, unknown>;
 export type ArrayResolver = (reference: ArrayReference) => Promise<unknown>;
@@ -99,7 +83,6 @@ export interface Theme {
     muted: string;
     grid: string;
     accent: string;
-    selection: string;
     fontFamily: string;
 }
 export type ThemeName = "light" | "dark" | "auto";

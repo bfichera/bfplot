@@ -43,11 +43,6 @@ export class MPlotViewer extends EventTarget {
             for (const axisId of detail.affected ?? [detail.axisId])
                 void this.renderAxis(axisId);
         });
-        this.model.addEventListener("selection", (event) => {
-            const detail = event.detail;
-            for (const axisId of new Set(detail.points.map((point) => this.model.document.artists.find((artist) => artist.id === point.artistId)?.axes_id).filter((id) => Boolean(id))))
-                void this.renderAxis(axisId);
-        });
         this.model.addEventListener("change", () => { void this.render(); });
         if (typeof ResizeObserver !== "undefined") {
             this.resize = new ResizeObserver((entries) => {
@@ -482,32 +477,39 @@ export class MPlotViewer extends EventTarget {
         return page;
     }
     metadataTree(value, label) {
-        if (value && typeof value === "object") {
-            const details = document.createElement("details"), summary = document.createElement("summary"), list = document.createElement("dl");
-            details.open = label === "Metadata";
-            summary.textContent = label;
-            details.append(summary);
-            for (const [key, item] of Object.entries(value)) {
-                const term = document.createElement("dt"), definition = document.createElement("dd");
-                term.textContent = key;
-                if (item && typeof item === "object")
-                    definition.append(this.metadataTree(item, Array.isArray(item) ? `${item.length} items` : "Details"));
-                else
-                    definition.textContent = item === null ? "null" : String(item);
-                list.append(term, definition);
-            }
-            details.append(list);
-            return details;
+        const section = document.createElement("section"), heading = document.createElement(label === "Metadata" ? "h3" : "h4");
+        section.className = "mplot-metadata-section";
+        heading.textContent = label;
+        section.append(heading);
+        if (!value || typeof value !== "object") {
+            const output = document.createElement("p");
+            output.textContent = value === null ? "null" : String(value);
+            section.append(output);
+            return section;
         }
-        const span = document.createElement("span");
-        span.textContent = `${label}: ${String(value)}`;
-        return span;
+        const list = document.createElement("dl"), nested = [];
+        for (const [key, item] of Object.entries(value)) {
+            if (item && typeof item === "object") {
+                if (!Object.keys(item).length)
+                    continue;
+                nested.push(this.metadataTree(item, key));
+                continue;
+            }
+            const term = document.createElement("dt"), definition = document.createElement("dd");
+            term.textContent = key;
+            definition.textContent = item === null ? "null" : String(item);
+            list.append(term, definition);
+        }
+        if (list.childElementCount)
+            section.append(list);
+        section.append(...nested);
+        return section;
     }
     createToolbar() {
         const toolbar = document.createElement("nav");
         toolbar.className = "mplot-toolbar";
         toolbar.setAttribute("aria-label", "Plot tools");
-        const actions = [["Pan", "pan", () => this.setMode("pan")], ["Zoom", "zoom", () => this.setMode("zoom")], ["Select", "select", () => this.setMode("select")], ["Reset", "reset", () => this.reset()]];
+        const actions = [["Pan", "pan", () => this.setMode("pan")], ["Zoom", "zoom", () => this.setMode("zoom")], ["Reset", "reset", () => this.reset()]];
         for (const [label, name, action] of actions) {
             const button = document.createElement("button");
             button.type = "button";
@@ -516,7 +518,7 @@ export class MPlotViewer extends EventTarget {
             button.dataset.action = name;
             button.title = label;
             button.onclick = action;
-            if (["pan", "zoom", "select"].includes(name))
+            if (["pan", "zoom"].includes(name))
                 button.setAttribute("aria-pressed", String(this.mode === name));
             toolbar.append(button);
         }
@@ -545,7 +547,7 @@ export class MPlotViewer extends EventTarget {
     setMode(mode) {
         this.mode = mode;
         this.element.querySelectorAll("[data-action]").forEach((button) => {
-            if (["pan", "zoom", "select"].includes(button.dataset.action ?? ""))
+            if (["pan", "zoom"].includes(button.dataset.action ?? ""))
                 button.setAttribute("aria-pressed", String(button.dataset.action === mode));
         });
     }
@@ -602,10 +604,9 @@ export class MPlotViewer extends EventTarget {
                 if (documentToken !== this.documentToken || this.views.get(axisId) !== view || view.figureId !== this.activeFigureIdValue)
                     return;
                 this.resolvedData.set(artist.id, data);
-                const selected = this.selectedIndices(artist.id);
                 const contrast = this.contrastLimits.get(artist.id);
                 const effectiveArtist = contrast ? { ...artist, props: { ...artist.props, clim: contrast } } : artist;
-                await renderer({ ...working, group, artist: effectiveArtist, data, theme: this.theme, selected, pointBudget: Math.max(500, Math.round(view.width * 4)), project3d: (x, y, z) => this.project3d(view, x, y, z) });
+                await renderer({ ...working, group, artist: effectiveArtist, data, theme: this.theme, pointBudget: Math.max(500, Math.round(view.width * 4)), project3d: (x, y, z) => this.project3d(view, x, y, z) });
             }
             catch (error) {
                 this.drawUnknown(group, artist, working, error instanceof Error ? error.message : "render failed");
@@ -666,12 +667,10 @@ export class MPlotViewer extends EventTarget {
         let brush;
         const finish = (event, cancel = false) => { if (!start)
             return; const pointer = this.pointer(view, event), p = this.boundToPlot(view, pointer.x, pointer.y); if (!cancel && this.mode === "zoom" && Math.hypot(p.x - start.x, p.y - start.y) > 4)
-            this.model.setViewport(view.axis.id, { ...start.viewport, x: [view.x.invert(Math.min(start.x, p.x)), view.x.invert(Math.max(start.x, p.x))], y: [view.y.invert(Math.max(start.y, p.y)), view.y.invert(Math.min(start.y, p.y))] });
-        else if (!cancel && this.mode === "select")
-            this.selectRect(view, start.x, start.y, p.x, p.y); start = undefined; brush?.remove(); brush = undefined; };
+            this.model.setViewport(view.axis.id, { ...start.viewport, x: [view.x.invert(Math.min(start.x, p.x)), view.x.invert(Math.max(start.x, p.x))], y: [view.y.invert(Math.max(start.y, p.y)), view.y.invert(Math.min(start.y, p.y))] }); start = undefined; brush?.remove(); brush = undefined; };
         view.svg.addEventListener("pointerdown", (event) => { this.activeAxisId = view.axis.id; this.markActiveAxis(); const p = this.pointer(view, event); if (!this.inPlot(view, p.x, p.y))
-            return; start = { ...p, viewport: structuredClone(this.model.viewports.get(view.axis.id)), xScale: view.x, yScale: view.y }; view.svg.setPointerCapture(event.pointerId); if (this.mode === "select" || this.mode === "zoom") {
-            brush = svg("rect", { x: p.x, y: p.y, width: 0, height: 0, class: `mplot-brush mplot-brush--${this.mode}` });
+            return; start = { ...p, viewport: structuredClone(this.model.viewports.get(view.axis.id)), xScale: view.x, yScale: view.y }; view.svg.setPointerCapture(event.pointerId); if (this.mode === "zoom") {
+            brush = svg("rect", { x: p.x, y: p.y, width: 0, height: 0, class: "mplot-brush mplot-brush--zoom" });
             view.overlay.append(brush);
         } });
         view.svg.addEventListener("pointermove", (event) => { const p = this.pointer(view, event); this.updateCoordinates(view, p.x, p.y); if (!start) {
@@ -726,16 +725,6 @@ export class MPlotViewer extends EventTarget {
     boundToPlot(view, x, y) { const bounds = this.plotBounds(view); return { x: Math.max(bounds.left, Math.min(bounds.right, x)), y: Math.max(bounds.top, Math.min(bounds.bottom, y)) }; }
     updateCoordinates(view, px, py) { view.readout.textContent = this.inPlot(view, px, py) ? `x = ${formatTick(view.x.invert(px), view.axis.xscale, this.dateFormat(view, "x"))} · y = ${formatTick(view.y.invert(py), view.axis.yscale, this.dateFormat(view, "y"))}` : "x — · y —"; }
     clearHover(view) { view.host.querySelector(".mplot-tooltip")?.remove(); view.readout.textContent = "x — · y —"; }
-    selectRect(view, x0, y0, x1, y1) { const left = Math.min(x0, x1), right = Math.max(x0, x1), top = Math.min(y0, y1), bottom = Math.max(y0, y1), points = []; for (const artist of this.model.document.artists.filter((item) => item.axes_id === view.axis.id)) {
-        const data = this.resolvedData.get(artist.id) ?? artist.data;
-        const selected = pairs(data.x, data.y).filter(([x, y]) => { const px = view.x(x), py = view.y(y); return px >= left && px <= right && py >= top && py <= bottom; }).map(([, , index]) => index);
-        if (selected.length)
-            points.push({ artistId: artist.id, indices: selected });
-    } const id = this.model.document.selections?.[0]?.id ?? "selection"; this.model.setSelection(id, points); const detail = { selectionId: id, axesId: view.axis.id, points }, event = new CustomEvent("mplot:selection", { detail }); this.element.dispatchEvent(event); this.dispatchEvent(event); }
-    selectedIndices(artistId) { const values = new Set(); for (const selection of this.model.selections.values())
-        for (const point of selection)
-            if (point.artistId === artistId)
-                point.indices.forEach((index) => values.add(index)); return values; }
     showTooltip(view, px, py) { let best; for (const artist of this.model.document.artists.filter((item) => item.axes_id === view.axis.id)) {
         const data = this.resolvedData.get(artist.id) ?? artist.data, values = pairs(data.x, data.y), stride = Math.max(1, Math.floor(values.length / 5000));
         for (let offset = 0; offset < values.length; offset += stride) {
@@ -854,7 +843,7 @@ export class MPlotViewer extends EventTarget {
         this.dispatchEvent(new CustomEvent("mplot:error", { detail: error }));
     } }; this.source.addEventListener("document", update); this.source.onmessage = update; this.source.onerror = () => this.dispatchEvent(new Event("mplot:disconnect")); }
     figureAxisIds(figure) { return (figure.axes ?? this.model.document.axes.filter((axis) => !axis.figure_id || axis.figure_id === figure.id)).map((axis) => typeof axis === "string" ? axis : axis.id); }
-    applyTheme() { const values = { "--mplot-bg": this.theme.background, "--mplot-panel": this.theme.panel, "--mplot-fg": this.theme.foreground, "--mplot-muted": this.theme.muted, "--mplot-grid": this.theme.grid, "--mplot-accent": this.theme.accent, "--mplot-selection": this.theme.selection, "font-family": this.theme.fontFamily }; for (const [key, value] of Object.entries(values))
+    applyTheme() { const values = { "--mplot-bg": this.theme.background, "--mplot-panel": this.theme.panel, "--mplot-fg": this.theme.foreground, "--mplot-muted": this.theme.muted, "--mplot-grid": this.theme.grid, "--mplot-accent": this.theme.accent, "font-family": this.theme.fontFamily }; for (const [key, value] of Object.entries(values))
         this.element.style.setProperty(key, value); }
 }
 const safeId = (value) => value.replace(/[^a-zA-Z0-9_-]/g, "-");

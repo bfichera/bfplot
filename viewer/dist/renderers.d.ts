@@ -9,7 +9,6 @@ export interface RenderContext {
     width: number;
     height: number;
     theme: Theme;
-    selected: ReadonlySet<number>;
     pointBudget: number;
     project3d(x: number, y: number, z: number): [number, number];
 }

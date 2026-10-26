@@ -1,5 +1,5 @@
 import { isArrayReference, normalizeArtistData } from "./normalize.js";
-import type { ArrayResolver, Axis, AxisDimension, Artist, MPlotDocument, PointSelection, ResolvedData, Viewport } from "./types.js";
+import type { ArrayResolver, Axis, AxisDimension, Artist, MPlotDocument, ResolvedData, Viewport } from "./types.js";
 const cloneViewport = (value: Viewport): Viewport => ({ x: [...value.x], y: [...value.y], ...(value.z ? { z: [...value.z] } : {}) } as Viewport);
 const numbers = (value: unknown): number[] => Array.isArray(value) || ArrayBuffer.isView(value) ? Array.from(value as ArrayLike<unknown>, Number).filter(Number.isFinite) : [];
 const pointValues = (value: unknown, dimension: 0 | 1 | 2): number[] => {
@@ -31,7 +31,6 @@ function dataValues(data: ResolvedData, dimension: "x" | "y" | "z"): number[] {
 export class ViewerModel extends EventTarget {
   document: MPlotDocument;
   readonly viewports = new Map<string, Viewport>();
-  readonly selections = new Map<string, PointSelection[]>();
   private resolver: ArrayResolver | undefined;
   private readonly dataCache = new Map<string, Promise<unknown>>();
   private activeResolutions = 0;
@@ -117,11 +116,6 @@ export class ViewerModel extends EventTarget {
     if (dimension === "x") target.x = [...source.x];
     else if (dimension === "y") target.y = [...source.y];
     else if (source.z) target.z = [...source.z];
-  }
-
-  setSelection(id: string, points: PointSelection[]): void {
-    this.selections.set(id, points.map((point) => ({ artistId: point.artistId, indices: [...point.indices] })));
-    this.dispatchEvent(new CustomEvent("selection", { detail: { id, points } }));
   }
 
   async resolveData(data: Record<string, unknown>, artist?: Artist): Promise<ResolvedData> {

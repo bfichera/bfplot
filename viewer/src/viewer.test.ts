@@ -86,6 +86,30 @@ describe("MPlotViewer", () => {
     viewer.destroy();
   });
 
+  it("applies reverse colorbar drags to filled contours", async () => {
+    const host = window.document.createElement("div");
+    window.document.body.append(host);
+    const withContour: MPlotDocument = {
+      ...document,
+      figures: [{ id: "f", title: "Results", axes: ["a", "c"] }],
+      axes: [...document.axes, { id: "c", figure_id: "f", role: "colorbar", position: [.82, .1, .03, .8], colorbar: { orientation: "vertical", limits: [0, 1], ticks: [0, .5, 1], colors: ["#440154", "#fde725"], mappable: "contour" } }],
+      artists: [{ type: "mplot.contourf", schema_version: 1, id: "contour", axes_id: "a", props: { clim: [0, 1], cmap: "viridis", facecolors: ["#abcdef"] }, data: { paths: [[[0, 0], [2, 0], [1, 4]]], path_values: [.25], levels: [0, 1] } }],
+    };
+    const viewer = new MPlotViewer(host, withContour);
+    await viewer.render();
+    const before = host.querySelector('[data-artist-id="contour"] path')?.getAttribute("fill");
+    host.querySelector<HTMLButtonElement>('[data-action="zoom"]')!.click();
+    const colorbar = host.querySelector<HTMLElement>(".mplot-colorbar")!, gradient = colorbar.querySelector<HTMLElement>(".mplot-colorbar-gradient")!;
+    Object.defineProperty(gradient, "getBoundingClientRect", { value: () => ({ left: 0, top: 0, width: 20, height: 100, right: 20, bottom: 100, x: 0, y: 0, toJSON: () => ({}) }) });
+    gradient.setPointerCapture = () => undefined;
+    gradient.dispatchEvent(pointer("pointerdown", { bubbles: true, pointerId: 1, clientX: 10, clientY: 20 }));
+    gradient.dispatchEvent(pointer("pointerup", { bubbles: true, pointerId: 1, clientX: 10, clientY: 80 }));
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(colorbar.dataset.contrastLimits).toBe("0.2,0.8");
+    expect(host.querySelector('[data-artist-id="contour"] path')?.getAttribute("fill")).not.toBe(before);
+    viewer.destroy();
+  });
+
   it("honors explicitly empty inset ticks", async () => {
     const host = window.document.createElement("div");
     window.document.body.append(host);
@@ -129,6 +153,7 @@ describe("MPlotViewer", () => {
     const viewer = new MPlotViewer(host, { ...document, metadata: { provenance: { created_utc: "2026-01-01T00:00:00Z" }, artifact: { version: "0.9.9" } } });
     await viewer.render();
     expect(host.querySelector('[data-action="metadata"]')).toBeNull();
+    expect(host.querySelector('[data-action="select"]')).toBeNull();
     host.querySelector<HTMLButtonElement>('[data-page-id="__metadata__"]')!.click();
     await new Promise((resolve) => setTimeout(resolve, 0));
     const page = host.querySelector<HTMLElement>(".mplot-metadata-page")!;
@@ -136,7 +161,10 @@ describe("MPlotViewer", () => {
     expect(host.querySelector<HTMLElement>(".mplot-figure")?.hidden).toBe(true);
     expect(host.querySelector('[data-page-id="__metadata__"]')?.getAttribute("aria-current")).toBe("page");
     expect(page.textContent).toContain("created_utc");
+    expect(page.textContent).toContain("2026-01-01T00:00:00Z");
     expect(page.textContent).toContain("0.9.9");
+    expect(page.querySelector("details")).toBeNull();
+    expect(Array.from(page.querySelectorAll("h4"), (heading) => heading.textContent)).toEqual(["provenance", "artifact"]);
     viewer.destroy();
   });
 

@@ -1,8 +1,7 @@
-import type { ArrayResolver, Axis, Artist, MPlotDocument, PointSelection, ResolvedData, Viewport } from "./types.js";
+import type { ArrayResolver, Axis, Artist, MPlotDocument, ResolvedData, Viewport } from "./types.js";
 export declare class ViewerModel extends EventTarget {
     document: MPlotDocument;
     readonly viewports: Map<string, Viewport>;
-    readonly selections: Map<string, PointSelection[]>;
     private resolver;
     private readonly dataCache;
     private activeResolutions;
@@ -19,7 +18,6 @@ export declare class ViewerModel extends EventTarget {
     private paddedBounds;
     setViewport(axisId: string, viewport: Viewport, source?: string): void;
     private copyDimension;
-    setSelection(id: string, points: PointSelection[]): void;
     resolveData(data: Record<string, unknown>, artist?: Artist): Promise<ResolvedData>;
     private resolveValue;
     private withResolutionSlot;

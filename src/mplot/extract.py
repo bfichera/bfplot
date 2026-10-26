@@ -359,7 +359,11 @@ def _extract_paths(type_name: str, artist: Any, axes_id: str, context: Extractio
     paths = [path.vertices for path in artist.get_paths()]
     lengths = np.asarray([len(path) for path in paths], dtype=np.int64)
     vertices = np.concatenate(paths) if paths else np.empty((0, 2))
-    return context.artist(type_name, axes_id, _collection_props(artist), {"vertices": context.array(vertices), "path_lengths": context.array(lengths)})
+    data = {"vertices": context.array(vertices), "path_lengths": context.array(lengths)}
+    values = artist.get_array() if hasattr(artist, "get_array") else None
+    if values is not None:
+        data["values"] = context.array(values)
+    return context.artist(type_name, axes_id, _collection_props(artist), data, source=artist)
 
 
 def _poly3d_faces(artist: Any) -> list[np.ndarray]:
@@ -381,23 +385,38 @@ def _extract_3d_paths(type_name: str, paths: list[Any], artist: Any, axes_id: st
     lengths = np.asarray([len(path) for path in arrays], dtype=np.int64)
     vertices = np.concatenate(arrays) if arrays else np.empty((0, 3))
     data = {"vertices": context.array(vertices), "path_lengths": context.array(lengths)}
-    return context.artist(type_name, axes_id, _collection_props(artist), data)
+    values = artist.get_array() if hasattr(artist, "get_array") else None
+    if values is not None:
+        data["values"] = context.array(values)
+    return context.artist(type_name, axes_id, _collection_props(artist), data, source=artist)
 
 
 def _extract_contour(artist: Any, axes_id: str, context: ExtractionContext) -> dict[str, Any]:
     paths = []
-    for collection in getattr(artist, "collections", []):
-        paths.extend(collection.get_paths())
+    path_values = []
+    cvalues = np.asarray(getattr(artist, "cvalues", []), dtype=float)
+    collections = getattr(artist, "collections", [])
+    for index, collection in enumerate(collections):
+        collection_paths = collection.get_paths()
+        paths.extend(collection_paths)
+        path_values.extend([cvalues[index] if index < len(cvalues) else float(index)] * len(collection_paths))
     if not paths and hasattr(artist, "get_paths"):
         paths.extend(artist.get_paths())
+        path_values.extend(cvalues[:len(paths)])
     lengths = np.asarray([len(path.vertices) for path in paths], dtype=np.int64)
     vertices = np.concatenate([path.vertices for path in paths]) if paths else np.empty((0, 2))
     codes = np.concatenate([path.codes if path.codes is not None else np.full(len(path.vertices), 2, dtype=np.uint8) for path in paths]) if paths else np.empty(0, dtype=np.uint8)
     filled = bool(getattr(artist, "filled", False))
-    data = {"vertices": context.array(vertices), "path_codes": context.array(codes), "path_lengths": context.array(lengths), "levels": context.array(artist.levels)}
+    data = {
+        "vertices": context.array(vertices),
+        "path_codes": context.array(codes),
+        "path_lengths": context.array(lengths),
+        "path_values": context.array(np.asarray(path_values, dtype=float)),
+        "levels": context.array(artist.levels),
+    }
     props = _collection_props(artist)
     props["cmap"] = artist.cmap.name
-    return context.artist("mplot.contourf" if filled else "mplot.contour", axes_id, props, data)
+    return context.artist("mplot.contourf" if filled else "mplot.contour", axes_id, props, data, source=artist)
 
 
 def _extract_image(image: Any, axes_id: str, context: ExtractionContext) -> dict[str, Any]:
