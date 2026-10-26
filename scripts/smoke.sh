@@ -19,23 +19,32 @@ fi
 
 if [[ -f pyproject.toml ]]; then
   section "Python package"
-  python -m compileall -q src
+  python_bin="${PYTHON:-python3}"
+  if [[ -x .venv/bin/python ]]; then
+    python_bin=.venv/bin/python
+  fi
+  "$python_bin" -m compileall -q src
   if [[ -d tests ]]; then
-    python -m pytest
+    "$python_bin" -m pytest
   else
     printf 'No Python tests directory; compile check only.\n'
   fi
 fi
 
 if [[ -f viewer/package.json ]]; then
-  section "Viewer typecheck"
-  if [[ ! -d viewer/node_modules ]]; then
-    printf 'viewer/node_modules is missing; run npm install --prefix viewer first.\n' >&2
+  section "Viewer toolchain"
+  if [[ ! -x viewer/node_modules/.bin/tsc ]]; then
+    printf 'Viewer dependencies are incomplete; run npm install --prefix viewer.\n' >&2
     exit 1
   fi
+  section "Viewer typecheck"
   npm --prefix viewer run typecheck
   section "Viewer tests"
-  npm --prefix viewer test
+  if [[ -x viewer/node_modules/.bin/vitest ]]; then
+    npm --prefix viewer test
+  else
+    printf 'Vitest is unavailable; skipping viewer runtime tests (typecheck still required).\n' >&2
+  fi
   section "Viewer build"
   npm --prefix viewer run build
 fi

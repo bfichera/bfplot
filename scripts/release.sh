@@ -19,7 +19,12 @@ if [[ -n "$(git status --porcelain)" ]]; then
   exit 1
 fi
 
-python - "$version" <<'PY'
+python_bin="${PYTHON:-python3}"
+if [[ -x .venv/bin/python ]]; then
+  python_bin=.venv/bin/python
+fi
+
+"$python_bin" - "$version" <<'PY'
 from pathlib import Path
 import json
 import re
@@ -60,7 +65,7 @@ rm -rf release-dist
 mkdir -p release-dist
 
 if [[ -f pyproject.toml ]]; then
-  python -m build --outdir release-dist
+  "$python_bin" -m build --outdir release-dist
 fi
 
 if [[ -f viewer/package.json ]]; then
