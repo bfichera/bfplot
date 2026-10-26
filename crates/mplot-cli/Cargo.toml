@@ -14,7 +14,7 @@ path = "src/main.rs"
 anyhow.workspace = true
 axum.workspace = true
 clap.workspace = true
-mplot-core = { path = "../mplot-core" }
+mplot-core = { version = "0.9.9", path = "../mplot-core" }
 serde_json.workspace = true
 tokio.workspace = true
 toml.workspace = true

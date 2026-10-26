@@ -65,7 +65,11 @@ rm -rf release-dist
 mkdir -p release-dist
 
 if [[ -f pyproject.toml ]]; then
-  "$python_bin" -m build --outdir release-dist
+  if "$python_bin" -c 'import build' 2>/dev/null; then
+    "$python_bin" -m build --outdir release-dist
+  else
+    "$python_bin" -m pip wheel --no-deps --wheel-dir release-dist .
+  fi
 fi
 
 if [[ -f viewer/package.json ]]; then
