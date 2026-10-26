@@ -1,0 +1,86 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mplot.dev/schema/mir-1.schema.json",
+  "title": "MPlot Intermediate Representation 1.0",
+  "type": "object",
+  "required": ["mir_version", "metadata", "document", "buffers"],
+  "additionalProperties": false,
+  "properties": {
+    "mir_version": {"const": "1.0"},
+    "metadata": {
+      "type": "object",
+      "required": ["created_utc"],
+      "properties": {"created_utc": {"type": "string", "format": "date-time"}},
+      "additionalProperties": true
+    },
+    "document": {"$ref": "#/$defs/document"},
+    "buffers": {
+      "type": "object",
+      "additionalProperties": {"$ref": "#/$defs/bufferDescriptor"}
+    }
+  },
+  "$defs": {
+    "document": {
+      "type": "object",
+      "required": ["schema_version", "figures", "links", "selections"],
+      "properties": {
+        "schema_version": {"type": "integer", "minimum": 1},
+        "figures": {"type": "array", "items": {"$ref": "#/$defs/figure"}},
+        "links": {"type": "array"},
+        "selections": {"type": "array"}
+      },
+      "additionalProperties": true
+    },
+    "figure": {
+      "type": "object",
+      "required": ["id", "axes"],
+      "properties": {
+        "id": {"type": "string", "minLength": 1},
+        "axes": {"type": "array", "items": {"$ref": "#/$defs/axes"}}
+      },
+      "additionalProperties": true
+    },
+    "axes": {
+      "type": "object",
+      "required": ["id", "artists"],
+      "properties": {
+        "id": {"type": "string", "minLength": 1},
+        "artists": {"type": "array", "items": {"$ref": "#/$defs/artist"}},
+        "parent_axes_id": {"type": "string"},
+        "colorbar": {
+          "type": "object",
+          "properties": {"mappable": {"type": "string"}},
+          "additionalProperties": true
+        }
+      },
+      "additionalProperties": true
+    },
+    "artist": {
+      "type": "object",
+      "required": ["id", "axes_id", "type", "props", "data"],
+      "properties": {
+        "id": {"type": "string", "minLength": 1},
+        "axes_id": {"type": "string", "minLength": 1},
+        "type": {"type": "string", "minLength": 1},
+        "props": {"type": "object"},
+        "data": {"type": "object"}
+      },
+      "additionalProperties": true
+    },
+    "bufferReference": {
+      "type": "object",
+      "required": ["$buffer"],
+      "properties": {"$buffer": {"type": "string", "minLength": 1}},
+      "additionalProperties": false
+    },
+    "bufferDescriptor": {
+      "type": "object",
+      "required": ["dtype", "shape"],
+      "properties": {
+        "dtype": {"type": "string"},
+        "shape": {"type": "array", "items": {"type": "integer", "minimum": 0}}
+      },
+      "additionalProperties": false
+    }
+  }
+}

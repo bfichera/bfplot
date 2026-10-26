@@ -5,7 +5,7 @@ build-backend = "hatchling.build"
 [project]
 name = "mplot"
 version = "0.9.9"
-description = "Content-addressed interactive Matplotlib artifacts"
+description = "Language-neutral interactive scientific plot artifacts"
 readme = "ARCHITECTURE.md"
 requires-python = ">=3.10"
 license = { text = "MIT OR Apache-2.0" }

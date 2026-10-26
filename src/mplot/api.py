@@ -12,8 +12,10 @@ from typing import Any
 import matplotlib.pyplot as plt
 from matplotlib.figure import Figure
 
+from .adapters.matplotlib import translate_figures
 from .artifact import materialize_document
-from .extract import extract_figures
+from .lower import lower_mir
+from .mir import MirDocument
 from .provenance import collect_provenance, processing_metadata
 from .store import ContentStore
 
@@ -29,6 +31,48 @@ def _figures(figure: Figure | Iterable[Figure] | None) -> list[Figure]:
     return figures
 
 
+def _metadata(provenance: bool | dict[str, Any]) -> dict[str, Any]:
+    if provenance is True:
+        return collect_provenance()
+    if provenance is False:
+        return processing_metadata()
+    if isinstance(provenance, dict):
+        return collect_provenance(extra=provenance)
+    raise TypeError("provenance must be bool or a dictionary")
+
+
+def translate(
+    figure: Figure | Iterable[Figure] | None = None,
+    *,
+    metadata: dict[str, Any] | None = None,
+) -> MirDocument:
+    """Translate Matplotlib figures into validated, storage-independent MIR."""
+    processing = processing_metadata()
+    if metadata is not None:
+        if not isinstance(metadata, dict):
+            raise TypeError("metadata must be a dictionary")
+        processing.update(metadata)
+    return translate_figures(_figures(figure), processing)
+
+
+def compile(
+    document: MirDocument,
+    path: str | Path,
+    *,
+    packed: bool | None = None,
+) -> Path:
+    """Compile validated MIR into a content-addressed MPlot artifact."""
+    if not isinstance(document, MirDocument):
+        raise TypeError("document must be a MirDocument")
+    output = Path(path)
+    if packed is None:
+        packed = output.suffix == ".mplot"
+    with tempfile.TemporaryDirectory(prefix="mplot-") as temporary:
+        store = ContentStore(Path(temporary) / "objects")
+        artifact_document = lower_mir(document, store)
+        return materialize_document(output, artifact_document, document.metadata, store, packed=packed)
+
+
 def savefig(
     path: str | Path,
     figure: Figure | Iterable[Figure] | None = None,
@@ -36,27 +80,13 @@ def savefig(
     packed: bool | None = None,
     provenance: bool | dict[str, Any] = True,
 ) -> Path:
-    """Extract Matplotlib figures into a content-addressed MPlot artifact.
+    """Translate Matplotlib figures through MIR and compile an MPlot artifact.
 
     ``*.mplot`` paths are deterministic packed artifacts. Other paths produce a split
     ``*.mplot.toml`` manifest and a sibling ``.mplot/objects`` store. Passing
     ``provenance=False`` omits environment details but still records creation time.
     """
-    output = Path(path)
-    if packed is None:
-        packed = output.suffix == ".mplot"
-    with tempfile.TemporaryDirectory(prefix="mplot-") as temporary:
-        store = ContentStore(Path(temporary) / "objects")
-        document = extract_figures(_figures(figure), store)
-        if provenance is True:
-            provenance_data = collect_provenance()
-        elif provenance is False:
-            provenance_data = processing_metadata()
-        elif isinstance(provenance, dict):
-            provenance_data = collect_provenance(extra=provenance)
-        else:
-            raise TypeError("provenance must be bool or a dictionary")
-        return materialize_document(output, document, provenance_data, store, packed=packed)
+    return compile(translate(figure, metadata=_metadata(provenance)), path, packed=packed)
 
 
 def show(

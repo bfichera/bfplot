@@ -41,7 +41,16 @@ PDFs and PNGs are useful, but they only save the *picture*. MPlot saves the plot
 
 MPlot also records useful information about how the output was made, including the MPlot, Python, Matplotlib, NumPy, and Zstandard versions; the command-line arguments; the script path; the working directory; the platform; and the creation time. This metadata does not magically make an analysis reproducible, but it is much nicer than finding `final_plot_REAL_v2.png` six months later and having no idea where it came from.
 
-Under the hood, MPlot uses Python to understand your Matplotlib figure, Rust to validate and serve the saved artifact, and a browser-based viewer for the graphical interface. You do not need to care about any of that to call `mplot.savefig()`.
+Under the hood, the Python Matplotlib adapter translates a figure into MPlot's language-neutral intermediate representation (MIR), and the compiler turns validated MIR into the content-addressed artifact that Rust validates and serves to the browser viewer. You do not need to care about any of that to call `mplot.savefig()`.
+
+The boundary is public when you do need it:
+
+```python
+mir = mplot.translate(fig)       # Matplotlib -> generic MIR
+mplot.compile(mir, "my_plot")   # generic MIR -> artifact
+```
+
+Adapters never handle hashes, compression, manifests, object stores, or packing. The compiler never imports or understands Matplotlib, which makes MIR the common target for future R, Julia, and other producers.
 
 ## Installation
 

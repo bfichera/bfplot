@@ -17,8 +17,7 @@ from matplotlib.patches import Patch, Polygon
 from matplotlib.spines import Spine
 from matplotlib.text import Text
 
-from .arrays import encode_array
-from .store import ContentStore
+from ..mir import MirBuilder, MirDocument
 
 
 def _finite(value: Any) -> Any:
@@ -54,12 +53,12 @@ def _common(artist: Artist) -> dict[str, Any]:
 
 @dataclass
 class ExtractionContext:
-    store: ContentStore
+    builder: MirBuilder
     _next_artist: int = 0
     _artist_ids: dict[int, str] | None = None
 
-    def array(self, value: Any) -> dict[str, Any]:
-        return encode_array(value, self.store)
+    def array(self, value: Any) -> dict[str, str]:
+        return self.builder.buffer(value)
 
     def artist_id(self, source: Any) -> str:
         if self._artist_ids is None:
@@ -93,15 +92,17 @@ class ExtractionContext:
         }
 
 
-def extract_figures(figures: list[Any], store: ContentStore) -> dict[str, Any]:
-    context = ExtractionContext(store)
+def translate_figures(figures: list[Any], metadata: dict[str, Any]) -> MirDocument:
+    """Translate Matplotlib figures into storage-independent MIR."""
+    builder = MirBuilder(metadata=metadata)
+    context = ExtractionContext(builder)
     extracted = [_extract_figure(figure, f"figure-{index}", context) for index, figure in enumerate(figures)]
-    return {
+    return builder.build({
         "schema_version": 1,
         "figures": extracted,
         "links": [],
         "selections": [],
-    }
+    })
 
 
 def _extract_figure(figure: Any, figure_id: str, context: ExtractionContext) -> dict[str, Any]:
@@ -287,13 +288,14 @@ def _extract_artist(artist: Any, axes_id: str, context: ExtractionContext, is_3d
             return context.artist("mplot.line3d", axes_id, _line_props(artist), {"x": context.array(x), "y": context.array(y), "z": context.array(z)})
         return context.artist("mplot.line", axes_id, _line_props(artist), {"x": context.array(x), "y": context.array(y)})
     if isinstance(artist, PathCollection):
-        offsets = np.asarray(artist.get_offsets())
-        data: dict[str, Any] = {"xy": context.array(offsets)}
         type_name = "mplot.scatter"
         if is_3d and hasattr(artist, "_offsets3d"):
             x, y, z = artist._offsets3d
-            data = {"x": context.array(x), "y": context.array(y), "z": context.array(z)}
+            data: dict[str, Any] = {"x": context.array(x), "y": context.array(y), "z": context.array(z)}
             type_name = "mplot.scatter3d"
+        else:
+            offsets = np.asarray(artist.get_offsets())
+            data = {"xy": context.array(offsets)}
         sizes = artist.get_sizes()
         if len(sizes):
             data["sizes"] = context.array(sizes)
