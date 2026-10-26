@@ -9,7 +9,10 @@ export declare class ViewerModel extends EventTarget {
     setDocument(document: MPlotDocument): void;
     setResolver(resolver?: ArrayResolver): void;
     resetViewports(clear?: boolean): void;
+    fitViewports(clear?: boolean): Promise<void>;
     defaultViewport(axis: Axis): Viewport;
+    private resolvedViewport;
+    private paddedBounds;
     setViewport(axisId: string, viewport: Viewport, source?: string): void;
     private copyDimension;
     setSelection(id: string, points: PointSelection[]): void;

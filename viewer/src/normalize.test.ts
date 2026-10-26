@@ -11,6 +11,11 @@ describe("document normalization",()=>{
     expect(result.artists[0]?.props.color).toBe("rgba(255, 0, 128, 0.5)");
   });
 
+  it("preserves flat axis limits from served artifacts",()=>{
+    const result=normalizeDocument({figures:[{id:"f",axes:["a"]}],axes:[{id:"a",figure_id:"f",xlim:[-2,8],ylim:[10,20]}],artists:[]});
+    expect(result.axes[0]).toMatchObject({id:"a",xlim:[-2,8],ylim:[10,20]});
+  });
+
   it("adapts matrix and segmented path arrays",()=>{
     const scatter=normalizeArtistData("mplot.scatter",{xy:ref([2,2])},{xy:new Float64Array([1,2,3,4])});
     expect(scatter).toMatchObject({x:[1,3],y:[2,4]});

@@ -21,6 +21,7 @@ export declare class MPlotViewer extends EventTarget {
     private source?;
     private resize?;
     private renderToken;
+    private fitPending;
     constructor(target: HTMLElement, document: MPlotDocument, options?: ViewerOptions);
     registerRenderer(type: string, renderer: ArtistRenderer): this;
     unregisterRenderer(type: string): boolean;
@@ -29,6 +30,7 @@ export declare class MPlotViewer extends EventTarget {
     reset(): void;
     destroy(): void;
     render(): Promise<void>;
+    private fitToData;
     private createToolbar;
     private setMode;
     private renderPlots;

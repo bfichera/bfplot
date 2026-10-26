@@ -1,8 +1,8 @@
 import type { Theme, ThemeName } from "./types.js";
 
 export const themes: Record<"light" | "dark", Theme> = {
-  light: { background: "#f5f7fb", panel: "#ffffff", foreground: "#182230", muted: "#687386", grid: "#dce2ea", accent: "#246bfd", selection: "#ffb000", fontFamily: "Inter, ui-sans-serif, system-ui, sans-serif" },
-  dark: { background: "#0e131b", panel: "#161d28", foreground: "#ecf1f8", muted: "#9aa8ba", grid: "#303b4a", accent: "#73a5ff", selection: "#ffc247", fontFamily: "Inter, ui-sans-serif, system-ui, sans-serif" },
+  light: { background: "#f3f1eb", panel: "#fffefb", foreground: "#171713", muted: "#5f5e57", grid: "#d8d5cc", accent: "#1f5a94", selection: "#a65a16", fontFamily: "Charter, 'Bitstream Charter', 'Iowan Old Style', 'Palatino Linotype', Palatino, Georgia, serif" },
+  dark: { background: "#171714", panel: "#211f1b", foreground: "#f1eee5", muted: "#aaa69c", grid: "#464239", accent: "#78a9d4", selection: "#e2a45f", fontFamily: "Charter, 'Bitstream Charter', 'Iowan Old Style', 'Palatino Linotype', Palatino, Georgia, serif" },
 };
 
 export function resolveTheme(theme: ThemeName | Partial<Theme> = "auto"): Theme {

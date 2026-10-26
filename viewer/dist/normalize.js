@@ -30,15 +30,16 @@ function normalizeAxis(rawValue, figureId) {
     const raw = record(rawValue), props = record(raw.props), source = { ...props, ...raw };
     const x = record(source.x), y = record(source.y), z = record(source.z);
     const projection = source.projection === "3d" ? "3d" : "2d";
+    const xlim = pair(source.xlim) ?? pair(x.limits), ylim = pair(source.ylim) ?? pair(y.limits), zlim = pair(source.zlim) ?? pair(z.limits);
     return {
         id: text(source.id), figure_id: figureId,
         ...(text(source.title) ? { title: text(source.title) } : {}),
         ...(text(x.label) ? { xlabel: text(x.label) } : {}),
         ...(text(y.label) ? { ylabel: text(y.label) } : {}),
         ...(text(z.label) ? { zlabel: text(z.label) } : {}),
-        ...(pair(x.limits) ? { xlim: pair(x.limits) } : {}),
-        ...(pair(y.limits) ? { ylim: pair(y.limits) } : {}),
-        ...(pair(z.limits) ? { zlim: pair(z.limits) } : {}),
+        ...(xlim ? { xlim } : {}),
+        ...(ylim ? { ylim } : {}),
+        ...(zlim ? { zlim } : {}),
         xscale: scale(x.scale), yscale: scale(y.scale), zscale: scale(z.scale), projection,
         ...(quad(source.bounds) ? { position: quad(source.bounds) } : {}), props: normalizeProps(props),
     };

@@ -15,6 +15,7 @@ export class MPlotViewer extends EventTarget {
     source;
     resize;
     renderToken = 0;
+    fitPending;
     constructor(target, document, options = {}) {
         super();
         this.element = target;
@@ -48,7 +49,7 @@ export class MPlotViewer extends EventTarget {
         this.applyTheme();
         void this.renderPlots();
     }
-    reset() { this.model.resetViewports(); void this.renderPlots(); }
+    reset() { void this.fitToData(); }
     destroy() {
         this.source?.close();
         this.resize?.disconnect();
@@ -107,7 +108,18 @@ export class MPlotViewer extends EventTarget {
             figures.append(figureElement);
         }
         if (token === this.renderToken)
-            await this.renderPlots();
+            await this.fitToData();
+    }
+    async fitToData() {
+        if (this.fitPending)
+            return this.fitPending;
+        this.fitPending = (async () => { await this.model.fitViewports(); await this.renderPlots(); })();
+        try {
+            await this.fitPending;
+        }
+        finally {
+            this.fitPending = undefined;
+        }
     }
     createToolbar() {
         const toolbar = document.createElement("nav");
@@ -189,7 +201,7 @@ export class MPlotViewer extends EventTarget {
             text.textContent = formatTick(tick, view.axis.yscale);
             view.plot.append(text);
         }
-        view.plot.append(svg("path", { d: `M${left},${top}V${b}H${r}`, fill: "none", stroke: this.theme.foreground, "stroke-width": 1 }));
+        view.plot.append(svg("path", { d: `M${left},${top}H${r}V${b}H${left}Z`, fill: "none", class: "mplot-axis-frame" }));
         if (view.axis.title) {
             const t = svg("text", { x: (left + r) / 2, y: 18, "text-anchor": "middle", class: "mplot-axis-title" });
             t.textContent = view.axis.title;

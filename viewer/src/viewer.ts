@@ -29,6 +29,7 @@ export class MPlotViewer extends EventTarget {
   private source?: EventSource;
   private resize?: ResizeObserver;
   private renderToken = 0;
+  private fitPending: Promise<void> | undefined;
 
   constructor(target: HTMLElement, document: MPlotDocument, options: ViewerOptions = {}) {
     super();
@@ -64,7 +65,7 @@ export class MPlotViewer extends EventTarget {
     void this.renderPlots();
   }
 
-  reset(): void { this.model.resetViewports(); void this.renderPlots(); }
+  reset(): void { void this.fitToData(); }
 
   destroy(): void {
     this.source?.close();
@@ -99,7 +100,13 @@ export class MPlotViewer extends EventTarget {
       }
       figures.append(figureElement);
     }
-    if (token === this.renderToken) await this.renderPlots();
+    if (token === this.renderToken) await this.fitToData();
+  }
+
+  private async fitToData(): Promise<void> {
+    if (this.fitPending) return this.fitPending;
+    this.fitPending = (async () => { await this.model.fitViewports(); await this.renderPlots(); })();
+    try { await this.fitPending; } finally { this.fitPending = undefined; }
   }
 
   private createToolbar(): HTMLElement {
@@ -129,7 +136,7 @@ export class MPlotViewer extends EventTarget {
     const {left,top,bottom,right}=view.margin,b=view.height-bottom,r=view.width-right;
     for(const tick of view.x.ticks()){const px=view.x(tick);view.plot.append(svg("line",{x1:px,x2:px,y1:top,y2:b,class:"mplot-grid-line"}));const text=svg("text",{x:px,y:b+17,"text-anchor":"middle",class:"mplot-tick"});text.textContent=formatTick(tick,view.axis.xscale);view.plot.append(text);}
     for(const tick of view.y.ticks()){const py=view.y(tick);view.plot.append(svg("line",{x1:left,x2:r,y1:py,y2:py,class:"mplot-grid-line"}));const text=svg("text",{x:left-8,y:py+4,"text-anchor":"end",class:"mplot-tick"});text.textContent=formatTick(tick,view.axis.yscale);view.plot.append(text);}
-    view.plot.append(svg("path",{d:`M${left},${top}V${b}H${r}`,fill:"none",stroke:this.theme.foreground,"stroke-width":1}));
+    view.plot.append(svg("path",{d:`M${left},${top}H${r}V${b}H${left}Z`,fill:"none",class:"mplot-axis-frame"}));
     if(view.axis.title){const t=svg("text",{x:(left+r)/2,y:18,"text-anchor":"middle",class:"mplot-axis-title"});t.textContent=view.axis.title;view.plot.append(t);}
     if(view.axis.xlabel){const t=svg("text",{x:(left+r)/2,y:b+44,"text-anchor":"middle",class:"mplot-label"});t.textContent=view.axis.xlabel;view.plot.append(t);}
     if(view.axis.ylabel){const t=svg("text",{x:14,y:(top+b)/2,"text-anchor":"middle",class:"mplot-label",transform:`rotate(-90 14 ${(top+b)/2})`});t.textContent=view.axis.ylabel;view.plot.append(t);}
