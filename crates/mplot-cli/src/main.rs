@@ -6,7 +6,7 @@ use std::{
     sync::Arc,
 };
 
-use anyhow::{Context, bail};
+use anyhow::Context;
 use axum::{
     Router,
     body::Body,
@@ -129,8 +129,14 @@ async fn main() -> anyhow::Result<()> {
 }
 
 fn is_packed(path: &Path) -> bool {
-    path.extension()
-        .is_some_and(|extension| extension == "mplot")
+    const MAGIC: &[u8; 8] = b"MPLOT\0\x09\x09";
+    fs::File::open(path)
+        .and_then(|file| {
+            use std::io::Read;
+            let mut magic = [0; 8];
+            file.take(8).read_exact(&mut magic).map(|_| magic)
+        })
+        .is_ok_and(|magic| &magic == MAGIC)
 }
 
 fn stream(command: StreamCommand) -> anyhow::Result<()> {
@@ -166,6 +172,14 @@ struct ServeState {
     document: Arc<Vec<u8>>,
     objects: mplot_core::ObjectStore,
     viewer_dir: Option<PathBuf>,
+    _packed_extraction: Option<Arc<tempfile::TempDir>>,
+}
+
+struct ServeArtifact {
+    manifest: Vec<u8>,
+    document: mplot_core::Document,
+    objects: mplot_core::ObjectStore,
+    packed_extraction: Option<Arc<tempfile::TempDir>>,
 }
 
 async fn serve(
@@ -175,11 +189,7 @@ async fn serve(
     viewer_dir: Option<PathBuf>,
     open_browser: bool,
 ) -> anyhow::Result<()> {
-    if is_packed(&path) {
-        bail!("serve currently requires a split *.mplot.toml artifact; unpack it first");
-    }
-    verify_artifact(&path)?;
-    let artifact = load_artifact(&path)?;
+    let artifact = prepare_serve_artifact(&path)?;
     let viewer_document_bytes = viewer_document(&artifact.document)?;
     let viewer_dir = discover_viewer_dir(viewer_dir);
     if viewer_dir.is_none() {
@@ -188,10 +198,11 @@ async fn serve(
         );
     }
     let state = ServeState {
-        manifest: Arc::new(fs::read(&path).with_context(|| format!("read {}", path.display()))?),
+        manifest: Arc::new(artifact.manifest),
         document: Arc::new(viewer_document_bytes),
-        objects: artifact.store,
+        objects: artifact.objects,
         viewer_dir,
+        _packed_extraction: artifact.packed_extraction,
     };
     let app = Router::new()
         .route("/", get(index))
@@ -209,6 +220,32 @@ async fn serve(
     }
     axum::serve(listener, app).await?;
     Ok(())
+}
+
+fn prepare_serve_artifact(path: &Path) -> anyhow::Result<ServeArtifact> {
+    if is_packed(path) {
+        verify_packed(path, PackLimits::default())?;
+        let extraction = Arc::new(tempfile::tempdir().context("create packed artifact workspace")?);
+        let manifest_path = extraction.path().join("artifact.mplot.toml");
+        unpack_artifact(path, &manifest_path, PackLimits::default())?;
+        let artifact = load_artifact(&manifest_path)?;
+        return Ok(ServeArtifact {
+            manifest: fs::read(&manifest_path)
+                .with_context(|| format!("read {}", manifest_path.display()))?,
+            document: artifact.document,
+            objects: artifact.store,
+            packed_extraction: Some(extraction),
+        });
+    }
+
+    verify_artifact(path)?;
+    let artifact = load_artifact(path)?;
+    Ok(ServeArtifact {
+        manifest: fs::read(path).with_context(|| format!("read {}", path.display()))?,
+        document: artifact.document,
+        objects: artifact.store,
+        packed_extraction: None,
+    })
 }
 
 async fn index(State(state): State<ServeState>) -> Response {
@@ -409,6 +446,7 @@ fn bytes_response(bytes: Vec<u8>, content_type: &'static str) -> Response {
 mod tests {
     use super::*;
     use clap::Parser;
+    use mplot_core::{Document, Manifest, ObjectStore};
 
     #[test]
     fn serve_defaults_to_loopback() {
@@ -432,6 +470,40 @@ mod tests {
         assert_eq!(value["axes"][0]["projection"], "2d");
         assert_eq!(value["artists"][0]["id"], "artist-0");
         assert_eq!(value["figures"][0]["axes"][0], "figure-0-axes-0");
+    }
+
+    #[test]
+    fn prepares_split_and_packed_artifacts_for_the_same_server() {
+        let directory = tempfile::tempdir().unwrap();
+        let manifest_path = directory.path().join("source.mplot.toml");
+        let store = ObjectStore::for_manifest(&manifest_path);
+        let document = Document::default();
+        let document_id = store.put_json(&document).unwrap();
+        fs::write(
+            &manifest_path,
+            toml::to_string(&Manifest::new(document_id)).unwrap(),
+        )
+        .unwrap();
+        let packed_path = directory.path().join("source.mplot");
+        pack_artifact(&manifest_path, &packed_path).unwrap();
+        let disguised_packed_path = directory.path().join("portable-artifact.bin");
+        fs::copy(&packed_path, &disguised_packed_path).unwrap();
+
+        let split = prepare_serve_artifact(&manifest_path).unwrap();
+        let packed = prepare_serve_artifact(&disguised_packed_path).unwrap();
+        assert_eq!(
+            serde_json::to_value(&split.document).unwrap(),
+            serde_json::to_value(&packed.document).unwrap()
+        );
+        assert!(split.packed_extraction.is_none());
+        assert!(packed.packed_extraction.is_some());
+        assert_eq!(split.manifest, packed.manifest);
+        let manifest: Manifest =
+            toml::from_str(std::str::from_utf8(&split.manifest).unwrap()).unwrap();
+        assert_eq!(
+            split.objects.get(&manifest.document).unwrap(),
+            packed.objects.get(&manifest.document).unwrap()
+        );
     }
 
     #[test]
