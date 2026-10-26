@@ -156,13 +156,33 @@ const image: ArtistRenderer = ({ group, artist, data, x, y }) => {
   group.append(svg("image", { href, x: Math.min(x(left!), x(right!)), y: Math.min(y(bottom!), y(top!)), width: Math.abs(x(right!) - x(left!)), height: Math.abs(y(top!) - y(bottom!)), preserveAspectRatio: prop(artist, "aspect", "none"), opacity: prop(artist, "alpha", 1), "image-rendering": artist.props.interpolation === "nearest" ? "pixelated" : undefined }));
 };
 
+const contourPath = (raw: unknown, rawCodes: unknown, x: Scale, y: Scale, budget: number, filled: boolean): string => {
+  const points = Array.isArray(raw) ? raw : [], codes = Array.isArray(rawCodes) ? rawCodes.map(Number) : [];
+  if (!codes.length) {
+    const scaled = sampled(points, budget).map((point) => Array.isArray(point) ? [x(Number(point[0])), y(Number(point[1]))] as [number, number] : null).filter((point): point is [number, number] => point !== null);
+    return scaled.length >= 2 ? pathFrom(scaled, filled) : "";
+  }
+  const parts: string[] = [];
+  for (let index = 0; index < points.length; index++) {
+    const point = points[index];
+    if (!Array.isArray(point)) continue;
+    const px = x(Number(point[0])), py = y(Number(point[1])), code = codes[index];
+    if (code === 1 || !parts.length) parts.push(`M${px.toFixed(2)},${py.toFixed(2)}`);
+    else if (code === 79) parts.push("Z");
+    else parts.push(`L${px.toFixed(2)},${py.toFixed(2)}`);
+  }
+  return parts.join(" ");
+};
+
 const contour = (filled: boolean): ArtistRenderer => ({ group, artist, data, x, y, theme, pointBudget }) => {
-  const levels = (data.paths ?? data.segments ?? data.polygons ?? []) as unknown[], budgetPerPath = Math.max(64, Math.floor(pointBudget / Math.max(1, levels.length)));
+  const levels = (data.paths ?? data.segments ?? data.polygons ?? []) as unknown[], codes = Array.isArray(data.path_codes) ? data.path_codes : [], budgetPerPath = Math.max(64, Math.floor(pointBudget / Math.max(1, levels.length)));
+  const facecolors = artist.props.facecolors as unknown[] | undefined, edgecolors = artist.props.edgecolors as unknown[] | undefined;
   for (const [index, raw] of levels.entries()) {
-    const pointList = Array.isArray(raw) ? raw : [];
-    const points = sampled(pointList, budgetPerPath).map((point) => Array.isArray(point) ? [x(Number(point[0])), y(Number(point[1]))] as [number, number] : null).filter((p): p is [number, number] => p !== null);
-    if (points.length < 2) continue;
-    group.append(svg("path", { d: pathFrom(points, filled), fill: filled ? cssColor((artist.props.colors as string[] | undefined)?.[index], theme.accent) : "none", "fill-opacity": filled ? prop(artist, "alpha", 0.35) : 0, stroke: cssColor((artist.props.colors as string[] | undefined)?.[index], theme.accent), "stroke-width": prop(artist, "linewidth", 1) }));
+    const path = contourPath(raw, codes[index], x, y, budgetPerPath, filled);
+    if (!path) continue;
+    const fill = cssColor(facecolors?.[index] ?? (artist.props.colors as unknown[] | undefined)?.[index], theme.accent);
+    const stroke = cssColor(edgecolors?.[index] ?? (artist.props.colors as unknown[] | undefined)?.[index], filled ? "none" : theme.accent);
+    group.append(svg("path", { d: path, fill: filled ? fill : "none", "fill-rule": filled ? "evenodd" : undefined, "fill-opacity": filled ? prop(artist, "alpha", 1) : 0, stroke, "stroke-width": numeric(artist.props.linewidths)[index] ?? prop(artist, "linewidth", 1) }));
   }
 };
 
@@ -190,8 +210,9 @@ const patch: ArtistRenderer = ({ group, artist, data, x, y, theme }) => {
   const vertices = data.vertices ?? data.points;
   const source = transformedPoints(vertices, data.transform);
   const points = source.length ? source.map(([px, py]) => [x(px), y(py)] as [number, number]) : pairs(data.x, data.y).map(([a,b]) => [x(a),y(b)] as [number,number]);
-  if (!points.length) return;
-  group.append(svg("path", { d: pathFrom(points, prop(artist, "closed", true)), fill: cssColor(artist.props.facecolor ?? artist.props.color, theme.accent), "fill-opacity": prop(artist, "alpha", 0.35), stroke: cssColor(artist.props.edgecolor, theme.accent), "stroke-width": prop(artist, "linewidth", 1.2) }));
+  if (points.length < 3) return;
+  const closed = prop(artist, "closed", true);
+  group.append(svg("path", { d: pathFrom(points, closed), fill: closed ? cssColor(artist.props.facecolor ?? artist.props.color, theme.accent) : "none", "fill-opacity": closed ? prop(artist, "alpha", 0.35) : 0, stroke: cssColor(artist.props.edgecolor, theme.accent), "stroke-width": prop(artist, "linewidth", 1.2) }));
 };
 
 const line3d: ArtistRenderer = ({ group, artist, data, project3d, theme, pointBudget }) => {

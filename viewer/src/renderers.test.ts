@@ -20,17 +20,22 @@ describe("artist rendering", () => {
     expect(errors.querySelectorAll("path").length).toBeGreaterThanOrEqual(2);
     expect(errors.querySelectorAll("circle")).toHaveLength(2);
     const contours = svg("g");
-    builtinRenderers["mplot.contourf"]!(context(contours, "mplot.contourf", { paths: [[[-2, -1], [0, 2], [2, -1]]] }));
-    expect(contours.querySelector("path")?.getAttribute("d")).toContain(" Z");
+    builtinRenderers["mplot.contourf"]!(context(contours, "mplot.contourf", { paths: [[[-2, -1], [0, 2], [2, -1], [-1, 0], [0, 1], [1, 0]]], path_codes: [[1, 2, 2, 1, 2, 79]] }, { facecolors: ["#abcdef"] }));
+    expect(contours.querySelector("path")?.getAttribute("d")).toContain("L500.00,400.00 M200.00,300.00");
+    expect(contours.querySelector("path")?.getAttribute("fill")).toBe("#abcdef");
+    expect(contours.querySelector("path")?.getAttribute("fill-rule")).toBe("evenodd");
     const lines = svg("g");
     builtinRenderers["mplot.line"]!(context(lines, "mplot.line", { x: [-1, 0, 1], y: [0, 1, 0] }));
     expect(lines.querySelector("path")?.getAttribute("d")).toContain("L300.00,200.00");
   });
 
-  it("applies affine patch transforms before scaling", () => {
+  it("applies affine patch transforms and suppresses two-point legacy spines", () => {
     const group = svg("g");
     builtinRenderers["mplot.patch"]!(context(group, "mplot.patch", { vertices: [[0, 0], [1, 0], [1, 1]], transform: [[.5, 0, 1], [0, .25, -1], [0, 0, 1]] }));
     expect(group.querySelector("path")?.getAttribute("d")).toBe("M400.00,400.00 L450.00,400.00 L450.00,375.00 Z");
+    const legacy = svg("g");
+    builtinRenderers["mplot.patch"]!(context(legacy, "mplot.patch", { vertices: [[0, -3], [0, 3]] }, { facecolor: "black", edgecolor: "black" }));
+    expect(legacy.querySelector("path")).toBeNull();
   });
 
   it("renders true 3D surface faces and wire paths", () => {

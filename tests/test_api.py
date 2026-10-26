@@ -46,9 +46,13 @@ def test_savefig_extracts_broad_artist_set(tmp_path):
     assert manifest["version"] == "0.9.9"
     types = {artist["type"] for axis in document["figures"][0]["axes"] for artist in axis["artists"]}
     assert {"mplot.line", "mplot.scatter", "mplot.image", "mplot.errorbar", "mplot.fill_between", "mplot.histogram", "mplot.contourf", "mplot.text"} <= types
+    assert all(len([artist for artist in axis["artists"] if artist["type"] == "mplot.patch"]) == 0 for axis in document["figures"][0]["axes"])
     for axis in document["figures"][0]["axes"]:
         for artist in axis["artists"]:
             assert {"type", "schema_version", "id", "axes_id", "props", "data"} == artist.keys()
+    contour = next(artist for artist in document["figures"][0]["axes"][5]["artists"] if artist["type"] == "mplot.contourf")
+    assert "facecolors" in contour["props"]
+    assert _decode_array(output, contour["data"]["path_codes"]).size > 0
 
 
 def test_savefig_preserves_true_3d_surface_and_wire_geometry(tmp_path):

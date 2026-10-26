@@ -31,8 +31,9 @@ describe("document normalization",()=>{
   it("reshapes extracted patch paths and applies path lengths to 3D vertices",()=>{
     const patch=normalizeArtistData("mplot.patch",{path:ref([3,2])},{path:new Float64Array([0,0,1,0,1,1]),transform:[[1,0,.25],[0,1,.5],[0,0,1]]});
     expect(patch.vertices).toEqual([[0,0],[1,0],[1,1]]);
-    const surface=normalizeArtistData("mplot.surface3d",{vertices:ref([4,3]),path_lengths:ref([1])},{vertices:new Float64Array([0,0,0,1,0,.5,1,1,1,0,1,.5]),path_lengths:new BigInt64Array([4n])});
+    const surface=normalizeArtistData("mplot.surface3d",{vertices:ref([4,3]),path_lengths:ref([1]),path_codes:ref([4])},{vertices:new Float64Array([0,0,0,1,0,.5,1,1,1,0,1,.5]),path_lengths:new BigInt64Array([4n]),path_codes:new Uint8Array([1,2,2,79])});
     expect(surface.paths).toEqual([[[0,0,0],[1,0,.5],[1,1,1],[0,1,.5]]]);
+    expect(surface.path_codes).toEqual([[1,2,2,79]]);
   });
 
   it("normalizes extracted error and cap segments",()=>{

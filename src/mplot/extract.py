@@ -13,6 +13,7 @@ from matplotlib.container import BarContainer, ErrorbarContainer
 from matplotlib.image import AxesImage
 from matplotlib.lines import Line2D
 from matplotlib.patches import Patch, Polygon
+from matplotlib.spines import Spine
 from matplotlib.text import Text
 
 from .arrays import encode_array
@@ -135,7 +136,7 @@ def _extract_axes(axes: Any, axes_id: str, context: ExtractionContext) -> dict[s
             consumed.add(id(image))
 
     for artist in axes.get_children():
-        if id(artist) in consumed or not artist.get_visible():
+        if id(artist) in consumed or not artist.get_visible() or artist is axes.patch or isinstance(artist, Spine):
             continue
         extracted = _extract_artist(artist, axes_id, context, is_3d)
         if extracted is not None:
@@ -298,14 +299,17 @@ def _extract_3d_paths(type_name: str, paths: list[Any], artist: Any, axes_id: st
 def _extract_contour(artist: Any, axes_id: str, context: ExtractionContext) -> dict[str, Any]:
     paths = []
     for collection in getattr(artist, "collections", []):
-        paths.extend(path.vertices for path in collection.get_paths())
+        paths.extend(collection.get_paths())
     if not paths and hasattr(artist, "get_paths"):
-        paths.extend(path.vertices for path in artist.get_paths())
-    lengths = np.asarray([len(path) for path in paths], dtype=np.int64)
-    vertices = np.concatenate(paths) if paths else np.empty((0, 2))
+        paths.extend(artist.get_paths())
+    lengths = np.asarray([len(path.vertices) for path in paths], dtype=np.int64)
+    vertices = np.concatenate([path.vertices for path in paths]) if paths else np.empty((0, 2))
+    codes = np.concatenate([path.codes if path.codes is not None else np.full(len(path.vertices), 2, dtype=np.uint8) for path in paths]) if paths else np.empty(0, dtype=np.uint8)
     filled = bool(getattr(artist, "filled", False))
-    data = {"vertices": context.array(vertices), "path_lengths": context.array(lengths), "levels": context.array(artist.levels)}
-    return context.artist("mplot.contourf" if filled else "mplot.contour", axes_id, {"cmap": artist.cmap.name}, data)
+    data = {"vertices": context.array(vertices), "path_codes": context.array(codes), "path_lengths": context.array(lengths), "levels": context.array(artist.levels)}
+    props = _collection_props(artist)
+    props["cmap"] = artist.cmap.name
+    return context.artist("mplot.contourf" if filled else "mplot.contour", axes_id, props, data)
 
 
 def _extract_image(image: Any, axes_id: str, context: ExtractionContext) -> dict[str, Any]:

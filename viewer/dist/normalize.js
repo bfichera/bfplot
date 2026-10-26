@@ -128,13 +128,17 @@ export function normalizeArtistData(type, source, resolved) {
         data.vertices = rows(data.path, arrayShape(source.path)?.[1] ?? 2);
     }
     if (data.vertices !== undefined && data.path_lengths !== undefined) {
-        const vertices = rows(data.vertices, arrayShape(source.vertices)?.[1] ?? 2), lengths = numbers(data.path_lengths), paths = [];
+        const vertices = rows(data.vertices, arrayShape(source.vertices)?.[1] ?? 2), lengths = numbers(data.path_lengths), codes = numbers(data.path_codes), paths = [], pathCodes = [];
         let offset = 0;
         for (const length of lengths) {
             paths.push(vertices.slice(offset, offset + length));
+            if (codes.length)
+                pathCodes.push(codes.slice(offset, offset + length));
             offset += length;
         }
         data.paths = paths;
+        if (pathCodes.length)
+            data.path_codes = pathCodes;
     }
     else if (data.vertices !== undefined && (ArrayBuffer.isView(data.vertices) || !Array.isArray(data.vertices))) {
         data.vertices = rows(data.vertices, arrayShape(source.vertices)?.[1] ?? 2);
