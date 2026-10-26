@@ -1,5 +1,7 @@
 # Welcome to MPlot!
 
+> **[Read the full, searchable MPlot documentation →](https://mplot-dev.github.io/mplot/)**
+
 MPlot saves Matplotlib figures as interactive files. You can zoom, pan, inspect your data, and pass the result to somebody else—without turning your beautiful plot into a sad, motionless PNG.
 
 Here is the important part:

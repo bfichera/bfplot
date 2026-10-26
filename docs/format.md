@@ -1,10 +1,10 @@
 # How MPlot files work
 
-You do **not** need to understand the file format to use MPlot. If this is your first visit, go back to the [front page](../README.md), call `mplot.savefig()`, and make yourself an interactive plot!
+You do **not** need to understand the file format to use MPlot. If this is your first visit, go back to the [front page](index.md), call `mplot.savefig()`, and make yourself an interactive plot!
 
 Still here? Great. This page explains what MPlot puts on disk and why it looks a little different from a PDF.
 
-> This is the friendly format guide. [`ARCHITECTURE.md`](../ARCHITECTURE.md) is the precise internal contract if you are implementing a reader or writer.
+> This is the friendly format guide. The [architecture contract](project/architecture.md) is the precise internal reference if you are implementing a reader or writer.
 
 ## The short version
 
@@ -129,7 +129,7 @@ A split → packed → split trip should preserve the scientific artifact. No nu
 
 MPlot artifacts contain data, not executable Python or native code. A plugin requirement names separately installed software; it does not give the artifact permission to download or run anything.
 
-Files are still untrusted input, so readers must validate hashes, paths, array sizes, and schemas. See the [security policy](../SECURITY.md) if you are writing a server or opening artifacts from strangers on the internet.
+Files are still untrusted input, so readers must validate hashes, paths, array sizes, and schemas. See the [security policy](project/security.md) if you are writing a server or opening artifacts from strangers on the internet.
 
 ## Compatibility
 

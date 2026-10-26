@@ -1,0 +1,121 @@
+site_name: MPlot
+site_description: Save Matplotlib figures as interactive, reproducible scientific files.
+site_url: https://mplot-dev.github.io/mplot/
+repo_url: https://github.com/mplot-dev/mplot
+repo_name: mplot-dev/mplot
+edit_uri: edit/main/docs/
+copyright: Copyright &copy; 2026 MPlot contributors
+
+theme:
+  name: material
+  custom_dir: docs/overrides
+  language: en
+  logo: assets/logo.svg
+  favicon: assets/favicon.svg
+  icon:
+    repo: fontawesome/brands/github
+  font: false
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: mplot-light
+      primary: custom
+      accent: custom
+      toggle:
+        icon: material/weather-night
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: custom
+      accent: custom
+      toggle:
+        icon: material/weather-sunny
+        name: Switch to light mode
+  features:
+    - announce.dismiss
+    - content.action.edit
+    - content.code.annotate
+    - content.code.copy
+    - content.tabs.link
+    - navigation.footer
+    - navigation.indexes
+    - navigation.instant
+    - navigation.instant.prefetch
+    - navigation.path
+    - navigation.sections
+    - navigation.tabs
+    - navigation.tabs.sticky
+    - navigation.top
+    - search.highlight
+    - search.share
+    - search.suggest
+    - toc.follow
+
+plugins:
+  - search:
+      separator: '[\s\-,:!=\[\]()"`/]+|\.(?!\d)|&[lg]t;|(?!\b)(?=[A-Z][a-z])'
+
+nav:
+  - Home: index.md
+  - Get started:
+      - Quick start: getting-started/index.md
+      - Installation: getting-started/installation.md
+      - Your first MPlot: getting-started/first-plot.md
+  - Guides:
+      - Choosing a file type: guides/file-types.md
+      - Using MPlot with Git: guides/version-control.md
+      - Provenance and metadata: guides/provenance.md
+      - Live plots: guides/streaming.md
+      - Serving plots: guides/serving.md
+  - Reference:
+      - Python API: reference/python-api.md
+      - Command-line interface: reference/cli.md
+      - Supported plots: reference/supported-plots.md
+      - File format: format.md
+  - Extend MPlot:
+      - Plugin guide: plugins.md
+  - Project:
+      - What MPlot is (and isn't): project/scope.md
+      - Contributing: project/contributing.md
+      - Security: project/security.md
+      - Architecture: project/architecture.md
+
+markdown_extensions:
+  - abbr
+  - admonition
+  - attr_list
+  - def_list
+  - footnotes
+  - md_in_html
+  - tables
+  - toc:
+      permalink: true
+      title: On this page
+  - pymdownx.details
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
+  - pymdownx.inlinehilite
+  - pymdownx.keys
+  - pymdownx.magiclink
+  - pymdownx.snippets:
+      base_path: ["."]
+      check_paths: true
+  - pymdownx.superfences
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.tasklist:
+      custom_checkbox: true
+
+extra_css:
+  - stylesheets/extra.css
+
+extra_javascript:
+  - javascripts/extra.js
+
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/mplot-dev/mplot
+      name: MPlot on GitHub
+  generator: false

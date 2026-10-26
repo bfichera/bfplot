@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-label="MPlot">
+  <defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#14b8a6"/><stop offset="1" stop-color="#6366f1"/></linearGradient></defs>
+  <rect width="128" height="128" rx="30" fill="#0b1020"/>
+  <path d="M20 85c13-2 17-45 31-45 13 0 15 55 29 55 12 0 14-35 28-50" fill="none" stroke="url(#g)" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="51" cy="40" r="6" fill="#f8fafc"/><circle cx="80" cy="95" r="6" fill="#f8fafc"/>
+</svg>
