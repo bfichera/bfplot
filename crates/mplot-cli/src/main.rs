@@ -465,6 +465,10 @@ mod tests {
         let value: serde_json::Value =
             serde_json::from_slice(&viewer_document(&document).unwrap()).unwrap();
         assert_eq!(value["axes"][0]["xlim"], serde_json::json!([0.0, 1.0]));
+        assert_eq!(
+            value["axes"][0]["position"],
+            serde_json::json!([0.125, 0.11, 0.775, 0.77])
+        );
         assert_eq!(value["axes"][0]["projection"], "2d");
         assert_eq!(value["artists"][0]["id"], "artist-0");
         assert_eq!(value["figures"][0]["axes"][0], "figure-0-axes-0");

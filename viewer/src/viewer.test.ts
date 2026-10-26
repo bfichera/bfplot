@@ -36,6 +36,23 @@ describe("MPlotViewer", () => {
     viewer.destroy();
   });
 
+  it("renders colorbars as auxiliary axes excluded from plot counts", async () => {
+    const host = window.document.createElement("div");
+    window.document.body.append(host);
+    const withColorbar: MPlotDocument = {
+      ...document,
+      figures: [{ id: "f", title: "Results", axes: ["a", "c"] }],
+      axes: [...document.axes, { id: "c", figure_id: "f", role: "colorbar", position: [.82, .1, .03, .8], colorbar: { orientation: "vertical", label: "intensity", limits: [0, 1], ticks: [0, .5, 1], colors: ["#000000", "#ffffff"] } }],
+    };
+    const viewer = new MPlotViewer(host, withColorbar);
+    await viewer.render();
+    expect(host.querySelector(".mplot-figure-count")?.textContent).toBe("1 plot");
+    expect(host.querySelectorAll(".mplot-axis")).toHaveLength(1);
+    expect(host.querySelector(".mplot-colorbar")?.getAttribute("style")).toContain("left: 82%");
+    expect(host.querySelector(".mplot-colorbar-label")?.textContent).toBe("intensity");
+    viewer.destroy();
+  });
+
   it("shows a visible rectangle while box zooming", async () => {
     const host = window.document.createElement("div");
     window.document.body.append(host);

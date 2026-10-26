@@ -3,7 +3,7 @@ import { builtinRenderers, type ArtistRenderer, type RenderContext } from "./ren
 import { createScale, formatTick, type Scale } from "./scales.js";
 import { resolveTheme } from "./theme.js";
 import type { Artist, ArrayResolver, Axis, Figure, MPlotDocument, MPlotSelectionEventDetail, PointSelection, ResolvedData, Theme, ThemeName, Viewport } from "./types.js";
-import { pairs, SVG_NS, svg } from "./svg.js";
+import { cssColor, pairs, SVG_NS, svg } from "./svg.js";
 
 export interface ViewerOptions {
   theme?: ThemeName | Partial<Theme>;
@@ -16,7 +16,7 @@ export interface ViewerOptions {
 export type ExportScope = "axis" | "figure" | "artifact";
 interface Margins { left: number; right: number; top: number; bottom: number; }
 interface AxisView { axis: Axis; figureId: string; host: HTMLElement; svg: SVGSVGElement; plot: SVGGElement; overlay: SVGGElement; readout: HTMLElement; width: number; height: number; margin: Margins; x: Scale; y: Scale; mounted: boolean; }
-interface FigureView { figure: Figure; element: HTMLElement; canvas: HTMLElement; axisIds: string[]; }
+interface FigureView { figure: Figure; element: HTMLElement; canvas: HTMLElement; axisIds: string[]; plotAxisIds: string[]; }
 type Mode = "pan" | "zoom" | "select";
 
 export class MPlotViewer extends EventTarget {
@@ -143,8 +143,14 @@ export class MPlotViewer extends EventTarget {
       for (const [axisIndex, axisId] of figureView.axisIds.entries()) {
         const axis = this.model.document.axes.find((item) => item.id === axisId);
         if (!axis) continue;
+        if (axis.role === "colorbar") {
+          const colorbar = this.createColorbar(axis);
+          this.positionAxis(colorbar, axis, axisIndex, figureView.axisIds.length);
+          figureView.canvas.append(colorbar);
+          continue;
+        }
         const view = this.createAxis(axis, figure.id);
-        this.positionAxis(view.host, axis, axisIndex, figureView.axisIds.length);
+        this.positionAxis(view.host, axis, figureView.plotAxisIds.indexOf(axisId), figureView.plotAxisIds.length);
         figureView.canvas.append(view.host);
         this.views.set(axis.id, view);
         this.resize?.observe(view.host);
@@ -168,16 +174,48 @@ export class MPlotViewer extends EventTarget {
     title.className = "mplot-figure-title";
     title.textContent = figure.title ?? `Figure ${index + 1}`;
     const axisIds = this.figureAxisIds(figure);
+    const plotAxisIds = axisIds.filter((axisId) => this.model.document.axes.find((axis) => axis.id === axisId)?.role !== "colorbar");
     const count = document.createElement("span");
     count.className = "mplot-figure-count";
-    count.textContent = `${axisIds.length} ${axisIds.length === 1 ? "plot" : "plots"}`;
+    count.textContent = `${plotAxisIds.length} ${plotAxisIds.length === 1 ? "plot" : "plots"}`;
     heading.append(title, count);
     const canvas = document.createElement("div");
     canvas.className = "mplot-figure-canvas";
     const [width, height] = figure.size ?? [640, 480];
     canvas.style.setProperty("--mplot-figure-ratio", String(width / Math.max(1, height)));
     element.append(heading, canvas);
-    return { figure, element, canvas, axisIds };
+    return { figure, element, canvas, axisIds, plotAxisIds };
+  }
+
+  private createColorbar(axis: Axis): HTMLElement {
+    const colorbar = document.createElement("aside");
+    colorbar.className = `mplot-colorbar mplot-colorbar--${axis.colorbar?.orientation ?? "vertical"}`;
+    colorbar.dataset.axesId = axis.id;
+    colorbar.setAttribute("aria-label", axis.colorbar?.label ? `Colorbar: ${axis.colorbar.label}` : "Colorbar");
+    const gradient = document.createElement("div");
+    gradient.className = "mplot-colorbar-gradient";
+    const colors = (axis.colorbar?.colors ?? []).map((color) => Array.isArray(color) && color.length >= 3 ? `rgba(${Math.round(Number(color[0]) * 255)}, ${Math.round(Number(color[1]) * 255)}, ${Math.round(Number(color[2]) * 255)}, ${color[3] === undefined ? 1 : Number(color[3])})` : cssColor(color, "")).filter(Boolean);
+    gradient.style.background = `linear-gradient(${axis.colorbar?.orientation === "horizontal" ? "to right" : "to top"}, ${colors.length > 1 ? colors.join(", ") : "#440154, #21918c, #fde725"})`;
+    const ticks = document.createElement("div");
+    ticks.className = "mplot-colorbar-ticks";
+    const values = axis.colorbar?.ticks ?? [], labels = axis.colorbar?.ticklabels ?? [];
+    const [lower, upper] = axis.colorbar?.limits ?? [values[0] ?? 0, values.at(-1) ?? 1];
+    values.forEach((value, index) => {
+      const tick = document.createElement("span");
+      tick.className = "mplot-colorbar-tick";
+      const fraction = (value - lower) / (upper - lower || 1);
+      tick.style.setProperty("--mplot-colorbar-position", `${Math.max(0, Math.min(1, fraction)) * 100}%`);
+      tick.textContent = labels[index] ?? formatTick(value, "linear");
+      ticks.append(tick);
+    });
+    colorbar.append(gradient, ticks);
+    if (axis.colorbar?.label) {
+      const label = document.createElement("div");
+      label.className = "mplot-colorbar-label";
+      label.textContent = axis.colorbar.label;
+      colorbar.append(label);
+    }
+    return colorbar;
   }
 
   private createAxis(axis: Axis, figureId: string): AxisView {

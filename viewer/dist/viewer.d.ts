@@ -35,6 +35,7 @@ export declare class MPlotViewer extends EventTarget {
     destroy(): void;
     render(): Promise<void>;
     private createFigure;
+    private createColorbar;
     private createAxis;
     private positionAxis;
     private mountAxis;

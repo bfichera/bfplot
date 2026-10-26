@@ -16,9 +16,21 @@ export interface Artist {
 }
 export type ScaleType = "linear" | "log" | "symlog" | "date" | "category";
 export type AxisDimension = "x" | "y" | "z";
+export interface Colorbar {
+    orientation: "vertical" | "horizontal";
+    label?: string;
+    limits?: [number, number];
+    ticks?: number[];
+    ticklabels?: string[];
+    cmap?: string;
+    colors?: unknown[];
+    mappable?: string;
+}
 export interface Axis {
     id: string;
     figure_id?: string;
+    role?: "plot" | "colorbar";
+    colorbar?: Colorbar;
     title?: string;
     xlabel?: string;
     ylabel?: string;

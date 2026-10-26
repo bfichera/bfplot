@@ -55,6 +55,23 @@ def test_savefig_extracts_broad_artist_set(tmp_path):
     assert _decode_array(output, contour["data"]["path_codes"]).size > 0
 
 
+def test_savefig_marks_colorbars_as_auxiliary_axes(tmp_path):
+    figure, axes = plt.subplots()
+    image = axes.imshow(np.arange(9).reshape(3, 3), cmap="magma")
+    figure.colorbar(image, ax=axes, label="intensity")
+
+    output = mplot.savefig(tmp_path / "colorbar", figure, provenance=False)
+    _, document = _document_from_split(output)
+    plot, colorbar = document["figures"][0]["axes"]
+    assert "role" not in plot
+    assert colorbar["role"] == "colorbar"
+    assert colorbar["artists"] == []
+    assert colorbar["colorbar"]["orientation"] == "vertical"
+    assert colorbar["colorbar"]["label"] == "intensity"
+    assert colorbar["colorbar"]["limits"] == [0, 8]
+    assert len(colorbar["colorbar"]["colors"]) == 64
+
+
 def test_savefig_preserves_true_3d_surface_and_wire_geometry(tmp_path):
     figure = plt.figure()
     surface_axes = figure.add_subplot(1, 2, 1, projection="3d")

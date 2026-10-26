@@ -115,6 +115,23 @@ def _extract_axes(axes: Any, axes_id: str, context: ExtractionContext) -> dict[s
         "facecolor": _color(axes.get_facecolor()),
         "artists": [],
     }
+    colorbar = getattr(axes, "_colorbar", None)
+    if axes.get_label() == "<colorbar>" or colorbar is not None:
+        result["role"] = "colorbar"
+        if colorbar is not None:
+            mappable = colorbar.mappable
+            lower, upper = mappable.get_clim()
+            result["colorbar"] = {
+                "orientation": colorbar.orientation,
+                "label": colorbar.ax.get_ylabel() if colorbar.orientation == "vertical" else colorbar.ax.get_xlabel(),
+                "limits": [_finite(lower), _finite(upper)],
+                "ticks": [_finite(item) for item in colorbar.get_ticks()],
+                "ticklabels": [item.get_text() for item in colorbar.ax.get_yticklabels()] if colorbar.orientation == "vertical" else [item.get_text() for item in colorbar.ax.get_xticklabels()],
+                "cmap": mappable.cmap.name,
+                "colors": [_color(mappable.cmap(value)) for value in np.linspace(0, 1, 64)],
+                "mappable": type(mappable).__name__,
+            }
+        return result
     if is_3d:
         result["z"] = _axis(axes, "z")
         result["view"] = {

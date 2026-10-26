@@ -11,9 +11,10 @@ describe("document normalization",()=>{
     expect(result.artists[0]?.props.color).toBe("rgba(255, 0, 128, 0.5)");
   });
 
-  it("preserves flat axis limits from served artifacts",()=>{
-    const result=normalizeDocument({figures:[{id:"f",axes:["a"]}],axes:[{id:"a",figure_id:"f",xlim:[-2,8],ylim:[10,20]}],artists:[]});
-    expect(result.axes[0]).toMatchObject({id:"a",xlim:[-2,8],ylim:[10,20]});
+  it("preserves flat axis limits, positions, and auxiliary colorbars from served artifacts",()=>{
+    const result=normalizeDocument({figures:[{id:"f",axes:["a","c"]}],axes:[{id:"a",figure_id:"f",xlim:[-2,8],ylim:[10,20],position:[.1,.2,.7,.7]},{id:"c",figure_id:"f",role:"colorbar",position:[.82,.2,.03,.7],colorbar:{orientation:"vertical",label:"intensity",limits:[-1,1],ticks:[-1,0,1],ticklabels:["−1","0","1"],cmap:"magma",colors:[[0,0,0,1],[1,1,1,1]]}}],artists:[]});
+    expect(result.axes[0]).toMatchObject({id:"a",xlim:[-2,8],ylim:[10,20],position:[.1,.2,.7,.7]});
+    expect(result.axes[1]).toMatchObject({id:"c",role:"colorbar",position:[.82,.2,.03,.7],colorbar:{orientation:"vertical",label:"intensity",limits:[-1,1],ticks:[-1,0,1]}});
   });
 
   it("adapts matrix and segmented path arrays",()=>{

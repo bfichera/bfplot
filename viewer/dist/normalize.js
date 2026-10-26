@@ -30,9 +30,19 @@ function normalizeAxis(rawValue, figureId) {
     const raw = record(rawValue), props = record(raw.props), source = { ...props, ...raw };
     const x = record(source.x), y = record(source.y), z = record(source.z);
     const projection = source.projection === "3d" ? "3d" : "2d";
-    const xlim = pair(source.xlim) ?? pair(x.limits), ylim = pair(source.ylim) ?? pair(y.limits), zlim = pair(source.zlim) ?? pair(z.limits);
+    const xlim = pair(source.xlim) ?? pair(x.limits), ylim = pair(source.ylim) ?? pair(y.limits), zlim = pair(source.zlim) ?? pair(z.limits), position = quad(source.position) ?? quad(source.bounds);
+    const colorbarRaw = record(source.colorbar), colorbarLimits = pair(colorbarRaw.limits);
+    const colorbar = source.role === "colorbar" ? {
+        orientation: colorbarRaw.orientation === "horizontal" ? "horizontal" : "vertical",
+        ...(text(colorbarRaw.label) ? { label: text(colorbarRaw.label) } : {}),
+        ...(colorbarLimits ? { limits: colorbarLimits } : {}),
+        ticks: list(colorbarRaw.ticks).map(Number), ticklabels: list(colorbarRaw.ticklabels).map(String),
+        ...(text(colorbarRaw.cmap) ? { cmap: text(colorbarRaw.cmap) } : {}),
+        colors: list(colorbarRaw.colors), ...(text(colorbarRaw.mappable) ? { mappable: text(colorbarRaw.mappable) } : {}),
+    } : undefined;
     return {
         id: text(source.id), figure_id: figureId,
+        ...(source.role === "colorbar" && colorbar ? { role: "colorbar", colorbar } : {}),
         ...(text(source.title) ? { title: text(source.title) } : {}),
         ...(text(x.label) ? { xlabel: text(x.label) } : {}),
         ...(text(y.label) ? { ylabel: text(y.label) } : {}),
@@ -41,7 +51,7 @@ function normalizeAxis(rawValue, figureId) {
         ...(ylim ? { ylim } : {}),
         ...(zlim ? { zlim } : {}),
         xscale: scale(x.scale), yscale: scale(y.scale), zscale: scale(z.scale), projection,
-        ...(quad(source.bounds) ? { position: quad(source.bounds) } : {}),
+        ...(position ? { position } : {}),
         props: { ...normalizeProps(props), ...(source.view && typeof source.view === "object" ? { view: source.view } : {}) },
     };
 }

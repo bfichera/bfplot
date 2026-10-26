@@ -165,6 +165,18 @@
 .mplot-axis--pending { display: grid; place-items: center; border: 1px dashed color-mix(in srgb, var(--mplot-muted) 22%, transparent); background: color-mix(in srgb, var(--mplot-bg) 18%, transparent); }
 .mplot-axis-placeholder { color: var(--mplot-muted); font-size: 12px; font-style: italic; }
 
+.mplot-colorbar { position: absolute; display: grid; color: var(--mplot-fg); font: 10px ui-sans-serif, system-ui, sans-serif; pointer-events: none; }
+.mplot-colorbar--vertical { grid-template-columns: minmax(8px, 1fr) auto auto; gap: 5px; }
+.mplot-colorbar--horizontal { grid-template-rows: minmax(8px, 1fr) auto auto; gap: 4px; }
+.mplot-colorbar-gradient { min-width: 8px; min-height: 8px; border: 1px solid color-mix(in srgb, var(--mplot-fg) 55%, transparent); }
+.mplot-colorbar-ticks { position: relative; min-width: 38px; min-height: 100%; }
+.mplot-colorbar--horizontal .mplot-colorbar-ticks { min-width: 100%; min-height: 16px; }
+.mplot-colorbar-tick { position: absolute; white-space: nowrap; }
+.mplot-colorbar--vertical .mplot-colorbar-tick { left: 0; bottom: var(--mplot-colorbar-position); transform: translateY(50%); }
+.mplot-colorbar--horizontal .mplot-colorbar-tick { top: 0; left: var(--mplot-colorbar-position); transform: translateX(-50%); }
+.mplot-colorbar-label { align-self: center; white-space: nowrap; }
+.mplot-colorbar--vertical .mplot-colorbar-label { writing-mode: vertical-rl; transform: rotate(180deg); }
+
 .mplot-axis svg {
   display: block;
   width: 100%;
