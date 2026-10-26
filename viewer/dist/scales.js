@@ -41,7 +41,7 @@ export function createScale(type = "linear", domain, range) {
 }
 export function formatTick(value, type = "linear") {
     if (type === "date")
-        return new Date(value).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
+        return new Date(value).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric", timeZone: "UTC" });
     const magnitude = Math.abs(value);
     if ((magnitude !== 0 && magnitude < 1e-3) || magnitude >= 1e5)
         return value.toExponential(2);

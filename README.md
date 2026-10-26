@@ -90,7 +90,7 @@ Then:
 $ mplot view results/sine_wave.mplot.toml
 ```
 
-MPlot currently understands lines, scatter plots, images, error bars, filled regions, histograms, contours, text, patches, and common 3D plots. Custom Matplotlib artists can be added with plugins.
+MPlot currently understands lines, scatter plots, images, error bars, filled regions, histograms, contours, text, patches, and common 3D plots. New artist types must be implemented in MPlot itself so artifacts remain portable and use one reviewed renderer set.
 
 ### Which figure gets saved?
 
@@ -212,7 +212,7 @@ Finally, provenance is not a time machine. MPlot can record useful context, but 
 ## Where should I go next?
 
 - Curious about the files? Read [How MPlot files work](docs/format.md).
-- Making a custom artist? Read [Writing an MPlot plugin](docs/plugins.md).
+- Need another artist type? Please propose or contribute it through [How to contribute](CONTRIBUTING.md).
 - Want to help? Wonderful! Read [How to contribute](CONTRIBUTING.md).
 - Found a security problem? Please read the [security policy](SECURITY.md).
 - Working on MPlot itself? The precise internal contract lives in [`ARCHITECTURE.md`](ARCHITECTURE.md).

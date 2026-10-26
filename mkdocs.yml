@@ -72,7 +72,6 @@ nav:
       - Supported plots: reference/supported-plots.md
       - File format: format.md
   - Extend MPlot:
-      - Plugin guide: plugins.md
   - Project:
       - What MPlot is (and isn't): project/scope.md
       - Contributing: project/contributing.md

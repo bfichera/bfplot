@@ -116,8 +116,6 @@ pub struct Document {
     pub links: Vec<Value>,
     #[serde(default)]
     pub selections: Vec<Selection>,
-    #[serde(default, alias = "plugins")]
-    pub plugin_requirements: Vec<PluginRequirement>,
     #[serde(default, flatten)]
     pub metadata: BTreeMap<String, Value>,
 }
@@ -129,7 +127,6 @@ impl Default for Document {
             figures: Vec::new(),
             links: Vec::new(),
             selections: Vec::new(),
-            plugin_requirements: Vec::new(),
             metadata: BTreeMap::new(),
         }
     }
@@ -180,25 +177,6 @@ pub struct ArrayRef {
     pub dtype: String,
     pub shape: Vec<u64>,
     pub codec: String,
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize)]
-#[serde(untagged)]
-pub enum PluginRequirement {
-    Name(String),
-    Detailed {
-        name: String,
-        #[serde(default, skip_serializing_if = "Option::is_none")]
-        version: Option<String>,
-    },
-}
-
-impl PluginRequirement {
-    pub fn name(&self) -> &str {
-        match self {
-            Self::Name(name) | Self::Detailed { name, .. } => name,
-        }
-    }
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -257,11 +235,17 @@ pub fn validate_document(document: &Document) -> Vec<ValidationIssue> {
             "unsupported schema version",
         ));
     }
-    for (index, requirement) in document.plugin_requirements.iter().enumerate() {
-        if requirement.name().trim().is_empty() {
+    for key in ["plugin_requirements", "plugins"] {
+        let unsupported = match document.metadata.get(key) {
+            Some(Value::Null) | None => false,
+            Some(Value::Array(values)) => !values.is_empty(),
+            Some(Value::Object(values)) => !values.is_empty(),
+            Some(_) => true,
+        };
+        if unsupported {
             issues.push(ValidationIssue::new(
-                format!("plugin_requirements[{index}]"),
-                "plugin requirement must not be empty",
+                key,
+                "third-party artist plugins are not supported",
             ));
         }
     }
@@ -405,17 +389,17 @@ fn unique_id(ids: &mut HashSet<String>, id: &str, path: String, issues: &mut Vec
 }
 
 fn validate_artist_type(value: &str, path: &str, issues: &mut Vec<ValidationIssue>) {
-    if let Some(name) = value.strip_prefix("mplot.") {
-        if !BUILT_INS.contains(&name) {
-            issues.push(ValidationIssue::new(
-                format!("{path}.type"),
-                "unknown mplot built-in",
-            ));
-        }
-    } else if value.split('.').count() < 3 {
+    let Some(name) = value.strip_prefix("mplot.") else {
         issues.push(ValidationIssue::new(
             format!("{path}.type"),
-            "plugin type must use a reverse-DNS name",
+            "custom artist types are not supported",
+        ));
+        return;
+    };
+    if !BUILT_INS.contains(&name) {
+        issues.push(ValidationIssue::new(
+            format!("{path}.type"),
+            "unknown mplot built-in",
         ));
     }
 }
@@ -465,11 +449,21 @@ mod tests {
     }
 
     #[test]
-    fn requires_reverse_dns_plugin_names() {
+    fn rejects_custom_artist_types_and_plugin_requirements() {
         let mut issues = Vec::new();
-        validate_artist_type("custom.line", "artist", &mut issues);
-        assert_eq!(issues.len(), 1);
         validate_artist_type("org.example.line", "artist", &mut issues);
         assert_eq!(issues.len(), 1);
+        assert_eq!(issues[0].message, "custom artist types are not supported");
+
+        let document = Document {
+            metadata: BTreeMap::from([("plugin_requirements".into(), json!(["org.example"]))]),
+            ..Document::default()
+        };
+        let issues = validate_document(&document);
+        assert!(
+            issues
+                .iter()
+                .any(|issue| issue.message.contains("plugins are not supported"))
+        );
     }
 }

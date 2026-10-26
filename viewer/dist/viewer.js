@@ -15,6 +15,7 @@ export class MPlotViewer extends EventTarget {
     mode = "pan";
     exportScope = "figure";
     activeAxisId;
+    activeFigureIdValue;
     source;
     resize;
     intersection;
@@ -27,7 +28,6 @@ export class MPlotViewer extends EventTarget {
         this.theme = resolveTheme(options.theme);
         this.model = new ViewerModel(document, options.arrayResolver);
         Object.entries(builtinRenderers).forEach(([type, renderer]) => this.renderers.set(type, renderer));
-        Object.entries(options.renderers ?? {}).forEach(([type, renderer]) => this.renderers.set(type, renderer));
         this.element.classList.add("mplot-viewer");
         this.element.setAttribute("role", "region");
         this.element.setAttribute("aria-label", document.title ?? "Interactive scientific plot collection");
@@ -66,9 +66,6 @@ export class MPlotViewer extends EventTarget {
             this.connectLive(options.liveUrl);
         void this.render();
     }
-    registerRenderer(type, renderer) { this.renderers.set(type, renderer); void this.renderMounted(); return this; }
-    unregisterRenderer(type) { const removed = this.renderers.delete(type); if (removed)
-        void this.renderMounted(); return removed; }
     update(document) { this.model.setDocument(document); }
     setTheme(theme) {
         this.options.theme = theme;
@@ -112,6 +109,8 @@ export class MPlotViewer extends EventTarget {
         this.element.append(header);
         const shell = document.createElement("div");
         shell.className = "mplot-shell";
+        if (!this.model.document.figures.some((figure) => figure.id === this.activeFigureIdValue))
+            this.activeFigureIdValue = this.model.document.figures[0]?.id;
         if (this.model.document.figures.length > 1)
             shell.append(this.createNavigator());
         const figuresElement = document.createElement("main");
@@ -122,6 +121,7 @@ export class MPlotViewer extends EventTarget {
         for (const [figureIndex, figure] of this.model.document.figures.entries()) {
             const figureView = this.createFigure(figure, figureIndex);
             this.figures.set(figure.id, figureView);
+            figureView.element.hidden = figure.id !== this.activeFigureIdValue;
             figuresElement.append(figureView.element);
             for (const [axisIndex, axisId] of figureView.axisIds.entries()) {
                 const axis = this.model.document.axes.find((item) => item.id === axisId);
@@ -141,6 +141,8 @@ export class MPlotViewer extends EventTarget {
         if (token !== this.documentToken)
             return;
         await Promise.all(immediateMounts);
+        if (this.activeFigureIdValue)
+            await this.mountFigure(this.activeFigureIdValue);
     }
     createFigure(figure, index) {
         const element = document.createElement("section");
@@ -156,27 +158,13 @@ export class MPlotViewer extends EventTarget {
         const count = document.createElement("span");
         count.className = "mplot-figure-count";
         count.textContent = `${axisIds.length} ${axisIds.length === 1 ? "plot" : "plots"}`;
-        const toggle = document.createElement("button");
-        toggle.type = "button";
-        toggle.className = "mplot-figure-toggle";
-        toggle.textContent = "Collapse";
-        toggle.setAttribute("aria-expanded", "true");
-        heading.append(title, count, toggle);
+        heading.append(title, count);
         const canvas = document.createElement("div");
         canvas.className = "mplot-figure-canvas";
         const [width, height] = figure.size ?? [640, 480];
         canvas.style.setProperty("--mplot-figure-ratio", String(width / Math.max(1, height)));
-        toggle.onclick = () => {
-            const collapsed = !element.classList.contains("mplot-figure--collapsed");
-            element.classList.toggle("mplot-figure--collapsed", collapsed);
-            toggle.textContent = collapsed ? "Expand" : "Collapse";
-            toggle.setAttribute("aria-expanded", String(!collapsed));
-            const stored = this.figures.get(figure.id);
-            if (stored)
-                stored.collapsed = collapsed;
-        };
         element.append(heading, canvas);
-        return { figure, element, canvas, axisIds, collapsed: false };
+        return { figure, element, canvas, axisIds };
     }
     createAxis(axis, figureId) {
         const host = document.createElement("article");
@@ -230,39 +218,63 @@ export class MPlotViewer extends EventTarget {
         const navigation = document.createElement("nav");
         navigation.className = "mplot-navigator";
         navigation.setAttribute("aria-label", "Figures");
-        const heading = document.createElement("strong");
-        heading.textContent = "Figures";
-        const controls = document.createElement("div");
-        controls.className = "mplot-navigator-controls";
-        for (const [label, collapsed] of [["Expand all", false], ["Collapse all", true]]) {
+        const previous = document.createElement("button");
+        previous.type = "button";
+        previous.className = "mplot-page-button";
+        previous.textContent = "Previous";
+        previous.setAttribute("aria-label", "Previous figure");
+        const pages = document.createElement("div");
+        pages.className = "mplot-page-list";
+        this.model.document.figures.forEach((figure, index) => {
             const button = document.createElement("button");
             button.type = "button";
-            button.textContent = label;
-            button.onclick = () => this.setAllFiguresCollapsed(collapsed);
-            controls.append(button);
-        }
-        const list = document.createElement("ol");
-        this.model.document.figures.forEach((figure, index) => {
-            const item = document.createElement("li"), link = document.createElement("a");
-            link.href = `#mplot-figure-${safeId(figure.id)}`;
-            const count = this.figureAxisIds(figure).length;
-            link.textContent = `${figure.title ?? `Figure ${index + 1}`} (${count})`;
-            item.append(link);
-            list.append(item);
+            button.className = "mplot-page-button";
+            button.dataset.figureId = figure.id;
+            button.textContent = String(index + 1);
+            button.title = figure.title ?? `Figure ${index + 1}`;
+            button.setAttribute("aria-label", `Show ${button.title}`);
+            button.onclick = () => void this.showFigure(figure.id);
+            pages.append(button);
         });
-        navigation.append(heading, controls, list);
+        const next = document.createElement("button");
+        next.type = "button";
+        next.className = "mplot-page-button";
+        next.textContent = "Next";
+        next.setAttribute("aria-label", "Next figure");
+        previous.onclick = () => void this.stepFigure(-1);
+        next.onclick = () => void this.stepFigure(1);
+        navigation.append(previous, pages, next);
+        queueMicrotask(() => this.updateNavigator());
         return navigation;
     }
-    setAllFiguresCollapsed(collapsed) {
-        for (const figure of this.figures.values()) {
-            figure.collapsed = collapsed;
-            figure.element.classList.toggle("mplot-figure--collapsed", collapsed);
-            const toggle = figure.element.querySelector(".mplot-figure-toggle");
-            if (toggle) {
-                toggle.textContent = collapsed ? "Expand" : "Collapse";
-                toggle.setAttribute("aria-expanded", String(!collapsed));
-            }
+    async showFigure(figureId) {
+        if (!this.figures.has(figureId))
+            return;
+        this.activeFigureIdValue = figureId;
+        for (const [id, figure] of this.figures)
+            figure.element.hidden = id !== figureId;
+        const firstAxis = this.figures.get(figureId)?.axisIds[0];
+        if (firstAxis) {
+            this.activeAxisId = firstAxis;
+            this.markActiveAxis();
         }
+        this.updateNavigator();
+        await this.mountFigure(figureId);
+    }
+    stepFigure(offset) {
+        const figures = this.model.document.figures, current = Math.max(0, figures.findIndex((figure) => figure.id === this.activeFigureIdValue));
+        const next = figures[current + offset];
+        if (next)
+            void this.showFigure(next.id);
+    }
+    updateNavigator() {
+        const figures = this.model.document.figures, index = figures.findIndex((figure) => figure.id === this.activeFigureIdValue);
+        this.element.querySelectorAll(".mplot-page-list [data-figure-id]").forEach((button) => button.setAttribute("aria-current", button.dataset.figureId === this.activeFigureIdValue ? "page" : "false"));
+        const previous = this.element.querySelector('[aria-label="Previous figure"]'), next = this.element.querySelector('[aria-label="Next figure"]');
+        if (previous)
+            previous.disabled = index <= 0;
+        if (next)
+            next.disabled = index < 0 || index >= figures.length - 1;
     }
     createToolbar() {
         const toolbar = document.createElement("nav");
@@ -539,7 +551,7 @@ export class MPlotViewer extends EventTarget {
         this.download(format === "svg" ? new Blob([this.exportSVG(scope)], { type: "image/svg+xml;charset=utf-8" }) : await this.exportPNG(2, scope), filename);
     }
     async mountFigure(figureId) { await Promise.all((this.figures.get(figureId)?.axisIds ?? []).map((axisId) => this.mountAxis(axisId))); }
-    activeFigureId() { return this.activeAxisId ? this.views.get(this.activeAxisId)?.figureId : this.model.document.figures[0]?.id; }
+    activeFigureId() { return this.activeFigureIdValue ?? (this.activeAxisId ? this.views.get(this.activeAxisId)?.figureId : this.model.document.figures[0]?.id); }
     download(blob, filename) { const link = document.createElement("a"), url = URL.createObjectURL(blob); link.href = url; link.download = filename; link.click(); setTimeout(() => URL.revokeObjectURL(url), 0); }
     connectLive(url) { this.source?.close(); if (typeof EventSource === "undefined")
         return; this.source = new EventSource(url); const update = (event) => { try {

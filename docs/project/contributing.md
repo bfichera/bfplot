@@ -16,9 +16,9 @@ Security vulnerabilities should follow the [security policy](security.md) instea
 
 ```text
 crates/          Rust format, verification, packing, server, streams, and CLI
-src/mplot/       Python API, Matplotlib extraction, provenance, and plugins
+src/mplot/       Python API, Matplotlib extraction, and provenance
 viewer/          Browser interface and artist renderers
-docs/            Friendly explanations of formats and plugins
+docs/            Friendly explanations of formats and workflows
 tests/           Python and integration tests
 scripts/         Smoke checks and release helpers
 ```
@@ -51,7 +51,7 @@ Run the complete smoke script before submitting code.
 - Parser and storage changes include malformed and truncated inputs.
 - Numerical changes test dtype, shape, non-finite values, and empty arrays.
 - Renderer changes test ordinary output and visible fallback behavior.
-- Plugin changes test unsupported schema versions.
+- New artist types include Python extraction and viewer rendering tests.
 - Format changes include packed/split round trips and compatibility fixtures.
 
 Please do not rely only on a screenshot. A screenshot tells us that pixels moved; a semantic test can tell us whether the data remained correct.
@@ -60,7 +60,7 @@ Please do not rely only on a screenshot. A screenshot tells us that pixels moved
 
 - Verify SHA-256 before decoding an object.
 - Keep canonical JSON deterministic.
-- Never let an artifact trigger code execution or automatic plugin installation.
+- Never let an artifact trigger code execution or load third-party renderers.
 - Keep network serving on loopback unless the user explicitly chooses otherwise.
 - Normalize paths and enforce file, allocation, and decompression limits.
 - Show unsupported artists visibly instead of quietly dropping them.

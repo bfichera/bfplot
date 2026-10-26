@@ -1,10 +1,8 @@
 import { ViewerModel } from "./model.js";
-import { type ArtistRenderer } from "./renderers.js";
 import type { ArrayResolver, MPlotDocument, Theme, ThemeName } from "./types.js";
 export interface ViewerOptions {
     theme?: ThemeName | Partial<Theme>;
     arrayResolver?: ArrayResolver;
-    renderers?: Record<string, ArtistRenderer>;
     interactive?: boolean;
     toolbar?: boolean;
     liveUrl?: string;
@@ -22,14 +20,13 @@ export declare class MPlotViewer extends EventTarget {
     private mode;
     private exportScope;
     private activeAxisId;
+    private activeFigureIdValue;
     private source?;
     private resize?;
     private intersection?;
     private documentToken;
     private axisTokens;
     constructor(target: HTMLElement, document: MPlotDocument, options?: ViewerOptions);
-    registerRenderer(type: string, renderer: ArtistRenderer): this;
-    unregisterRenderer(type: string): boolean;
     update(document: MPlotDocument): void;
     setTheme(theme: ThemeName | Partial<Theme>): void;
     reset(axisId?: string): void;
@@ -41,7 +38,9 @@ export declare class MPlotViewer extends EventTarget {
     private mountAxis;
     private refitAxis;
     private createNavigator;
-    private setAllFiguresCollapsed;
+    private showFigure;
+    private stepFigure;
+    private updateNavigator;
     private createToolbar;
     private setMode;
     private renderMounted;

@@ -84,11 +84,13 @@ export function normalizeDocument(value) {
         if (!artists.some((item) => item.id === artist.id))
             artists.push(artist);
     }
+    const metadata = { ...record(raw.metadata) };
+    delete metadata.plugin_requirements;
+    delete metadata.plugins;
     return {
         figures, axes, artists,
         links: list(raw.links), selections: list(raw.selections),
-        plugin_requirements: (list(raw.plugin_requirements).length ? list(raw.plugin_requirements) : list(raw.plugins)),
-        ...(text(raw.title) ? { title: text(raw.title) } : {}), metadata: record(raw.metadata),
+        ...(text(raw.title) ? { title: text(raw.title) } : {}), metadata,
     };
 }
 const arrayShape = (value) => {

@@ -1,6 +1,5 @@
 export { MPlotViewer } from "./viewer.js";
 export { ViewerModel } from "./model.js";
-export { builtinRenderers } from "./renderers.js";
 export { createScale, formatTick } from "./scales.js";
 export { resolveTheme, themes } from "./theme.js";
 export { normalizeDocument, normalizeArtistData, isArrayReference } from "./normalize.js";

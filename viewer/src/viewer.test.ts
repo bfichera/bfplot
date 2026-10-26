@@ -32,7 +32,7 @@ describe("MPlotViewer", () => {
     expect(host.querySelector(".mplot-coordinates")?.textContent).toBe("x — · y —");
     const xLabel = Array.from(host.querySelectorAll(".mplot-label")).find((label) => label.textContent === "time");
     expect(Number(xLabel?.getAttribute("y"))).toBeLessThan(360);
-    expect(viewer.exportSVG()).toContain("Scientific plot");
+    expect(viewer.exportSVG()).toContain(">Signal</text>");
     viewer.destroy();
   });
 
@@ -62,11 +62,4 @@ describe("MPlotViewer", () => {
     viewer.destroy();
   });
 
-  it("allows explicit plugin renderer registration", async () => {
-    const host = window.document.createElement("div");
-    const viewer = new MPlotViewer(host, document);
-    viewer.registerRenderer("org.example.missing", ({ group }) => group.setAttribute("data-plugin", "yes"));
-    await viewer.render();
-    expect(host.querySelector('[data-plugin="yes"]')).not.toBeNull();
-  });
 });

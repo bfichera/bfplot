@@ -70,7 +70,6 @@ export interface MPlotDocument {
   artists: Artist[];
   links?: AxisLink[];
   selections?: SelectionDefinition[];
-  plugin_requirements?: Array<string | { name: string; version?: string }>;
   metadata?: Record<string, unknown>;
 }
 

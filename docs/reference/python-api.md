@@ -64,18 +64,6 @@ with mplot.stream("runs/detector") as stream:
 
 `Stream.append()` and `Stream.send()` are aliases. Both accept an optional `timestamp` keyword.
 
-## `mplot.register_artist`
+## Additional artist types
 
-```python
-mplot.register_artist(
-    type_name,
-    artist_class,
-    extractor,
-    *,
-    requirement=None,
-)
-```
-
-Register a Python exporter for a custom Matplotlib artist. Type names must use a non-MPlot reverse-DNS namespace such as `org.example.spectrum`.
-
-See the [plugin guide](../plugins.md) for a complete example.
+MPlot does not load third-party artist exporters or viewer renderers. To add support for another Matplotlib artist, please submit a pull request that implements and tests both sides in MPlot itself.

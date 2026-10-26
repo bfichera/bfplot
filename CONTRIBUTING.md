@@ -18,9 +18,9 @@ If your change affects artifact behavior, read [`ARCHITECTURE.md`](ARCHITECTURE.
 
 ```text
 crates/          Rust format, verification, packing, server, streams, and CLI
-src/mplot/       Python API, Matplotlib extraction, provenance, and plugins
+src/mplot/       Python API, Matplotlib extraction, and provenance
 viewer/          Browser interface and artist renderers
-docs/            Friendly explanations of formats and plugins
+docs/            Friendly explanations of formats and workflows
 tests/           Python and integration tests
 scripts/         Smoke checks and release helpers
 ```
@@ -63,7 +63,7 @@ A good test explains the behavior you care about and fails for the bug you fixed
 - Parser and storage changes should include malformed and truncated inputs.
 - Numerical changes should test dtype, shape, non-finite values, and empty arrays.
 - Renderer changes should test ordinary output and the visible fallback for bad data.
-- Plugin changes should test unsupported schema versions.
+- New artist types should include Python extraction and viewer rendering tests.
 - Format changes need a packed/split round trip and compatibility fixture.
 
 Please do not rely only on a screenshot. A screenshot can tell us that pixels moved; a semantic test can tell us whether the data remained correct.
@@ -74,7 +74,7 @@ MPlot handles scientific artifacts, sometimes from untrusted sources. Please pre
 
 - Verify the SHA-256 hash before decoding an object.
 - Keep canonical JSON deterministic.
-- Never let an artifact trigger code execution or automatic plugin installation.
+- Never let an artifact trigger code execution or load third-party renderers.
 - Keep network serving on loopback unless the user explicitly chooses otherwise.
 - Normalize paths and enforce file, allocation, and decompression limits.
 - Show unsupported artists visibly instead of quietly dropping them.

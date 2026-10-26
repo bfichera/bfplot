@@ -40,5 +40,5 @@ Version 0.9.9 is a release candidate. Test the artists, axis scales, file sizes,
 2. **Scientific data does not disappear silently.** Unsupported artists and corrupt arrays fail visibly.
 3. **Files remain inspectable.** Metadata is TOML and plot structure is JSON.
 4. **Large data is handled deliberately.** Arrays are compressed and content-addressed.
-5. **Artifacts do not execute code.** Plugins are separately installed software.
+5. **Artifacts do not execute code.** Artist exporters and renderers ship with MPlot; artifacts cannot extend them.
 6. **Scripts and version control come first.** Outputs should fit cleanly into a real scientific software project.

@@ -72,11 +72,13 @@ export function normalizeDocument(value: unknown): MPlotDocument {
   }
   for (const axisValue of list(raw.axes)) { const axis = normalizeAxis(axisValue, text(record(axisValue).figure_id)); if (!axes.some((item) => item.id === axis.id)) axes.push(axis); }
   for (const artistValue of list(raw.artists)) { const artist = normalizeArtist(artistValue, text(record(artistValue).axes_id)); if (!artists.some((item) => item.id === artist.id)) artists.push(artist); }
+  const metadata = { ...record(raw.metadata) };
+  delete metadata.plugin_requirements;
+  delete metadata.plugins;
   return {
     figures, axes, artists,
     links: list(raw.links) as NonNullable<MPlotDocument["links"]>, selections: list(raw.selections) as NonNullable<MPlotDocument["selections"]>,
-    plugin_requirements: (list(raw.plugin_requirements).length ? list(raw.plugin_requirements) : list(raw.plugins)) as NonNullable<MPlotDocument["plugin_requirements"]>,
-    ...(text(raw.title) ? { title: text(raw.title) } : {}), metadata: record(raw.metadata),
+    ...(text(raw.title) ? { title: text(raw.title) } : {}), metadata,
   };
 }
 

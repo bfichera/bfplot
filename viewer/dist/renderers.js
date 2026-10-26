@@ -80,23 +80,78 @@ const errorbar = (context) => {
     }
     scatter(context);
 };
-const image = ({ group, artist, data, x, y }) => {
-    const extent = numeric(data.extent);
-    const href = typeof data.url === "string" ? data.url : typeof data.data_url === "string" ? data.data_url : "";
-    const [left, right, bottom, top] = extent.length >= 4 ? extent : [0, 1, 0, 1];
-    if (href)
-        group.append(svg("image", { href, x: Math.min(x(left), x(right)), y: Math.min(y(bottom), y(top)), width: Math.abs(x(right) - x(left)), height: Math.abs(y(top) - y(bottom)), preserveAspectRatio: prop(artist, "aspect", "none"), opacity: prop(artist, "alpha", 1) }));
-    else {
-        const values = numeric(data.values ?? data.array), shape = numeric(data.shape);
-        const rows = shape[0] ?? Math.round(Math.sqrt(values.length)), cols = shape[1] ?? Math.ceil(values.length / rows);
-        const min = Math.min(...values), max = Math.max(...values), palette = prop(artist, "colors", ["#0b1f6d", "#246bfd", "#45c4b0", "#ffe06b"]);
-        values.forEach((value, i) => {
-            const row = Math.floor(i / cols), col = i % cols, t = (value - min) / (max - min || 1), color = palette[Math.min(palette.length - 1, Math.floor(t * palette.length))];
-            const xa = left + (right - left) * col / cols, xb = left + (right - left) * (col + 1) / cols;
-            const ya = bottom + (top - bottom) * row / rows, yb = bottom + (top - bottom) * (row + 1) / rows;
-            group.append(svg("rect", { x: Math.min(x(xa), x(xb)), y: Math.min(y(ya), y(yb)), width: Math.abs(x(xb) - x(xa)) + 0.5, height: Math.abs(y(yb) - y(ya)) + 0.5, fill: color }));
-        });
+const palettes = {
+    viridis: ["#440154", "#3b528b", "#21918c", "#5ec962", "#fde725"],
+    magma: ["#000004", "#3b0f70", "#8c2981", "#de4968", "#fe9f6d", "#fcfdbf"],
+    cividis: ["#00224e", "#344e6c", "#7d7c78", "#c7b866", "#fee838"],
+    coolwarm: ["#3b4cc0", "#8db0fe", "#dddcdc", "#f4987a", "#b40426"],
+};
+const colorChannels = (color) => {
+    const hex = color.replace("#", "");
+    return [0, 2, 4].map((offset) => Number.parseInt(hex.slice(offset, offset + 2), 16));
+};
+const paletteColor = (palette, value) => {
+    const scaled = Math.max(0, Math.min(1, value)) * (palette.length - 1), index = Math.min(palette.length - 2, Math.floor(scaled)), mix = scaled - index;
+    const from = colorChannels(palette[index]), to = colorChannels(palette[index + 1]);
+    return from.map((channel, offset) => Math.round(channel + (to[offset] - channel) * mix));
+};
+const finiteRange = (values, fallback) => {
+    let minimum = Infinity, maximum = -Infinity;
+    for (const value of values)
+        if (Number.isFinite(value)) {
+            minimum = Math.min(minimum, value);
+            maximum = Math.max(maximum, value);
+        }
+    return minimum <= maximum ? [minimum, maximum] : fallback;
+};
+const rasterDataUrl = (values, rows, columns, artist) => {
+    if (typeof document === "undefined" || !rows || !columns)
+        return undefined;
+    const limit = 1024, width = Math.min(columns, limit), height = Math.min(rows, limit), canvas = document.createElement("canvas");
+    canvas.width = width;
+    canvas.height = height;
+    let context = null;
+    try {
+        context = canvas.getContext("2d");
     }
+    catch {
+        return undefined;
+    }
+    if (!context)
+        return undefined;
+    const configured = numeric(artist.props.clim), [minimum, maximum] = configured.length >= 2 ? [configured[0], configured[1]] : finiteRange(values, [0, 1]);
+    const configuredPalette = prop(artist, "colors", palettes[String(artist.props.cmap)] ?? palettes.viridis);
+    const palette = configuredPalette.length >= 2 ? configuredPalette : palettes.viridis;
+    const pixels = context.createImageData(width, height), lower = artist.props.origin === "lower";
+    for (let targetRow = 0; targetRow < height; targetRow++) {
+        const sourceRowFromTop = Math.min(rows - 1, Math.floor(targetRow * rows / height));
+        const sourceRow = lower ? rows - sourceRowFromTop - 1 : sourceRowFromTop;
+        for (let column = 0; column < width; column++) {
+            const sourceColumn = Math.min(columns - 1, Math.floor(column * columns / width));
+            const value = values[sourceRow * columns + sourceColumn], offset = (targetRow * width + column) * 4;
+            if (!Number.isFinite(value)) {
+                pixels.data[offset + 3] = 0;
+                continue;
+            }
+            const [red, green, blue] = paletteColor(palette, (value - minimum) / (maximum - minimum || 1));
+            pixels.data[offset] = red;
+            pixels.data[offset + 1] = green;
+            pixels.data[offset + 2] = blue;
+            pixels.data[offset + 3] = 255;
+        }
+    }
+    context.putImageData(pixels, 0, 0);
+    return canvas.toDataURL("image/png");
+};
+const image = ({ group, artist, data, x, y }) => {
+    const extent = numeric(data.extent), values = numeric(data.values ?? data.array), shape = numeric(data.shape);
+    const [left, right, bottom, top] = extent.length >= 4 ? extent : [0, 1, 0, 1];
+    const rows = shape[0] ?? Math.round(Math.sqrt(values.length)), columns = shape[1] ?? Math.ceil(values.length / Math.max(1, rows));
+    const supplied = typeof data.url === "string" ? data.url : typeof data.data_url === "string" ? data.data_url : "";
+    const href = supplied || rasterDataUrl(values, rows, columns, artist);
+    if (!href)
+        return;
+    group.append(svg("image", { href, x: Math.min(x(left), x(right)), y: Math.min(y(bottom), y(top)), width: Math.abs(x(right) - x(left)), height: Math.abs(y(top) - y(bottom)), preserveAspectRatio: prop(artist, "aspect", "none"), opacity: prop(artist, "alpha", 1), "image-rendering": artist.props.interpolation === "nearest" ? "pixelated" : undefined }));
 };
 const contour = (filled) => ({ group, artist, data, x, y, theme }) => {
     const levels = (data.paths ?? data.segments ?? data.polygons ?? []);

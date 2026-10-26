@@ -78,7 +78,7 @@ That saves the *picture*, but not the useful interactive plot behind it. MPlot p
 <span>Lines</span><span>Scatter</span><span>Images</span><span>Error bars</span><span>Filled regions</span><span>Histograms</span><span>Contours</span><span>Text</span><span>Patches</span><span>3D plots</span>
 </div>
 
-Custom Matplotlib artists can be supported with [plugins](plugins.md). If a viewer encounters something it cannot draw, it shows a visible explanation instead of quietly making your data disappear.
+Supported artists are implemented and reviewed in MPlot itself. If you need another artist type, please open an issue or submit a pull request. If a viewer encounters something it cannot draw, it shows a visible explanation instead of quietly making your data disappear.
 
 ## Pick your next stop
 
@@ -95,9 +95,9 @@ Custom Matplotlib artists can be supported with [plugins](plugins.md). If a view
 <strong>I care about Git</strong>
 <span>Keep readable manifests without committing huge arrays.</span>
 </a>
-<a href="plugins/">
-<strong>I made a custom artist</strong>
-<span>Teach MPlot how to save and render it.</span>
+<a href="project/contributing/">
+<strong>I need another artist</strong>
+<span>Propose or contribute support to MPlot itself.</span>
 </a>
 </div>
 

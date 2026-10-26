@@ -19,13 +19,17 @@
 .mplot-viewer * { box-sizing: border-box; }
 
 .mplot-header {
+  position: sticky;
+  top: 0;
+  z-index: 20;
   display: flex;
   align-items: center;
   gap: 12px;
   min-height: 58px;
   padding: 10px 18px;
   border-bottom: 1px solid color-mix(in srgb, var(--mplot-fg) 16%, transparent);
-  background: color-mix(in srgb, var(--mplot-panel) 86%, var(--mplot-bg));
+  background: color-mix(in srgb, var(--mplot-panel) 94%, var(--mplot-bg));
+  box-shadow: 0 2px 8px #0000000a;
 }
 
 .mplot-title {
@@ -90,29 +94,27 @@
   grid-template-columns: minmax(0, 1fr);
 }
 
-.mplot-shell:has(.mplot-navigator) {
-  grid-template-columns: 210px minmax(0, 1fr);
-  align-items: start;
-}
+.mplot-shell:has(.mplot-navigator) { align-items: start; }
 
 .mplot-navigator {
   position: sticky;
-  top: 0;
-  max-height: 100vh;
-  overflow: auto;
-  padding: 20px 12px 20px 18px;
-  color: var(--mplot-muted);
+  top: 58px;
+  z-index: 15;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 8px 16px;
+  border-bottom: 1px solid color-mix(in srgb, var(--mplot-fg) 12%, transparent);
+  background: color-mix(in srgb, var(--mplot-bg) 94%, var(--mplot-panel));
   font: 11px ui-sans-serif, system-ui, sans-serif;
 }
 
-.mplot-navigator strong { display: block; margin-bottom: 8px; color: var(--mplot-fg); font-family: inherit; font-size: 12px; text-transform: uppercase; letter-spacing: .08em; }
-.mplot-navigator ol { margin: 10px 0 0; padding-left: 20px; }
-.mplot-navigator li { margin: 5px 0; }
-.mplot-navigator a { color: inherit; text-decoration: none; }
-.mplot-navigator a:hover { color: var(--mplot-accent); text-decoration: underline; }
-.mplot-navigator-controls { display: flex; gap: 4px; }
-.mplot-navigator-controls button, .mplot-figure-toggle { appearance: none; border: 0; background: transparent; color: var(--mplot-muted); cursor: pointer; font: 10px ui-sans-serif, system-ui, sans-serif; padding: 2px 0; }
-.mplot-navigator-controls button + button::before { content: "·"; margin-right: 4px; }
+.mplot-page-list { display: flex; gap: 4px; }
+.mplot-page-button { appearance: none; min-width: 28px; border: 1px solid color-mix(in srgb, var(--mplot-fg) 16%, transparent); border-radius: 3px; background: var(--mplot-panel); color: var(--mplot-muted); cursor: pointer; padding: 5px 8px; font: inherit; }
+.mplot-page-button:hover:not(:disabled) { color: var(--mplot-accent); border-color: var(--mplot-accent); }
+.mplot-page-button[aria-current=page] { color: var(--mplot-panel); border-color: var(--mplot-fg); background: var(--mplot-fg); }
+.mplot-page-button:disabled { cursor: default; opacity: .38; }
 
 .mplot-figures {
   display: grid;
@@ -148,10 +150,7 @@
 }
 
 .mplot-figure-count { color: var(--mplot-muted); font: 10px ui-sans-serif, system-ui, sans-serif; }
-.mplot-figure-toggle:hover { color: var(--mplot-accent); }
 .mplot-figure-canvas { position: relative; width: 100%; aspect-ratio: var(--mplot-figure-ratio, 1.333); min-height: 320px; }
-.mplot-figure--collapsed .mplot-figure-canvas { display: none; }
-.mplot-figure--collapsed .mplot-figure-header { min-height: 42px; padding-bottom: 12px; }
 
 .mplot-axis {
   position: absolute;
@@ -267,20 +266,18 @@
   .mplot-header { align-items: flex-start; flex-wrap: wrap; padding: 10px 12px; }
   .mplot-toolbar { width: 100%; overflow: auto; }
   .mplot-button { white-space: nowrap; }
-  .mplot-shell:has(.mplot-navigator) { grid-template-columns: minmax(0, 1fr); }
-  .mplot-navigator { position: static; max-height: none; padding: 10px 14px 0; }
-  .mplot-navigator ol { display: flex; gap: 14px; overflow: auto; padding: 0 0 6px; list-style: none; }
-  .mplot-navigator li { white-space: nowrap; }
+  .mplot-navigator { top: 98px; overflow-x: auto; justify-content: flex-start; padding: 7px 10px; }
+  .mplot-page-list { flex: none; }
   .mplot-figures { padding: 10px; }
   .mplot-figure-canvas { min-height: 280px; }
 }
 
 @media print {
-  .mplot-toolbar, .mplot-status, .mplot-navigator, .mplot-figure-toggle { display: none; }
+  .mplot-toolbar, .mplot-status, .mplot-navigator { display: none; }
   .mplot-viewer { background: white; }
-  .mplot-header { border-bottom: 0; }
-  .mplot-shell, .mplot-shell:has(.mplot-navigator) { display: block; }
+  .mplot-header { position: static; border-bottom: 0; }
+  .mplot-shell { display: block; }
   .mplot-figures { padding: 0; }
   .mplot-figure { border: 0; box-shadow: none; break-inside: avoid; }
-  .mplot-figure--collapsed .mplot-figure-canvas { display: block; }
+  .mplot-figure[hidden] { display: block; }
 }

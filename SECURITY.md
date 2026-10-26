@@ -9,7 +9,7 @@ Please **do not** open a public issue yet. Use GitHub’s private vulnerability 
 A helpful report includes:
 
 - the affected MPlot version or commit;
-- the affected component (Rust core/CLI, Python exporter, viewer, plugin API, or packaging);
+- the affected component (Rust core/CLI, Python exporter, viewer, or packaging);
 - reproduction steps or a minimal artifact, if it is safe to share;
 - the likely impact and any known workaround.
 
@@ -23,7 +23,7 @@ MPlot is currently pre-1.0. Security fixes are provided for the latest released 
 
 ## What MPlot trusts—and what it does not
 
-An MPlot artifact is data, not code. Opening one never authorizes executable Python/native code or automatic plugin installation.
+An MPlot artifact is data, not code. Opening one never authorizes executable Python or native code.
 
 That does not make every file harmless. Parsers and renderers still need to treat artifacts as untrusted input. MPlot implementations should:
 
@@ -36,7 +36,7 @@ That does not make every file harmless. Parsers and renderers still need to trea
 
 Hashes provide integrity: they tell you whether bytes still match their recorded identity. They do not prove who created the artifact. Use a trusted external signature when authenticity matters.
 
-Installed plugins are ordinary trusted application code and have the privileges of the process loading them. Review and pin them just as you would any other dependency.
+MPlot does not load third-party artist exporters or viewer renderers. Supported artist implementations ship with MPlot and are reviewed as part of the project.
 
 ## Serving plots remotely
 

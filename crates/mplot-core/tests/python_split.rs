@@ -21,7 +21,6 @@ fn verifies_python_shaped_split_artifact_end_to_end() {
 
     let document: Document = serde_json::from_str(PYTHON_DOCUMENT).unwrap();
     assert_eq!(document.schema_version, 1);
-    assert_eq!(document.plugin_requirements.len(), 2);
     assert_eq!(document.figures[0].metadata["dpi"], 100.0);
     assert_eq!(
         document.figures[0].axes[0].metadata["projection"],

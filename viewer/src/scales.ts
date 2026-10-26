@@ -50,7 +50,7 @@ export function createScale(type: ScaleType = "linear", domain: [number, number]
 }
 
 export function formatTick(value: number, type: ScaleType = "linear"): string {
-  if (type === "date") return new Date(value).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
+  if (type === "date") return new Date(value).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric", timeZone: "UTC" });
   const magnitude = Math.abs(value);
   if ((magnitude !== 0 && magnitude < 1e-3) || magnitude >= 1e5) return value.toExponential(2);
   return new Intl.NumberFormat(undefined, { maximumSignificantDigits: 6 }).format(value);

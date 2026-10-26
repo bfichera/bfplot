@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import math
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any
 
 import matplotlib
@@ -16,7 +16,6 @@ from matplotlib.patches import Patch, Polygon
 from matplotlib.text import Text
 
 from .arrays import encode_array
-from .plugins import PluginRegistry, registry
 from .store import ContentStore
 
 
@@ -54,8 +53,6 @@ def _common(artist: Artist) -> dict[str, Any]:
 @dataclass
 class ExtractionContext:
     store: ContentStore
-    plugins: PluginRegistry = registry
-    requirements: set[str] = field(default_factory=set)
     _next_artist: int = 0
 
     def array(self, value: Any) -> dict[str, Any]:
@@ -80,16 +77,14 @@ class ExtractionContext:
         }
 
 
-def extract_figures(figures: list[Any], store: ContentStore, *, plugins: PluginRegistry = registry) -> dict[str, Any]:
-    plugins.load_entry_points()
-    context = ExtractionContext(store, plugins)
+def extract_figures(figures: list[Any], store: ContentStore) -> dict[str, Any]:
+    context = ExtractionContext(store)
     extracted = [_extract_figure(figure, f"figure-{index}", context) for index, figure in enumerate(figures)]
     return {
         "schema_version": 1,
         "figures": extracted,
         "links": [],
         "selections": [],
-        "plugin_requirements": sorted(context.requirements),
     }
 
 
@@ -195,15 +190,6 @@ def _extract_container(container: Any, axes_id: str, context: ExtractionContext)
 
 
 def _extract_artist(artist: Any, axes_id: str, context: ExtractionContext, is_3d: bool) -> dict[str, Any] | None:
-    plugin = context.plugins.match(artist)
-    if plugin is not None:
-        payload = plugin.extractor(artist, context)
-        if payload is None:
-            return None
-        if plugin.requirement:
-            context.requirements.add(plugin.requirement)
-        return context.artist(plugin.type_name, axes_id, payload.get("props", {}), payload.get("data", {}))
-
     class_name = artist.__class__.__name__
     if isinstance(artist, Line2D) and artist.axes is not None:
         x, y = artist.get_data()

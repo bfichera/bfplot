@@ -41,7 +41,7 @@ describe("large plot collections", () => {
       const host = document.createElement("div"), viewer = new MPlotViewer(host, manyPlots());
       await viewer.render();
       expect(host.querySelectorAll(".mplot-figure")).toHaveLength(2);
-      expect(host.querySelectorAll(".mplot-navigator li")).toHaveLength(2);
+      expect(host.querySelectorAll(".mplot-page-list [data-figure-id]")).toHaveLength(2);
       const main = host.querySelector<HTMLElement>('[data-axes-id="a1"]')!;
       const inset = host.querySelector<HTMLElement>('[data-axes-id="a2"]')!;
       expect(main.style.left).toBe("8%");
@@ -58,7 +58,7 @@ describe("large plot collections", () => {
       globalThis.IntersectionObserver = DeferredIntersectionObserver as unknown as typeof IntersectionObserver;
       const host = document.createElement("div"), viewer = new MPlotViewer(host, manyPlots());
       await viewer.render();
-      const axis = host.querySelector<HTMLElement>('[data-axes-id="a1"]')!;
+      const axis = host.querySelector<HTMLElement>('[data-axes-id="a3"]')!;
       expect(axis.classList.contains("mplot-axis--pending")).toBe(true);
       expect(axis.querySelector("svg")).toBeNull();
       DeferredIntersectionObserver.instances[0]!.trigger(axis);
@@ -68,18 +68,23 @@ describe("large plot collections", () => {
     } finally { globalThis.IntersectionObserver = original; }
   });
 
-  it("collapses and expands every figure from collection controls", async () => {
+  it("shows figures as separate pages and mounts the selected page", async () => {
+    DeferredIntersectionObserver.instances.length = 0;
     const original = globalThis.IntersectionObserver;
     try {
       globalThis.IntersectionObserver = DeferredIntersectionObserver as unknown as typeof IntersectionObserver;
       const host = document.createElement("div"), viewer = new MPlotViewer(host, manyPlots());
       await viewer.render();
-      const collapse = Array.from(host.querySelectorAll<HTMLButtonElement>(".mplot-navigator-controls button")).find((button) => button.textContent === "Collapse all")!;
-      collapse.click();
-      expect(host.querySelectorAll(".mplot-figure--collapsed")).toHaveLength(2);
-      const expand = Array.from(host.querySelectorAll<HTMLButtonElement>(".mplot-navigator-controls button")).find((button) => button.textContent === "Expand all")!;
-      expand.click();
-      expect(host.querySelectorAll(".mplot-figure--collapsed")).toHaveLength(0);
+      const figures = host.querySelectorAll<HTMLElement>(".mplot-figure");
+      expect(figures[0]!.hidden).toBe(false);
+      expect(figures[1]!.hidden).toBe(true);
+      const secondPage = host.querySelector<HTMLButtonElement>('[data-figure-id="f2"]')!;
+      secondPage.click();
+      await vi.waitFor(() => expect(figures[1]!.hidden).toBe(false));
+      expect(figures[0]!.hidden).toBe(true);
+      expect(secondPage.getAttribute("aria-current")).toBe("page");
+      expect(host.querySelector('[data-axes-id="a3"] svg')).not.toBeNull();
+      expect(host.querySelector<HTMLElement>(".mplot-header")!.classList.contains("mplot-header")).toBe(true);
       viewer.destroy();
     } finally { globalThis.IntersectionObserver = original; }
   });
@@ -93,7 +98,7 @@ describe("large plot collections", () => {
       const axisSvg = viewer.exportSVG("axis", "a1");
       const figureSvg = viewer.exportSVG("figure", "f1");
       const artifactSvg = viewer.exportSVG("artifact");
-      expect(axisSvg).toContain("Scientific plot");
+      expect(axisSvg).toContain('aria-label="Main"');
       expect(figureSvg).toContain("translate(");
       expect(artifactSvg.match(/translate\(/g)?.length).toBeGreaterThan(1);
       viewer.destroy();

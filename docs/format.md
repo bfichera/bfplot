@@ -50,7 +50,7 @@ The manifest is intended to be small enough to read, diff, and commit.
 
 ## The plot document
 
-The document is canonical JSON describing the figures, axes, artists, links, selections, plugin requirements, and references to numerical arrays.
+The document is canonical JSON describing the figures, axes, artists, links, selections, and references to numerical arrays.
 
 “Canonical” sounds fancy, but it just means MPlot writes equivalent JSON in one predictable way:
 
@@ -127,7 +127,7 @@ A split → packed → split trip should preserve the scientific artifact. No nu
 
 ## Are MPlot files safe to open?
 
-MPlot artifacts contain data, not executable Python or native code. A plugin requirement names separately installed software; it does not give the artifact permission to download or run anything.
+MPlot artifacts contain data, not executable Python or native code. They cannot request or load third-party artist implementations; supported exporters and renderers ship with MPlot.
 
 Files are still untrusted input, so readers must validate hashes, paths, array sizes, and schemas. See the [security policy](project/security.md) if you are writing a server or opening artifacts from strangers on the internet.
 

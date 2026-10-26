@@ -395,7 +395,6 @@ fn viewer_document(document: &mplot_core::Document) -> anyhow::Result<Vec<u8>> {
             );
         }
     }
-    let requirements = serde_json::to_value(&document.plugin_requirements)?;
     serde_json::to_vec(&json!({
         "schema_version": document.schema_version,
         "figures": figures,
@@ -403,7 +402,6 @@ fn viewer_document(document: &mplot_core::Document) -> anyhow::Result<Vec<u8>> {
         "artists": artists,
         "links": document.links,
         "selections": document.selections,
-        "plugin_requirements": requirements,
         "metadata": document.metadata,
     }))
     .map_err(Into::into)

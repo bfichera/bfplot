@@ -25,7 +25,7 @@ MPlot also records linear, logarithmic, symmetric-log, and common Matplotlib axi
 
 MPlot does not silently remove unsupported data. The viewer displays a placeholder containing the artist type and ID, so it is clear that the saved figure contains something the current renderer cannot draw.
 
-For a custom Matplotlib artist, write a [plugin](../plugins.md) that exports its numerical data and provides a viewer renderer.
+For another Matplotlib artist, please open an issue or submit a pull request that adds its exporter and viewer renderer to MPlot.
 
 !!! note "Pre-1.0 reality check"
     Matplotlib has a wonderfully large and occasionally surprising artist ecosystem. Test MPlot against the exact plot types your analysis uses before relying on it for final archival output.
