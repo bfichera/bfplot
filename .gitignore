@@ -4,6 +4,7 @@
 .venv/
 node_modules/
 dist/
+release-dist/
 .mplot/objects/
 .mplot/cache/
 *.mplot-stream/chunks/
