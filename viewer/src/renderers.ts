@@ -34,6 +34,14 @@ const scatter: ArtistRenderer = ({ group, artist, data, x, y, theme, selected })
 };
 
 const bars = (horizontal = false): ArtistRenderer => ({ group, artist, data, x, y, theme }) => {
+  if (Array.isArray(data.rects)) {
+    for (const raw of data.rects) {
+      if (!Array.isArray(raw)) continue;
+      const [left=0,bottom=0,width=0,height=0]=raw.map(Number), x0=x(left),x1=x(left+width),y0=y(bottom),y1=y(bottom+height);
+      group.append(svg("rect",{x:Math.min(x0,x1),y:Math.min(y0,y1),width:Math.abs(x1-x0),height:Math.abs(y1-y0),fill:cssColor(artist.props.facecolor??artist.props.color,theme.accent),opacity:prop(artist,"alpha",.75),stroke:cssColor(artist.props.edgecolor,"none")}));
+    }
+    return;
+  }
   const values = numeric(data.values ?? data.counts ?? data.y);
   const positions = numeric(data.positions ?? data.bins ?? data.x);
   const widths = numeric(data.widths);
@@ -49,6 +57,8 @@ const bars = (horizontal = false): ArtistRenderer => ({ group, artist, data, x, 
 };
 
 const fillBetween: ArtistRenderer = ({ group, artist, data, x, y, theme }) => {
+  const paths=Array.isArray(data.paths)?data.paths:[];
+  if(paths.length){for(const raw of paths){if(!Array.isArray(raw))continue;const points=raw.map(point=>Array.isArray(point)?[x(Number(point[0])),y(Number(point[1]))] as [number,number]:null).filter((point):point is [number,number]=>point!==null);group.append(svg("path",{d:pathFrom(points,true),fill:cssColor(artist.props.facecolor??artist.props.color,theme.accent),opacity:prop(artist,"alpha",.28),stroke:cssColor(artist.props.edgecolor,"none")}));}return;}
   const xs = numeric(data.x), y1 = numeric(data.y1 ?? data.y), y2 = numeric(data.y2);
   const top = xs.map((v, i) => [x(v), y(y1[i] ?? 0)] as [number, number]);
   const bottom = xs.map((v, i) => [x(v), y(y2[i] ?? 0)] as [number, number]).reverse();
@@ -57,6 +67,10 @@ const fillBetween: ArtistRenderer = ({ group, artist, data, x, y, theme }) => {
 
 const errorbar: ArtistRenderer = (context) => {
   const { group, artist, data, x, y, theme } = context;
+  for(const path of [...(Array.isArray(data.error_paths)?data.error_paths:[]),...(Array.isArray(data.cap_paths)?data.cap_paths:[])]){
+    if(!Array.isArray(path))continue;const points=path.map(point=>Array.isArray(point)?[x(Number(point[0])),y(Number(point[1]))] as [number,number]:null).filter((point):point is [number,number]=>point!==null);
+    group.append(svg("path",{d:pathFrom(points),fill:"none",stroke:cssColor(artist.props.color,theme.accent),"stroke-width":prop(artist,"linewidth",1.2)}));
+  }
   const cap = prop(artist, "capsize", 4), points = pairs(data.x, data.y), xerr = numeric(data.xerr), yerr = numeric(data.yerr);
   for (const [px, py, i] of points) {
     if (yerr[i] !== undefined) {
@@ -90,7 +104,7 @@ const image: ArtistRenderer = ({ group, artist, data, x, y }) => {
 };
 
 const contour = (filled: boolean): ArtistRenderer => ({ group, artist, data, x, y, theme }) => {
-  const levels = (data.paths ?? data.polygons ?? []) as unknown[];
+  const levels = (data.paths ?? data.segments ?? data.polygons ?? []) as unknown[];
   for (const [index, raw] of levels.entries()) {
     const pointList = Array.isArray(raw) ? raw : [];
     const points = pointList.map((point) => Array.isArray(point) ? [x(Number(point[0])), y(Number(point[1]))] as [number, number] : null).filter((p): p is [number, number] => p !== null);

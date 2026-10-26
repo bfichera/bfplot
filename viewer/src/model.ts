@@ -1,6 +1,5 @@
-import type { ArrayReference, ArrayResolver, Axis, AxisDimension, MPlotDocument, PointSelection, ResolvedData, Viewport } from "./types.js";
-
-const isReference = (value: unknown): value is ArrayReference => !!value && typeof value === "object" && typeof (value as ArrayReference).object === "string" && (value as ArrayReference).object.startsWith("sha256:");
+import { isArrayReference, normalizeArtistData } from "./normalize.js";
+import type { ArrayResolver, Axis, AxisDimension, Artist, MPlotDocument, PointSelection, ResolvedData, Viewport } from "./types.js";
 const cloneViewport = (value: Viewport): Viewport => ({ x: [...value.x], y: [...value.y], ...(value.z ? { z: [...value.z] } : {}) } as Viewport);
 
 export class ViewerModel extends EventTarget {
@@ -75,13 +74,14 @@ export class ViewerModel extends EventTarget {
     this.dispatchEvent(new CustomEvent("selection", { detail: { id, points } }));
   }
 
-  async resolveData(data: Record<string, unknown>): Promise<ResolvedData> {
+  async resolveData(data: Record<string, unknown>, artist?: Artist): Promise<ResolvedData> {
     const entries = await Promise.all(Object.entries(data).map(async ([key, value]) => [key, await this.resolveValue(value)] as const));
-    return Object.fromEntries(entries);
+    const resolved = Object.fromEntries(entries);
+    return artist ? normalizeArtistData(artist.type, data, resolved) : resolved;
   }
 
   private async resolveValue(value: unknown): Promise<unknown> {
-    if (isReference(value)) {
+    if (isArrayReference(value)) {
       if (!this.resolver) return value;
       let pending = this.dataCache.get(value.object);
       if (!pending) { pending = this.resolver(value); this.dataCache.set(value.object, pending); }

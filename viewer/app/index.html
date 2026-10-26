@@ -1,0 +1,15 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <title>MPlot Viewer</title>
+  <link rel="stylesheet" href="./style.css">
+  <style>html,body,#mplot-app{margin:0;min-height:100%;min-height:100dvh}body{background:#f5f7fb}#mplot-app[aria-busy=true]{display:grid;place-items:center;color:#687386;font:14px system-ui}#mplot-app[aria-busy=true]::after{content:"Loading plot…"}</style>
+</head>
+<body>
+  <main id="mplot-app" aria-busy="true"></main>
+  <script type="module" src="./app.js"></script>
+</body>
+</html>

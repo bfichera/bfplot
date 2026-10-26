@@ -116,7 +116,7 @@ export class MPlotViewer extends EventTarget {
       this.drawAxes(view);
       const clipId=`mplot-clip-${safeId(view.axis.id)}`; const defs=svg("defs"),clip=svg("clipPath",{id:clipId});clip.append(svg("rect",{x:view.margin.left,y:view.margin.top,width:right-view.margin.left,height:bottom-view.margin.top}));defs.append(clip);view.plot.prepend(defs);
       const artists=this.model.document.artists.filter((artist)=>artist.axes_id===view.axis.id);
-      for(const artist of artists){const group=svg("g",{"data-artist-id":artist.id,"clip-path":`url(#${clipId})`});view.plot.append(group);const renderer=this.renderers.get(artist.type);if(!renderer){this.drawUnknown(group,artist,view);continue;}try{const data=await this.model.resolveData(artist.data);if(token!==this.renderToken)return;const selected=this.selectedIndices(artist.id);await renderer({...view,group,artist,data,theme:this.theme,selected,project3d:(x,y,z)=>this.project3d(view,x,y,z)} as RenderContext);}catch(error){this.drawUnknown(group,artist,view,error instanceof Error?error.message:"render failed");}}
+      for(const artist of artists){const group=svg("g",{"data-artist-id":artist.id,"clip-path":`url(#${clipId})`});view.plot.append(group);const renderer=this.renderers.get(artist.type);if(!renderer){this.drawUnknown(group,artist,view);continue;}try{const data=await this.model.resolveData(artist.data,artist);if(token!==this.renderToken)return;const selected=this.selectedIndices(artist.id);await renderer({...view,group,artist,data,theme:this.theme,selected,project3d:(x,y,z)=>this.project3d(view,x,y,z)} as RenderContext);}catch(error){this.drawUnknown(group,artist,view,error instanceof Error?error.message:"render failed");}}
       this.drawHitArea(view);
     }
   }

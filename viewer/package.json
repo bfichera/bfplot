@@ -14,10 +14,13 @@
   },
   "files": ["dist"],
   "scripts": {
-    "build": "tsc -p tsconfig.json && cp src/style.css dist/style.css",
+    "build": "tsc -p tsconfig.json && cp src/style.css app/index.html dist/ && cp node_modules/fzstd/esm/index.mjs dist/fzstd.js && sed -i.bak 's/from \"fzstd\"/from \".\\/fzstd.js\"/' dist/loader.js && rm -f dist/loader.js.bak",
     "test": "vitest run",
     "test:watch": "vitest",
     "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "fzstd": "^0.1.1"
   },
   "devDependencies": {
     "@types/node": "^24.0.0",

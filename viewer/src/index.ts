@@ -3,6 +3,8 @@ export { ViewerModel } from "./model.js";
 export { builtinRenderers, type ArtistRenderer, type RenderContext } from "./renderers.js";
 export { createScale, formatTick, type Scale } from "./scales.js";
 export { resolveTheme, themes } from "./theme.js";
+export { normalizeDocument, normalizeArtistData, isArrayReference } from "./normalize.js";
+export { createHttpArrayResolver, decodeArray, loadDocument, type LoadOptions } from "./loader.js";
 export type * from "./types.js";
 
 import { MPlotViewer, type ViewerOptions } from "./viewer.js";
