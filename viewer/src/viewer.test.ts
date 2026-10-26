@@ -3,6 +3,13 @@ import { describe, expect, it } from "vitest";
 import { MPlotViewer } from "./viewer.js";
 import type { MPlotDocument } from "./types.js";
 
+const pointer = (type: string, init: PointerEventInit): Event => {
+  const EventConstructor = window.PointerEvent || window.MouseEvent;
+  const event = new EventConstructor(type, init);
+  if (!("pointerId" in event)) Object.defineProperty(event, "pointerId", { value: init.pointerId ?? 1 });
+  return event;
+};
+
 const document: MPlotDocument = {
   title: "Experiment",
   figures: [{ id: "f", title: "Results", axes: ["a"] }],
@@ -22,7 +29,36 @@ describe("MPlotViewer", () => {
     expect(host.textContent).toContain("Experiment");
     expect(host.querySelector('[data-artist-id="line"] path')).not.toBeNull();
     expect(host.textContent).toContain("Unknown: org.example.missing");
+    expect(host.querySelector(".mplot-coordinates")?.textContent).toBe("x — · y —");
+    const xLabel = Array.from(host.querySelectorAll(".mplot-label")).find((label) => label.textContent === "time");
+    expect(Number(xLabel?.getAttribute("y"))).toBeLessThan(360);
     expect(viewer.exportSVG()).toContain("Scientific plot");
+    viewer.destroy();
+  });
+
+  it("shows a visible rectangle while box zooming", async () => {
+    const host = window.document.createElement("div");
+    window.document.body.append(host);
+    const viewer = new MPlotViewer(host, document);
+    await viewer.render();
+    const zoom = host.querySelector<HTMLButtonElement>('[data-action="zoom"]')!;
+    const chart = host.querySelector<SVGSVGElement>(".mplot-axis svg")!;
+    zoom.click();
+    chart.setPointerCapture = () => undefined;
+    chart.dispatchEvent(pointer("pointerdown", { bubbles: true, pointerId: 1, clientX: 100, clientY: 100 }));
+    chart.dispatchEvent(pointer("pointermove", { bubbles: true, pointerId: 1, clientX: 220, clientY: 180 }));
+    expect(host.querySelector(".mplot-brush--zoom")).not.toBeNull();
+    viewer.destroy();
+  });
+
+  it("updates the coordinate readout while hovering", async () => {
+    const host = window.document.createElement("div");
+    window.document.body.append(host);
+    const viewer = new MPlotViewer(host, document);
+    await viewer.render();
+    const chart = host.querySelector<SVGSVGElement>(".mplot-axis svg")!;
+    chart.dispatchEvent(pointer("pointermove", { bubbles: true, clientX: 200, clientY: 150 }));
+    expect(host.querySelector(".mplot-coordinates")?.textContent).toMatch(/^x .+ · y .+$/);
     viewer.destroy();
   });
 

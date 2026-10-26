@@ -16,6 +16,7 @@ export declare class MPlotViewer extends EventTarget {
     private theme;
     private renderers;
     private views;
+    private resolvedData;
     private mode;
     private source?;
     private resize?;
@@ -36,6 +37,11 @@ export declare class MPlotViewer extends EventTarget {
     private drawHitArea;
     private bindInteractions;
     private pointer;
+    private plotBounds;
+    private inPlot;
+    private boundToPlot;
+    private updateCoordinates;
+    private clearHover;
     private selectRect;
     private selectedIndices;
     private showTooltip;

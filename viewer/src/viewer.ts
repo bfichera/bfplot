@@ -2,7 +2,7 @@ import { ViewerModel } from "./model.js";
 import { builtinRenderers, type ArtistRenderer, type RenderContext } from "./renderers.js";
 import { createScale, formatTick, type Scale } from "./scales.js";
 import { resolveTheme } from "./theme.js";
-import type { Artist, ArrayResolver, Axis, MPlotDocument, MPlotSelectionEventDetail, PointSelection, Theme, ThemeName, Viewport } from "./types.js";
+import type { Artist, ArrayResolver, Axis, MPlotDocument, MPlotSelectionEventDetail, PointSelection, ResolvedData, Theme, ThemeName, Viewport } from "./types.js";
 import { numeric, pairs, SVG_NS, svg } from "./svg.js";
 
 export interface ViewerOptions {
@@ -14,7 +14,7 @@ export interface ViewerOptions {
   liveUrl?: string;
 }
 
-interface AxisView { axis: Axis; host: HTMLElement; svg: SVGSVGElement; plot: SVGGElement; overlay: SVGGElement; width: number; height: number; margin: { left: number; right: number; top: number; bottom: number }; x: Scale; y: Scale; }
+interface AxisView { axis: Axis; host: HTMLElement; svg: SVGSVGElement; plot: SVGGElement; overlay: SVGGElement; readout: HTMLElement; width: number; height: number; margin: { left: number; right: number; top: number; bottom: number }; x: Scale; y: Scale; }
 type Mode = "pan" | "zoom" | "select";
 
 export class MPlotViewer extends EventTarget {
@@ -24,6 +24,7 @@ export class MPlotViewer extends EventTarget {
   private theme: Theme;
   private renderers = new Map<string, ArtistRenderer>();
   private views = new Map<string, AxisView>();
+  private resolvedData = new Map<string, ResolvedData>();
   private mode: Mode = "pan";
   private source?: EventSource;
   private resize?: ResizeObserver;
@@ -75,6 +76,7 @@ export class MPlotViewer extends EventTarget {
   async render(): Promise<void> {
     const token = ++this.renderToken;
     this.views.clear();
+    this.resolvedData.clear();
     this.element.replaceChildren();
     const header = document.createElement("header"); header.className = "mplot-header";
     const title = document.createElement("div"); title.className = "mplot-title"; title.textContent = this.model.document.title ?? "MPlot"; header.append(title);
@@ -89,8 +91,10 @@ export class MPlotViewer extends EventTarget {
         const axis = this.model.document.axes.find((item) => item.id === axisId); if (!axis) continue;
         const host=document.createElement("div"); host.className="mplot-axis"; host.dataset.axesId=axis.id; host.setAttribute("aria-label",axis.title??`Plot ${axis.id}`);
         const chart=svg("svg",{role:"img",viewBox:"0 0 640 360","aria-label":axis.title??"Scientific plot"});
-        const plot=svg("g"), overlay=svg("g"); chart.append(plot,overlay); host.append(chart); figureElement.append(host);
-        this.views.set(axis.id,{axis,host,svg:chart,plot,overlay,width:640,height:360,margin:{left:62,right:22,top:28,bottom:50},x:createScale(axis.xscale,this.model.viewports.get(axis.id)!.x,[62,618]),y:createScale(axis.yscale,this.model.viewports.get(axis.id)!.y,[310,28])});
+        const plot=svg("g"), overlay=svg("g"); chart.append(plot,overlay);
+        const readout=document.createElement("output");readout.className="mplot-coordinates";readout.setAttribute("aria-live","polite");readout.textContent="x — · y —";
+        host.append(chart,readout); figureElement.append(host);
+        this.views.set(axis.id,{axis,host,svg:chart,plot,overlay,readout,width:640,height:360,margin:{left:70,right:24,top:34,bottom:72},x:createScale(axis.xscale,this.model.viewports.get(axis.id)!.x,[70,616]),y:createScale(axis.yscale,this.model.viewports.get(axis.id)!.y,[288,34])});
         if (this.options.interactive !== false) this.bindInteractions(this.views.get(axis.id)!);
       }
       figures.append(figureElement);
@@ -116,7 +120,7 @@ export class MPlotViewer extends EventTarget {
       this.drawAxes(view);
       const clipId=`mplot-clip-${safeId(view.axis.id)}`; const defs=svg("defs"),clip=svg("clipPath",{id:clipId});clip.append(svg("rect",{x:view.margin.left,y:view.margin.top,width:right-view.margin.left,height:bottom-view.margin.top}));defs.append(clip);view.plot.prepend(defs);
       const artists=this.model.document.artists.filter((artist)=>artist.axes_id===view.axis.id);
-      for(const artist of artists){const group=svg("g",{"data-artist-id":artist.id,"clip-path":`url(#${clipId})`});view.plot.append(group);const renderer=this.renderers.get(artist.type);if(!renderer){this.drawUnknown(group,artist,view);continue;}try{const data=await this.model.resolveData(artist.data,artist);if(token!==this.renderToken)return;const selected=this.selectedIndices(artist.id);await renderer({...view,group,artist,data,theme:this.theme,selected,project3d:(x,y,z)=>this.project3d(view,x,y,z)} as RenderContext);}catch(error){this.drawUnknown(group,artist,view,error instanceof Error?error.message:"render failed");}}
+      for(const artist of artists){const group=svg("g",{"data-artist-id":artist.id,"clip-path":`url(#${clipId})`});view.plot.append(group);const renderer=this.renderers.get(artist.type);if(!renderer){this.drawUnknown(group,artist,view);continue;}try{const data=await this.model.resolveData(artist.data,artist);if(token!==this.renderToken)return;this.resolvedData.set(artist.id,data);const selected=this.selectedIndices(artist.id);await renderer({...view,group,artist,data,theme:this.theme,selected,project3d:(x,y,z)=>this.project3d(view,x,y,z)} as RenderContext);}catch(error){this.drawUnknown(group,artist,view,error instanceof Error?error.message:"render failed");}}
       this.drawHitArea(view);
     }
   }
@@ -127,7 +131,7 @@ export class MPlotViewer extends EventTarget {
     for(const tick of view.y.ticks()){const py=view.y(tick);view.plot.append(svg("line",{x1:left,x2:r,y1:py,y2:py,class:"mplot-grid-line"}));const text=svg("text",{x:left-8,y:py+4,"text-anchor":"end",class:"mplot-tick"});text.textContent=formatTick(tick,view.axis.yscale);view.plot.append(text);}
     view.plot.append(svg("path",{d:`M${left},${top}V${b}H${r}`,fill:"none",stroke:this.theme.foreground,"stroke-width":1}));
     if(view.axis.title){const t=svg("text",{x:(left+r)/2,y:18,"text-anchor":"middle",class:"mplot-axis-title"});t.textContent=view.axis.title;view.plot.append(t);}
-    if(view.axis.xlabel){const t=svg("text",{x:(left+r)/2,y:view.height-10,"text-anchor":"middle",class:"mplot-label"});t.textContent=view.axis.xlabel;view.plot.append(t);}
+    if(view.axis.xlabel){const t=svg("text",{x:(left+r)/2,y:b+44,"text-anchor":"middle",class:"mplot-label"});t.textContent=view.axis.xlabel;view.plot.append(t);}
     if(view.axis.ylabel){const t=svg("text",{x:14,y:(top+b)/2,"text-anchor":"middle",class:"mplot-label",transform:`rotate(-90 14 ${(top+b)/2})`});t.textContent=view.axis.ylabel;view.plot.append(t);}
   }
 
@@ -137,19 +141,27 @@ export class MPlotViewer extends EventTarget {
 
   private bindInteractions(view: AxisView): void {
     let start: {x:number;y:number;viewport:Viewport}|undefined; let brush: SVGRectElement|undefined;
-    view.svg.addEventListener("pointerdown",event=>{const p=this.pointer(view,event);start={...p,viewport:structuredClone(this.model.viewports.get(view.axis.id)!)};view.svg.setPointerCapture(event.pointerId);if(this.mode==="select"){brush=svg("rect",{x:p.x,y:p.y,width:0,height:0,class:"mplot-brush"});view.overlay.append(brush);}});
-    view.svg.addEventListener("pointermove",event=>{const p=this.pointer(view,event);if(!start){this.showTooltip(view,p.x,p.y);return;}if(this.mode==="pan"){const next=structuredClone(start.viewport);const dx=view.x.invert(start.x)-view.x.invert(p.x),dy=view.y.invert(start.y)-view.y.invert(p.y);next.x=[start.viewport.x[0]+dx,start.viewport.x[1]+dx];next.y=[start.viewport.y[0]+dy,start.viewport.y[1]+dy];this.model.setViewport(view.axis.id,next);}else if(brush){brush.setAttribute("x",String(Math.min(start.x,p.x)));brush.setAttribute("y",String(Math.min(start.y,p.y)));brush.setAttribute("width",String(Math.abs(p.x-start.x)));brush.setAttribute("height",String(Math.abs(p.y-start.y)));}});
-    view.svg.addEventListener("pointerup",event=>{if(!start)return;const p=this.pointer(view,event);if(this.mode==="zoom"&&Math.hypot(p.x-start.x,p.y-start.y)>4){this.model.setViewport(view.axis.id,{...start.viewport,x:[view.x.invert(Math.min(start.x,p.x)),view.x.invert(Math.max(start.x,p.x))],y:[view.y.invert(Math.max(start.y,p.y)),view.y.invert(Math.min(start.y,p.y))]});}else if(this.mode==="select")this.selectRect(view,start.x,start.y,p.x,p.y);start=undefined;brush?.remove();brush=undefined;});
-    view.svg.addEventListener("wheel",event=>{event.preventDefault();const p=this.pointer(view,event),factor=Math.exp(event.deltaY*.001);const current=this.model.viewports.get(view.axis.id)!;const cx=view.x.invert(p.x),cy=view.y.invert(p.y);this.model.setViewport(view.axis.id,{...current,x:[cx+(current.x[0]-cx)*factor,cx+(current.x[1]-cx)*factor],y:[cy+(current.y[0]-cy)*factor,cy+(current.y[1]-cy)*factor]});},{passive:false});
+    const finish=(event:PointerEvent,cancel=false)=>{if(!start)return;const pointer=this.pointer(view,event),p=this.boundToPlot(view,pointer.x,pointer.y);if(!cancel&&this.mode==="zoom"&&Math.hypot(p.x-start.x,p.y-start.y)>4){this.model.setViewport(view.axis.id,{...start.viewport,x:[view.x.invert(Math.min(start.x,p.x)),view.x.invert(Math.max(start.x,p.x))],y:[view.y.invert(Math.max(start.y,p.y)),view.y.invert(Math.min(start.y,p.y))]});}else if(!cancel&&this.mode==="select")this.selectRect(view,start.x,start.y,p.x,p.y);start=undefined;brush?.remove();brush=undefined;};
+    view.svg.addEventListener("pointerdown",event=>{const p=this.pointer(view,event);if(!this.inPlot(view,p.x,p.y))return;start={...p,viewport:structuredClone(this.model.viewports.get(view.axis.id)!)};view.svg.setPointerCapture(event.pointerId);if(this.mode==="select"||this.mode==="zoom"){brush=svg("rect",{x:p.x,y:p.y,width:0,height:0,class:`mplot-brush mplot-brush--${this.mode}`});view.overlay.append(brush);}});
+    view.svg.addEventListener("pointermove",event=>{const p=this.pointer(view,event);this.updateCoordinates(view,p.x,p.y);if(!start){this.showTooltip(view,p.x,p.y);return;}if(this.mode==="pan"){const next=structuredClone(start.viewport);const dx=view.x.invert(start.x)-view.x.invert(p.x),dy=view.y.invert(start.y)-view.y.invert(p.y);next.x=[start.viewport.x[0]+dx,start.viewport.x[1]+dx];next.y=[start.viewport.y[0]+dy,start.viewport.y[1]+dy];this.model.setViewport(view.axis.id,next);}else if(brush){const bounded=this.boundToPlot(view,p.x,p.y);brush.setAttribute("x",String(Math.min(start.x,bounded.x)));brush.setAttribute("y",String(Math.min(start.y,bounded.y)));brush.setAttribute("width",String(Math.abs(bounded.x-start.x)));brush.setAttribute("height",String(Math.abs(bounded.y-start.y)));}});
+    view.svg.addEventListener("pointerup",event=>finish(event));
+    view.svg.addEventListener("pointercancel",event=>finish(event,true));
+    view.svg.addEventListener("pointerleave",()=>{if(!start){this.clearHover(view);}});
+    view.svg.addEventListener("wheel",event=>{event.preventDefault();const p=this.pointer(view,event);if(!this.inPlot(view,p.x,p.y))return;const factor=Math.exp(event.deltaY*.001);const current=this.model.viewports.get(view.axis.id)!;const cx=view.x.invert(p.x),cy=view.y.invert(p.y);this.model.setViewport(view.axis.id,{...current,x:[cx+(current.x[0]-cx)*factor,cx+(current.x[1]-cx)*factor],y:[cy+(current.y[0]-cy)*factor,cy+(current.y[1]-cy)*factor]});},{passive:false});
     view.svg.addEventListener("dblclick",()=>this.reset());
   }
 
   private pointer(view: AxisView,event: PointerEvent|WheelEvent): {x:number;y:number} {const rect=view.svg.getBoundingClientRect();return{x:(event.clientX-rect.left)*view.width/(rect.width||view.width),y:(event.clientY-rect.top)*view.height/(rect.height||view.height)};}
+  private plotBounds(view:AxisView):{left:number;right:number;top:number;bottom:number}{return{left:view.margin.left,right:view.width-view.margin.right,top:view.margin.top,bottom:view.height-view.margin.bottom};}
+  private inPlot(view:AxisView,x:number,y:number):boolean{const bounds=this.plotBounds(view);return x>=bounds.left&&x<=bounds.right&&y>=bounds.top&&y<=bounds.bottom;}
+  private boundToPlot(view:AxisView,x:number,y:number):{x:number;y:number}{const bounds=this.plotBounds(view);return{x:Math.max(bounds.left,Math.min(bounds.right,x)),y:Math.max(bounds.top,Math.min(bounds.bottom,y))};}
+  private updateCoordinates(view:AxisView,px:number,py:number):void{if(!this.inPlot(view,px,py)){view.readout.textContent="x — · y —";return;}view.readout.textContent=`x ${formatTick(view.x.invert(px),view.axis.xscale)} · y ${formatTick(view.y.invert(py),view.axis.yscale)}`;}
+  private clearHover(view:AxisView):void{view.host.querySelector<HTMLElement>(".mplot-tooltip")?.remove();view.readout.textContent="x — · y —";}
 
-  private selectRect(view: AxisView,x0:number,y0:number,x1:number,y1:number): void {const left=Math.min(x0,x1),right=Math.max(x0,x1),top=Math.min(y0,y1),bottom=Math.max(y0,y1),points:PointSelection[]=[];for(const artist of this.model.document.artists.filter(a=>a.axes_id===view.axis.id)){const selected=pairs(artist.data.x,artist.data.y).filter(([x,y])=>{const px=view.x(x),py=view.y(y);return px>=left&&px<=right&&py>=top&&py<=bottom;}).map(([, ,i])=>i);if(selected.length)points.push({artistId:artist.id,indices:selected});}const id=this.model.document.selections?.[0]?.id??"selection";this.model.setSelection(id,points);const detail:MPlotSelectionEventDetail={selectionId:id,axesId:view.axis.id,points};const event=new CustomEvent<MPlotSelectionEventDetail>("mplot:selection",{detail});this.element.dispatchEvent(event);this.dispatchEvent(event);}
+  private selectRect(view: AxisView,x0:number,y0:number,x1:number,y1:number): void {const left=Math.min(x0,x1),right=Math.max(x0,x1),top=Math.min(y0,y1),bottom=Math.max(y0,y1),points:PointSelection[]=[];for(const artist of this.model.document.artists.filter(a=>a.axes_id===view.axis.id)){const data=this.resolvedData.get(artist.id)??artist.data;const selected=pairs(data.x,data.y).filter(([x,y])=>{const px=view.x(x),py=view.y(y);return px>=left&&px<=right&&py>=top&&py<=bottom;}).map(([, ,i])=>i);if(selected.length)points.push({artistId:artist.id,indices:selected});}const id=this.model.document.selections?.[0]?.id??"selection";this.model.setSelection(id,points);const detail:MPlotSelectionEventDetail={selectionId:id,axesId:view.axis.id,points};const event=new CustomEvent<MPlotSelectionEventDetail>("mplot:selection",{detail});this.element.dispatchEvent(event);this.dispatchEvent(event);}
   private selectedIndices(artistId:string): Set<number> {const values=new Set<number>();for(const selection of this.model.selections.values())for(const point of selection)if(point.artistId===artistId)point.indices.forEach(i=>values.add(i));return values;}
 
-  private showTooltip(view:AxisView,px:number,py:number):void {let best:{artist:Artist;index:number;x:number;y:number;distance:number}|undefined;for(const artist of this.model.document.artists.filter(a=>a.axes_id===view.axis.id)){for(const [x,y,index] of pairs(artist.data.x,artist.data.y)){const distance=Math.hypot(view.x(x)-px,view.y(y)-py);if(distance<18&&(!best||distance<best.distance))best={artist,index,x,y,distance};}}let tooltip=view.host.querySelector<HTMLElement>(".mplot-tooltip");if(!best){tooltip?.remove();return;}if(!tooltip){tooltip=document.createElement("div");tooltip.className="mplot-tooltip";view.host.append(tooltip);}tooltip.style.left=`${px/view.width*100}%`;tooltip.style.top=`${py/view.height*100}%`;tooltip.textContent=`${best.artist.props.label??best.artist.id} [${best.index}]  x ${formatTick(best.x)} · y ${formatTick(best.y)}`;}
+  private showTooltip(view:AxisView,px:number,py:number):void {let best:{artist:Artist;index:number;x:number;y:number;distance:number}|undefined;for(const artist of this.model.document.artists.filter(a=>a.axes_id===view.axis.id)){const data=this.resolvedData.get(artist.id)??artist.data;for(const [x,y,index] of pairs(data.x,data.y)){const distance=Math.hypot(view.x(x)-px,view.y(y)-py);if(distance<18&&(!best||distance<best.distance))best={artist,index,x,y,distance};}}let tooltip=view.host.querySelector<HTMLElement>(".mplot-tooltip");if(!best){tooltip?.remove();return;}if(!tooltip){tooltip=document.createElement("div");tooltip.className="mplot-tooltip";view.host.append(tooltip);}tooltip.style.left=`${px/view.width*100}%`;tooltip.style.top=`${py/view.height*100}%`;tooltip.textContent=`${best.artist.props.label??best.artist.id} [${best.index}]  x ${formatTick(best.x,view.axis.xscale)} · y ${formatTick(best.y,view.axis.yscale)}`;}
 
   private project3d(view:AxisView,x:number,y:number,z:number):[number,number] {const viewport=this.model.viewports.get(view.axis.id)!;const zlim=viewport.z??[0,1],zn=(z-zlim[0])/(zlim[1]-zlim[0]||1)-.5;return[view.x(x)+zn*32,view.y(y)-zn*24];}
 
