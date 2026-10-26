@@ -1,0 +1,43 @@
+name: Release artifacts
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build and verify
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: "1.88"
+          components: rustfmt, clippy
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: ${{ hashFiles('viewer/package-lock.json') != '' && 'npm' || '' }}
+          cache-dependency-path: viewer/package-lock.json
+      - run: python -m pip install --upgrade pip build
+      - run: python -m pip install -e '.[test]'
+      - name: Install viewer dependencies
+        run: if [[ -f viewer/package-lock.json ]]; then npm ci --prefix viewer; else npm install --prefix viewer; fi
+      - name: Build release candidates
+        run: ./scripts/release.sh "${GITHUB_REF_NAME#v}"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mplot-${{ github.ref_name }}
+          path: release-dist/*
+          if-no-files-found: error
+          retention-days: 14
