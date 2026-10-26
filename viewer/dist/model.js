@@ -37,6 +37,9 @@ export class ViewerModel extends EventTarget {
     selections = new Map();
     resolver;
     dataCache = new Map();
+    activeResolutions = 0;
+    resolutionQueue = [];
+    resolutionLimit = 6;
     constructor(document, resolver) {
         super();
         this.document = document;
@@ -60,13 +63,19 @@ export class ViewerModel extends EventTarget {
             if (!this.viewports.has(axis.id))
                 this.viewports.set(axis.id, this.defaultViewport(axis));
     }
-    async fitViewports(clear = true) {
+    async fitViewports(clear = true, axisIds) {
         if (clear)
             this.viewports.clear();
-        await Promise.all(this.document.axes.map(async (axis) => {
+        const requested = axisIds ? new Set(axisIds) : undefined;
+        await Promise.all(this.document.axes.filter((axis) => !requested || requested.has(axis.id)).map(async (axis) => {
             if (!this.viewports.has(axis.id))
                 this.viewports.set(axis.id, await this.resolvedViewport(axis));
         }));
+    }
+    async fitViewport(axisId) {
+        const axis = this.document.axes.find((item) => item.id === axisId);
+        if (axis)
+            this.viewports.set(axis.id, await this.resolvedViewport(axis));
     }
     defaultViewport(axis) {
         const artists = this.document.artists.filter((artist) => artist.axes_id === axis.id && artist.props.visible !== false);
@@ -75,6 +84,8 @@ export class ViewerModel extends EventTarget {
     }
     async resolvedViewport(axis) {
         const artists = this.document.artists.filter((artist) => artist.axes_id === axis.id && artist.props.visible !== false);
+        if (axis.xlim && axis.ylim && (axis.projection !== "3d" || axis.zlim))
+            return { x: [...axis.xlim], y: [...axis.ylim], ...(axis.zlim ? { z: [...axis.zlim] } : {}) };
         const data = await Promise.all(artists.map((artist) => this.resolveData(artist.data, artist)));
         const bounds = (dimension) => this.paddedBounds(data.flatMap((item) => dataValues(item, dimension)));
         return { x: axis.xlim ? [...axis.xlim] : bounds("x"), y: axis.ylim ? [...axis.ylim] : bounds("y"), ...(axis.zlim ? { z: [...axis.zlim] } : axis.projection === "3d" ? { z: bounds("z") } : {}) };
@@ -87,6 +98,7 @@ export class ViewerModel extends EventTarget {
     }
     setViewport(axisId, viewport, source = axisId) {
         this.viewports.set(axisId, cloneViewport(viewport));
+        const affected = new Set([axisId]);
         for (const link of this.document.links ?? []) {
             const members = link.axes ?? link.axis_ids ?? [];
             if (!members.includes(axisId))
@@ -102,9 +114,10 @@ export class ViewerModel extends EventTarget {
                 for (const dimension of dimensions)
                     this.copyDimension(next, viewport, dimension);
                 this.viewports.set(member, next);
+                affected.add(member);
             }
         }
-        this.dispatchEvent(new CustomEvent("viewport", { detail: { axisId, source } }));
+        this.dispatchEvent(new CustomEvent("viewport", { detail: { axisId, source, affected: Array.from(affected) } }));
     }
     copyDimension(target, source, dimension) {
         if (dimension === "x")
@@ -129,7 +142,7 @@ export class ViewerModel extends EventTarget {
                 return value;
             let pending = this.dataCache.get(value.object);
             if (!pending) {
-                pending = this.resolver(value);
+                pending = this.withResolutionSlot(() => this.resolver(value));
                 this.dataCache.set(value.object, pending);
             }
             return pending;
@@ -141,6 +154,18 @@ export class ViewerModel extends EventTarget {
             return Object.fromEntries(entries);
         }
         return value;
+    }
+    async withResolutionSlot(operation) {
+        if (this.activeResolutions >= this.resolutionLimit)
+            await new Promise((resolve) => this.resolutionQueue.push(resolve));
+        this.activeResolutions += 1;
+        try {
+            return await operation();
+        }
+        finally {
+            this.activeResolutions -= 1;
+            this.resolutionQueue.shift()?.();
+        }
     }
 }
 //# sourceMappingURL=model.js.map

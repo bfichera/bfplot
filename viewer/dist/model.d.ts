@@ -5,11 +5,15 @@ export declare class ViewerModel extends EventTarget {
     readonly selections: Map<string, PointSelection[]>;
     private resolver;
     private readonly dataCache;
+    private activeResolutions;
+    private readonly resolutionQueue;
+    private readonly resolutionLimit;
     constructor(document: MPlotDocument, resolver?: ArrayResolver);
     setDocument(document: MPlotDocument): void;
     setResolver(resolver?: ArrayResolver): void;
     resetViewports(clear?: boolean): void;
-    fitViewports(clear?: boolean): Promise<void>;
+    fitViewports(clear?: boolean, axisIds?: Iterable<string>): Promise<void>;
+    fitViewport(axisId: string): Promise<void>;
     defaultViewport(axis: Axis): Viewport;
     private resolvedViewport;
     private paddedBounds;
@@ -18,4 +22,5 @@ export declare class ViewerModel extends EventTarget {
     setSelection(id: string, points: PointSelection[]): void;
     resolveData(data: Record<string, unknown>, artist?: Artist): Promise<ResolvedData>;
     private resolveValue;
+    private withResolutionSlot;
 }

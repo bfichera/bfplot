@@ -1,13 +1,21 @@
 import { cssColor, numeric, pairs, svg } from "./svg.js";
 const prop = (artist, key, fallback) => artist.props[key] ?? fallback;
 const pathFrom = (points, close = false) => points.map((p, i) => `${i ? "L" : "M"}${p[0].toFixed(2)},${p[1].toFixed(2)}`).join(" ") + (close ? " Z" : "");
-const line = ({ group, artist, data, x, y, theme }) => {
-    const points = pairs(data.x, data.y).map(([px, py]) => [x(px), y(py)]);
+const sampled = (values, budget) => {
+    if (values.length <= budget)
+        return values;
+    const result = [], stride = (values.length - 1) / Math.max(1, budget - 1);
+    for (let index = 0; index < budget; index++)
+        result.push(values[Math.min(values.length - 1, Math.round(index * stride))]);
+    return result;
+};
+const line = ({ group, artist, data, x, y, theme, pointBudget }) => {
+    const points = sampled(pairs(data.x, data.y), pointBudget).map(([px, py]) => [x(px), y(py)]);
     group.append(svg("path", { d: pathFrom(points), fill: "none", stroke: cssColor(artist.props.color, theme.accent), "stroke-width": prop(artist, "linewidth", 1.8), "stroke-dasharray": prop(artist, "dasharray", undefined), opacity: prop(artist, "alpha", 1), "vector-effect": "non-scaling-stroke" }));
 };
-const scatter = ({ group, artist, data, x, y, theme, selected }) => {
+const scatter = ({ group, artist, data, x, y, theme, selected, pointBudget }) => {
     const sizes = numeric(data.sizes ?? artist.props.size), colors = Array.isArray(data.colors) ? data.colors : [];
-    for (const [px, py, index] of pairs(data.x, data.y)) {
+    for (const [px, py, index] of sampled(pairs(data.x, data.y), pointBudget)) {
         const point = svg("circle", { cx: x(px), cy: y(py), r: Math.sqrt(sizes[index] ?? prop(artist, "size", 24)) / 2, fill: cssColor(colors[index] ?? artist.props.color, theme.accent), opacity: prop(artist, "alpha", 0.85), class: "mplot-point", "data-index": index, "data-selected": selected.has(index) ? "true" : "false", tabindex: "-1" });
         group.append(point);
     }
@@ -108,12 +116,12 @@ const patch = ({ group, artist, data, x, y, theme }) => {
     const points = Array.isArray(vertices) ? vertices.map((p) => Array.isArray(p) ? [x(Number(p[0])), y(Number(p[1]))] : null).filter((p) => p !== null) : pairs(data.x, data.y).map(([a, b]) => [x(a), y(b)]);
     group.append(svg("path", { d: pathFrom(points, prop(artist, "closed", true)), fill: cssColor(artist.props.facecolor ?? artist.props.color, theme.accent), "fill-opacity": prop(artist, "alpha", 0.35), stroke: cssColor(artist.props.edgecolor, theme.accent), "stroke-width": prop(artist, "linewidth", 1.2) }));
 };
-const line3d = ({ group, artist, data, project3d, theme }) => {
-    const xs = numeric(data.x), ys = numeric(data.y), zs = numeric(data.z), points = xs.slice(0, Math.min(xs.length, ys.length, zs.length)).map((v, i) => project3d(v, ys[i], zs[i]));
+const line3d = ({ group, artist, data, project3d, theme, pointBudget }) => {
+    const xs = numeric(data.x), ys = numeric(data.y), zs = numeric(data.z), points = sampled(xs.slice(0, Math.min(xs.length, ys.length, zs.length)).map((v, i) => [v, ys[i], zs[i]]), pointBudget).map(([x, y, z]) => project3d(x, y, z));
     group.append(svg("path", { d: pathFrom(points), fill: "none", stroke: cssColor(artist.props.color, theme.accent), "stroke-width": prop(artist, "linewidth", 1.8) }));
 };
-const scatter3d = ({ group, artist, data, project3d, theme, selected }) => {
-    const xs = numeric(data.x), ys = numeric(data.y), zs = numeric(data.z), indices = xs.map((_, i) => i).sort((a, b) => (zs[a] ?? 0) - (zs[b] ?? 0));
+const scatter3d = ({ group, artist, data, project3d, theme, selected, pointBudget }) => {
+    const xs = numeric(data.x), ys = numeric(data.y), zs = numeric(data.z), indices = sampled(xs.map((_, i) => i), pointBudget).sort((a, b) => (zs[a] ?? 0) - (zs[b] ?? 0));
     for (const i of indices) {
         if (ys[i] === undefined || zs[i] === undefined)
             continue;

@@ -75,8 +75,48 @@
   outline-offset: 1px;
 }
 
+.mplot-export-scope {
+  max-width: 112px;
+  border: 0;
+  border-left: 1px solid color-mix(in srgb, var(--mplot-fg) 14%, transparent);
+  background: transparent;
+  color: var(--mplot-muted);
+  padding: 0 5px;
+  font: 10px ui-sans-serif, system-ui, sans-serif;
+}
+
+.mplot-shell {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.mplot-shell:has(.mplot-navigator) {
+  grid-template-columns: 210px minmax(0, 1fr);
+  align-items: start;
+}
+
+.mplot-navigator {
+  position: sticky;
+  top: 0;
+  max-height: 100vh;
+  overflow: auto;
+  padding: 20px 12px 20px 18px;
+  color: var(--mplot-muted);
+  font: 11px ui-sans-serif, system-ui, sans-serif;
+}
+
+.mplot-navigator strong { display: block; margin-bottom: 8px; color: var(--mplot-fg); font-family: inherit; font-size: 12px; text-transform: uppercase; letter-spacing: .08em; }
+.mplot-navigator ol { margin: 10px 0 0; padding-left: 20px; }
+.mplot-navigator li { margin: 5px 0; }
+.mplot-navigator a { color: inherit; text-decoration: none; }
+.mplot-navigator a:hover { color: var(--mplot-accent); text-decoration: underline; }
+.mplot-navigator-controls { display: flex; gap: 4px; }
+.mplot-navigator-controls button, .mplot-figure-toggle { appearance: none; border: 0; background: transparent; color: var(--mplot-muted); cursor: pointer; font: 10px ui-sans-serif, system-ui, sans-serif; padding: 2px 0; }
+.mplot-navigator-controls button + button::before { content: "·"; margin-right: 4px; }
+
 .mplot-figures {
   display: grid;
+  min-width: 0;
   gap: 18px;
   padding: 20px;
 }
@@ -90,26 +130,47 @@
   box-shadow: 0 1px 2px #00000012, 0 12px 32px #0000000a;
 }
 
+.mplot-figure-header {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  min-height: 42px;
+  padding: 12px 16px 6px;
+}
+
 .mplot-figure-title {
-  padding: 16px 20px 2px;
+  flex: 1;
+  margin: 0;
   font-size: 14px;
   font-weight: 600;
   letter-spacing: .01em;
   text-align: center;
 }
 
+.mplot-figure-count { color: var(--mplot-muted); font: 10px ui-sans-serif, system-ui, sans-serif; }
+.mplot-figure-toggle:hover { color: var(--mplot-accent); }
+.mplot-figure-canvas { position: relative; width: 100%; aspect-ratio: var(--mplot-figure-ratio, 1.333); min-height: 320px; }
+.mplot-figure--collapsed .mplot-figure-canvas { display: none; }
+.mplot-figure--collapsed .mplot-figure-header { min-height: 42px; padding-bottom: 12px; }
+
 .mplot-axis {
-  position: relative;
-  min-height: 360px;
-  padding: 4px 8px 32px;
+  position: absolute;
+  min-width: 0;
+  min-height: 0;
+  padding: 0;
+  border: 1px solid transparent;
   touch-action: none;
 }
+
+.mplot-axis--active { border-color: color-mix(in srgb, var(--mplot-accent) 28%, transparent); }
+.mplot-axis--pending { display: grid; place-items: center; border: 1px dashed color-mix(in srgb, var(--mplot-muted) 22%, transparent); background: color-mix(in srgb, var(--mplot-bg) 18%, transparent); }
+.mplot-axis-placeholder { color: var(--mplot-muted); font-size: 12px; font-style: italic; }
 
 .mplot-axis svg {
   display: block;
   width: 100%;
-  height: 360px;
-  min-height: 360px;
+  height: 100%;
+  min-height: 0;
   overflow: visible;
   user-select: none;
   shape-rendering: geometricPrecision;
@@ -202,19 +263,24 @@
 .mplot-point[data-selected=true] { stroke: var(--mplot-selection); stroke-width: 3; }
 .mplot-hidden { display: none !important; }
 
-@media (max-width: 600px) {
+@media (max-width: 760px) {
   .mplot-header { align-items: flex-start; flex-wrap: wrap; padding: 10px 12px; }
   .mplot-toolbar { width: 100%; overflow: auto; }
   .mplot-button { white-space: nowrap; }
+  .mplot-shell:has(.mplot-navigator) { grid-template-columns: minmax(0, 1fr); }
+  .mplot-navigator { position: static; max-height: none; padding: 10px 14px 0; }
+  .mplot-navigator ol { display: flex; gap: 14px; overflow: auto; padding: 0 0 6px; list-style: none; }
+  .mplot-navigator li { white-space: nowrap; }
   .mplot-figures { padding: 10px; }
-  .mplot-axis { min-height: 320px; padding-inline: 0; }
-  .mplot-axis svg { height: 320px; min-height: 320px; }
+  .mplot-figure-canvas { min-height: 280px; }
 }
 
 @media print {
-  .mplot-toolbar, .mplot-status { display: none; }
+  .mplot-toolbar, .mplot-status, .mplot-navigator, .mplot-figure-toggle { display: none; }
   .mplot-viewer { background: white; }
   .mplot-header { border-bottom: 0; }
+  .mplot-shell, .mplot-shell:has(.mplot-navigator) { display: block; }
   .mplot-figures { padding: 0; }
   .mplot-figure { border: 0; box-shadow: none; break-inside: avoid; }
+  .mplot-figure--collapsed .mplot-figure-canvas { display: block; }
 }

@@ -42,6 +42,25 @@ def test_savefig_extracts_broad_artist_set(tmp_path):
             assert {"type", "schema_version", "id", "axes_id", "props", "data"} == artist.keys()
 
 
+def test_savefig_preserves_large_multi_figure_collections(tmp_path):
+    figures = []
+    for figure_index in range(10):
+        figure, axes = plt.subplots(2, 2)
+        for axis_index, axis in enumerate(axes.flat):
+            axis.plot([0, 1, 2], [figure_index, axis_index, figure_index + axis_index])
+            axis.set_title(f"Figure {figure_index + 1}, plot {axis_index + 1}")
+        figures.append(figure)
+
+    output = mplot.savefig(tmp_path / "many", figures, provenance=False)
+    _, document = _document_from_split(output)
+    assert len(document["figures"]) == 10
+    assert sum(len(figure["axes"]) for figure in document["figures"]) == 40
+    positions = [axis["bounds"] for figure in document["figures"] for axis in figure["axes"]]
+    assert all(len(position) == 4 for position in positions)
+    assert len({tuple(position) for position in positions}) == 4
+    plt.close("all")
+
+
 def test_packed_artifact_contains_manifest_and_all_objects(tmp_path):
     figure, axes = plt.subplots()
     axes.plot([1, 2], [3, 4])

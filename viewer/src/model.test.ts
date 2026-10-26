@@ -16,6 +16,13 @@ describe("ViewerModel", () => {
     expect(model.viewports.get("b")).toEqual({ x: [2, 4], y: [-1, 1] });
   });
 
+  it("reports every linked axis affected by a viewport change", () => {
+    const model = new ViewerModel(document), listener = vi.fn();
+    model.addEventListener("viewport", listener);
+    model.setViewport("a", { x: [2, 4], y: [1, 2] });
+    expect((listener.mock.calls[0]?.[0] as CustomEvent).detail.affected).toEqual(["a", "b"]);
+  });
+
   it("fits and resets object-backed data when explicit limits are absent", async () => {
     const xref = { object: `sha256:${"b".repeat(64)}` as const, dtype: "f8", shape: [3] };
     const yref = { object: `sha256:${"c".repeat(64)}` as const, dtype: "f8", shape: [3] };

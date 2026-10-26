@@ -34,6 +34,9 @@ export class ViewerModel extends EventTarget {
   readonly selections = new Map<string, PointSelection[]>();
   private resolver: ArrayResolver | undefined;
   private readonly dataCache = new Map<string, Promise<unknown>>();
+  private activeResolutions = 0;
+  private readonly resolutionQueue: Array<() => void> = [];
+  private readonly resolutionLimit = 6;
 
   constructor(document: MPlotDocument, resolver?: ArrayResolver) {
     super();
@@ -57,11 +60,17 @@ export class ViewerModel extends EventTarget {
     for (const axis of this.document.axes) if (!this.viewports.has(axis.id)) this.viewports.set(axis.id, this.defaultViewport(axis));
   }
 
-  async fitViewports(clear = true): Promise<void> {
+  async fitViewports(clear = true, axisIds?: Iterable<string>): Promise<void> {
     if (clear) this.viewports.clear();
-    await Promise.all(this.document.axes.map(async (axis) => {
+    const requested = axisIds ? new Set(axisIds) : undefined;
+    await Promise.all(this.document.axes.filter((axis) => !requested || requested.has(axis.id)).map(async (axis) => {
       if (!this.viewports.has(axis.id)) this.viewports.set(axis.id, await this.resolvedViewport(axis));
     }));
+  }
+
+  async fitViewport(axisId: string): Promise<void> {
+    const axis = this.document.axes.find((item) => item.id === axisId);
+    if (axis) this.viewports.set(axis.id, await this.resolvedViewport(axis));
   }
 
   defaultViewport(axis: Axis): Viewport {
@@ -72,6 +81,7 @@ export class ViewerModel extends EventTarget {
 
   private async resolvedViewport(axis: Axis): Promise<Viewport> {
     const artists = this.document.artists.filter((artist) => artist.axes_id === axis.id && artist.props.visible !== false);
+    if (axis.xlim && axis.ylim && (axis.projection !== "3d" || axis.zlim)) return { x: [...axis.xlim], y: [...axis.ylim], ...(axis.zlim ? { z: [...axis.zlim] } : {}) };
     const data = await Promise.all(artists.map((artist) => this.resolveData(artist.data, artist)));
     const bounds = (dimension: "x" | "y" | "z"): [number, number] => this.paddedBounds(data.flatMap((item) => dataValues(item, dimension)));
     return { x: axis.xlim ? [...axis.xlim] : bounds("x"), y: axis.ylim ? [...axis.ylim] : bounds("y"), ...(axis.zlim ? { z: [...axis.zlim] } : axis.projection === "3d" ? { z: bounds("z") } : {}) };
@@ -85,6 +95,7 @@ export class ViewerModel extends EventTarget {
 
   setViewport(axisId: string, viewport: Viewport, source = axisId): void {
     this.viewports.set(axisId, cloneViewport(viewport));
+    const affected = new Set([axisId]);
     for (const link of this.document.links ?? []) {
       const members = link.axes ?? link.axis_ids ?? [];
       if (!members.includes(axisId)) continue;
@@ -96,9 +107,10 @@ export class ViewerModel extends EventTarget {
         const next = cloneViewport(current);
         for (const dimension of dimensions) this.copyDimension(next, viewport, dimension);
         this.viewports.set(member, next);
+        affected.add(member);
       }
     }
-    this.dispatchEvent(new CustomEvent("viewport", { detail: { axisId, source } }));
+    this.dispatchEvent(new CustomEvent("viewport", { detail: { axisId, source, affected: Array.from(affected) } }));
   }
 
   private copyDimension(target: Viewport, source: Viewport, dimension: AxisDimension): void {
@@ -122,7 +134,7 @@ export class ViewerModel extends EventTarget {
     if (isArrayReference(value)) {
       if (!this.resolver) return value;
       let pending = this.dataCache.get(value.object);
-      if (!pending) { pending = this.resolver(value); this.dataCache.set(value.object, pending); }
+      if (!pending) { pending = this.withResolutionSlot(() => this.resolver!(value)); this.dataCache.set(value.object, pending); }
       return pending;
     }
     if (Array.isArray(value)) return Promise.all(value.map((item) => this.resolveValue(item)));
@@ -131,5 +143,12 @@ export class ViewerModel extends EventTarget {
       return Object.fromEntries(entries);
     }
     return value;
+  }
+
+  private async withResolutionSlot<T>(operation: () => Promise<T>): Promise<T> {
+    if (this.activeResolutions >= this.resolutionLimit) await new Promise<void>((resolve) => this.resolutionQueue.push(resolve));
+    this.activeResolutions += 1;
+    try { return await operation(); }
+    finally { this.activeResolutions -= 1; this.resolutionQueue.shift()?.(); }
   }
 }

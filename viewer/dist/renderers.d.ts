@@ -10,6 +10,7 @@ export interface RenderContext {
     height: number;
     theme: Theme;
     selected: ReadonlySet<number>;
+    pointBudget: number;
     project3d(x: number, y: number, z: number): [number, number];
 }
 export type ArtistRenderer = (context: RenderContext) => void | Promise<void>;
