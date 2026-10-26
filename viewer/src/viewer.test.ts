@@ -90,6 +90,35 @@ describe("MPlotViewer", () => {
     viewer.destroy();
   });
 
+  it("renders artifact metadata in a themed explorer", async () => {
+    const host = window.document.createElement("div");
+    window.document.body.append(host);
+    const viewer = new MPlotViewer(host, { ...document, metadata: { provenance: { created_utc: "2026-01-01T00:00:00Z" }, artifact: { version: "0.9.9" } } });
+    await viewer.render();
+    host.querySelector<HTMLButtonElement>('[data-action="metadata"]')!.click();
+    const panel = host.querySelector<HTMLElement>(".mplot-metadata")!;
+    expect(panel.hidden).toBe(false);
+    expect(panel.textContent).toContain("created_utc");
+    expect(panel.textContent).toContain("0.9.9");
+    viewer.destroy();
+  });
+
+  it("rotates 3D plots by dragging", async () => {
+    const host = window.document.createElement("div");
+    window.document.body.append(host);
+    const threeDimensional: MPlotDocument = { ...document, axes: [{ ...document.axes[0]!, projection: "3d", zlim: [0, 2], props: { view: { elev: 30, azim: -60 } } }], artists: [{ type: "mplot.line3d", schema_version: 1, id: "line3d", axes_id: "a", props: {}, data: { x: [0, 1], y: [0, 1], z: [0, 2] } }] };
+    const viewer = new MPlotViewer(host, threeDimensional);
+    await viewer.render();
+    const chart = host.querySelector<SVGSVGElement>(".mplot-axis svg")!, before = host.querySelector('[data-artist-id="line3d"] path')?.getAttribute("d");
+    chart.setPointerCapture = () => undefined;
+    chart.dispatchEvent(pointer("pointerdown", { bubbles: true, pointerId: 1, clientX: 200, clientY: 150 }));
+    chart.dispatchEvent(pointer("pointermove", { bubbles: true, pointerId: 1, clientX: 260, clientY: 180 }));
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(chart.classList.contains("mplot-3d-view")).toBe(true);
+    expect(host.querySelector('[data-artist-id="line3d"] path')?.getAttribute("d")).not.toBe(before);
+    viewer.destroy();
+  });
+
   it("shows a visible rectangle while box zooming", async () => {
     const host = window.document.createElement("div");
     window.document.body.append(host);

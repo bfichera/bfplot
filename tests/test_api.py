@@ -87,7 +87,7 @@ def test_savefig_preserves_dates_insets_and_public_labels(tmp_path):
     dates = [datetime(2026, 1, 1) + timedelta(days=index) for index in range(3)]
     axes.plot(dates, [1, 2, 3])
     axes.xaxis.set_major_formatter(mdates.DateFormatter("%b %d"))
-    inset = figure.add_axes([.6, .6, .2, .2])
+    inset = axes.inset_axes([.6, .6, .2, .2])
     inset.plot([0, 1], [0, 1], label="_child0")
 
     output = mplot.savefig(tmp_path / "semantic-axes", figure, provenance=False)

@@ -1,3 +1,4 @@
+import { plotText } from "./math.js";
 import { cssColor, numeric, pairs, svg } from "./svg.js";
 const prop = (artist, key, fallback) => artist.props[key] ?? fallback;
 export const PLOT_TEXT_SIZE = 15;
@@ -193,9 +194,8 @@ const contour = (filled) => ({ group, artist, data, x, y, theme, pointBudget }) 
     }
 };
 const text = ({ group, artist, data, x, y, theme }) => {
-    const element = svg("text", { x: x(Number(data.x ?? 0)), y: y(Number(data.y ?? 0)), fill: cssColor(artist.props.color, theme.foreground), "font-size": Math.max(PLOT_TEXT_SIZE, prop(artist, "fontsize", PLOT_TEXT_SIZE)), "font-weight": prop(artist, "fontweight", undefined), "text-anchor": prop(artist, "align", "start"), transform: `rotate(${prop(artist, "rotation", 0)} ${x(Number(data.x ?? 0))} ${y(Number(data.y ?? 0))})` });
-    element.textContent = String(data.text ?? artist.props.text ?? "");
-    group.append(element);
+    const px = x(Number(data.x ?? 0)), py = y(Number(data.y ?? 0));
+    group.append(plotText({ x: px, y: py, fill: cssColor(artist.props.color, theme.foreground), "font-size": Math.max(PLOT_TEXT_SIZE, prop(artist, "fontsize", PLOT_TEXT_SIZE)), "font-weight": prop(artist, "fontweight", undefined), "text-anchor": prop(artist, "align", "start"), transform: `rotate(${prop(artist, "rotation", 0)} ${px} ${py})` }, String(data.text ?? artist.props.text ?? ""), "mplot-artist-text"));
 };
 const transformedPoints = (value, transform) => {
     const vertices = Array.isArray(value) ? value : [], matrix = Array.isArray(transform) ? transform : [];

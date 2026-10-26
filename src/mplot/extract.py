@@ -99,14 +99,22 @@ def _extract_figure(figure: Any, figure_id: str, context: ExtractionContext) -> 
         "facecolor": _color(figure.get_facecolor()),
         "axes": [],
     }
-    subplot_axes = {id(axes) for axes in figure.axes if _has_subplotspec(axes)}
-    for index, axes in enumerate(figure.axes):
-        extracted_axes = _extract_axes(axes, f"{figure_id}-axes-{index}", context)
-        if id(axes) not in subplot_axes and extracted_axes.get("role") != "colorbar":
-            parent = _inset_parent(axes, figure.axes, subplot_axes)
+    axes_entries: list[tuple[Any, Any | None]] = []
+    for axes in figure.axes:
+        axes_entries.append((axes, None))
+        axes_entries.extend((child, axes) for child in getattr(axes, "child_axes", []))
+    subplot_axes = {id(axes) for axes, _ in axes_entries if _has_subplotspec(axes)}
+    axes_ids = {id(axes): f"{figure_id}-axes-{index}" for index, (axes, _) in enumerate(axes_entries)}
+    for index, (axes, explicit_parent) in enumerate(axes_entries):
+        extracted_axes = _extract_axes(axes, axes_ids[id(axes)], context)
+        if explicit_parent is not None and extracted_axes.get("role") != "colorbar":
+            extracted_axes["role"] = "inset"
+            extracted_axes["parent_axes_id"] = axes_ids[id(explicit_parent)]
+        elif id(axes) not in subplot_axes and extracted_axes.get("role") != "colorbar":
+            parent = _inset_parent(axes, [item for item, _ in axes_entries], subplot_axes)
             if parent is not None:
                 extracted_axes["role"] = "inset"
-                extracted_axes["parent_axes_id"] = f"{figure_id}-axes-{figure.axes.index(parent)}"
+                extracted_axes["parent_axes_id"] = axes_ids[id(parent)]
         result["axes"].append(extracted_axes)
     return result
 

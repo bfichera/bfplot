@@ -218,6 +218,13 @@
 .mplot-label { font-style: italic; }
 .mplot-axis-title { font-weight: 700; }
 .mplot-hit { fill: transparent; cursor: crosshair; }
+.mplot-3d-view .mplot-hit { cursor: grab; }
+.mplot-3d-view .mplot-hit:active { cursor: grabbing; }
+.mplot-math { overflow: visible; color: var(--mplot-fg); }
+.mplot-math-content { display: flex; align-items: baseline; height: 100%; font: 15px "CMU Serif", serif; white-space: nowrap; }
+.mplot-math-content--middle { justify-content: center; }
+.mplot-math-content--end { justify-content: flex-end; }
+.mplot-math math { font-family: "CMU Serif", serif; font-size: 1em; }
 
 .mplot-tooltip { position: absolute; z-index: 4; padding: 5px 7px; border: 1px solid #aaa79e; border-radius: 0; background: #fffffff2; box-shadow: 0 3px 12px #0001; font: 11px "CMU Serif", serif; white-space: nowrap; pointer-events: none; transform: translate(8px, -100%); }
 .mplot-coordinates { position: absolute; left: 22px; bottom: 9px; z-index: 3; min-width: 160px; color: var(--mplot-muted); font: 10px "CMU Serif", serif; font-style: italic; pointer-events: none; }
@@ -227,6 +234,17 @@
 .mplot-unknown text { fill: var(--mplot-muted); font-size: 12px; }
 .mplot-status { position: absolute; right: 14px; bottom: 9px; color: var(--mplot-muted); font: 10px "CMU Serif", serif; pointer-events: none; }
 .mplot-error { padding: 24px; color: #8b1d21; }
+.mplot-metadata { position: fixed; z-index: 20; top: 0; right: 0; width: min(440px, 92vw); height: 100dvh; overflow: auto; border-left: 1px solid #c9c7bf; background: #fff; box-shadow: -12px 0 32px #00000012; color: var(--mplot-fg); }
+.mplot-metadata[hidden] { display: none; }
+.mplot-metadata > header { position: sticky; top: 0; display: flex; align-items: baseline; justify-content: space-between; padding: 24px 28px 15px; border-bottom: 1px solid #27251f; background: #fff; }
+.mplot-metadata h2 { margin: 0; font-size: 18px; font-weight: 500; }
+.mplot-metadata button { border: 0; background: transparent; color: var(--mplot-accent); font: 12px "CMU Serif", serif; cursor: pointer; }
+.mplot-metadata-body { padding: 22px 28px 50px; font: 14px/1.45 "CMU Serif", serif; }
+.mplot-metadata details { margin: 7px 0 12px; }
+.mplot-metadata summary { cursor: pointer; font-weight: 700; }
+.mplot-metadata dl { display: grid; grid-template-columns: minmax(100px, .8fr) minmax(0, 1.6fr); gap: 5px 15px; margin: 10px 0 16px 12px; }
+.mplot-metadata dt { color: var(--mplot-muted); overflow-wrap: anywhere; }
+.mplot-metadata dd { margin: 0; overflow-wrap: anywhere; }
 .mplot-point { transition: opacity .12s, stroke-width .12s; }
 .mplot-point[data-selected=true] { stroke: var(--mplot-selection); stroke-width: 3; }
 .mplot-hidden { display: none !important; }

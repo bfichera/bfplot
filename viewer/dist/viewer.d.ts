@@ -28,6 +28,7 @@ export declare class MPlotViewer extends EventTarget {
     private axisTokens;
     private axisRenders;
     private dirtyAxes;
+    private cameras;
     constructor(target: HTMLElement, document: MPlotDocument, options?: ViewerOptions);
     update(document: MPlotDocument): void;
     setTheme(theme: ThemeName | Partial<Theme>): void;
@@ -45,6 +46,8 @@ export declare class MPlotViewer extends EventTarget {
     private showFigure;
     private stepFigure;
     private updateNavigator;
+    private createMetadataExplorer;
+    private metadataTree;
     private createToolbar;
     private setMode;
     private renderMounted;
@@ -56,6 +59,8 @@ export declare class MPlotViewer extends EventTarget {
     private drawUnknown;
     private drawHitArea;
     private bindInteractions;
+    private bind3dInteractions;
+    private camera;
     private pointer;
     private plotBounds;
     private inPlot;

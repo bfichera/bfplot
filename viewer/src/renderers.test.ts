@@ -29,6 +29,13 @@ describe("artist rendering", () => {
     expect(lines.querySelector("path")?.getAttribute("d")).toContain("L300.00,200.00");
   });
 
+  it("renders TeX annotations as native MathML", () => {
+    const group = svg("g");
+    builtinRenderers["mplot.text"]!(context(group, "mplot.text", { x: 0, y: 0, text: "$x_1$" }));
+    expect(group.querySelector("math")?.textContent).toContain("x1");
+    expect(group.textContent).not.toContain("$x_1$");
+  });
+
   it("uses a uniform readable baseline for annotations", () => {
     const small = svg("g"), large = svg("g");
     builtinRenderers["mplot.text"]!(context(small, "mplot.text", { x: 0, y: 0, text: "small" }, { fontsize: 7 }));

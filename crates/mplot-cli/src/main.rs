@@ -177,6 +177,7 @@ struct ServeState {
 
 struct ServeArtifact {
     manifest: Vec<u8>,
+    manifest_data: mplot_core::Manifest,
     document: mplot_core::Document,
     objects: mplot_core::ObjectStore,
     packed_extraction: Option<Arc<tempfile::TempDir>>,
@@ -190,7 +191,7 @@ async fn serve(
     open_browser: bool,
 ) -> anyhow::Result<()> {
     let artifact = prepare_serve_artifact(&path)?;
-    let viewer_document_bytes = viewer_document(&artifact.document)?;
+    let viewer_document_bytes = viewer_document(&artifact.document, &artifact.manifest_data)?;
     let viewer_dir = discover_viewer_dir(viewer_dir);
     if viewer_dir.is_none() {
         eprintln!(
@@ -232,6 +233,7 @@ fn prepare_serve_artifact(path: &Path) -> anyhow::Result<ServeArtifact> {
         return Ok(ServeArtifact {
             manifest: fs::read(&manifest_path)
                 .with_context(|| format!("read {}", manifest_path.display()))?,
+            manifest_data: artifact.manifest,
             document: artifact.document,
             objects: artifact.store,
             packed_extraction: Some(extraction),
@@ -242,6 +244,7 @@ fn prepare_serve_artifact(path: &Path) -> anyhow::Result<ServeArtifact> {
     let artifact = load_artifact(path)?;
     Ok(ServeArtifact {
         manifest: fs::read(path).with_context(|| format!("read {}", path.display()))?,
+        manifest_data: artifact.manifest,
         document: artifact.document,
         objects: artifact.store,
         packed_extraction: None,
@@ -348,7 +351,10 @@ fn viewer_entry_exists(directory: &Path) -> bool {
     directory.join("app.js").is_file() || directory.join("index.js").is_file()
 }
 
-fn viewer_document(document: &mplot_core::Document) -> anyhow::Result<Vec<u8>> {
+fn viewer_document(
+    document: &mplot_core::Document,
+    manifest: &mplot_core::Manifest,
+) -> anyhow::Result<Vec<u8>> {
     use serde_json::{Map, Value, json};
 
     let mut figures = Vec::new();
@@ -402,7 +408,16 @@ fn viewer_document(document: &mplot_core::Document) -> anyhow::Result<Vec<u8>> {
         "artists": artists,
         "links": document.links,
         "selections": document.selections,
-        "metadata": document.metadata,
+        "metadata": {
+            "artifact": {
+                "format": manifest.format,
+                "version": manifest.version,
+                "schema_version": manifest.schema_version,
+                "document": manifest.document.to_string(),
+            },
+            "provenance": manifest.provenance,
+            "document": document.metadata,
+        },
     }))
     .map_err(Into::into)
 }
@@ -452,7 +467,7 @@ fn bytes_response(bytes: Vec<u8>, content_type: &'static str) -> Response {
 mod tests {
     use super::*;
     use clap::Parser;
-    use mplot_core::{Document, Manifest, ObjectStore};
+    use mplot_core::{Document, Manifest, ObjectId, ObjectStore};
 
     #[test]
     fn serve_defaults_to_loopback() {
@@ -470,8 +485,13 @@ mod tests {
             "../../mplot-core/tests/fixtures/python-document.json"
         ))
         .unwrap();
+        let mut manifest = Manifest::new(ObjectId::from_bytes(b"document"));
+        manifest.provenance.insert(
+            "created_utc".into(),
+            serde_json::json!("2026-01-01T00:00:00Z"),
+        );
         let value: serde_json::Value =
-            serde_json::from_slice(&viewer_document(&document).unwrap()).unwrap();
+            serde_json::from_slice(&viewer_document(&document, &manifest).unwrap()).unwrap();
         assert_eq!(value["axes"][0]["xlim"], serde_json::json!([0.0, 1.0]));
         assert_eq!(
             value["axes"][0]["position"],
@@ -480,6 +500,11 @@ mod tests {
         assert_eq!(value["axes"][0]["projection"], "2d");
         assert_eq!(value["artists"][0]["id"], "artist-0");
         assert_eq!(value["figures"][0]["axes"][0], "figure-0-axes-0");
+        assert_eq!(value["metadata"]["artifact"]["version"], "0.9.9");
+        assert_eq!(
+            value["metadata"]["provenance"]["created_utc"],
+            "2026-01-01T00:00:00Z"
+        );
     }
 
     #[test]

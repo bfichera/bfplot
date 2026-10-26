@@ -1,3 +1,4 @@
+import { plotText } from "./math.js";
 import type { Artist, ResolvedData, Theme } from "./types.js";
 import type { Scale } from "./scales.js";
 import { cssColor, numeric, pairs, svg } from "./svg.js";
@@ -188,9 +189,8 @@ const contour = (filled: boolean): ArtistRenderer => ({ group, artist, data, x, 
 };
 
 const text: ArtistRenderer = ({ group, artist, data, x, y, theme }) => {
-  const element = svg("text", { x: x(Number(data.x ?? 0)), y: y(Number(data.y ?? 0)), fill: cssColor(artist.props.color, theme.foreground), "font-size": Math.max(PLOT_TEXT_SIZE, prop(artist, "fontsize", PLOT_TEXT_SIZE)), "font-weight": prop(artist, "fontweight", undefined), "text-anchor": prop(artist, "align", "start"), transform: `rotate(${prop(artist, "rotation", 0)} ${x(Number(data.x ?? 0))} ${y(Number(data.y ?? 0))})` });
-  element.textContent = String(data.text ?? artist.props.text ?? "");
-  group.append(element);
+  const px = x(Number(data.x ?? 0)), py = y(Number(data.y ?? 0));
+  group.append(plotText({ x: px, y: py, fill: cssColor(artist.props.color, theme.foreground), "font-size": Math.max(PLOT_TEXT_SIZE, prop(artist, "fontsize", PLOT_TEXT_SIZE)), "font-weight": prop(artist, "fontweight", undefined), "text-anchor": prop(artist, "align", "start"), transform: `rotate(${prop(artist, "rotation", 0)} ${px} ${py})` }, String(data.text ?? artist.props.text ?? ""), "mplot-artist-text"));
 };
 
 const transformedPoints = (value: unknown, transform: unknown): Array<[number, number]> => {

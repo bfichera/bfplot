@@ -1,3 +1,4 @@
+import { plotText } from "./math.js";
 import { ViewerModel } from "./model.js";
 import { builtinRenderers, PLOT_TEXT_SIZE } from "./renderers.js";
 import { createScale, formatTick } from "./scales.js";
@@ -23,6 +24,7 @@ export class MPlotViewer extends EventTarget {
     axisTokens = new Map();
     axisRenders = new Map();
     dirtyAxes = new Set();
+    cameras = new Map();
     constructor(target, document, options = {}) {
         super();
         this.element = target;
@@ -78,13 +80,21 @@ export class MPlotViewer extends EventTarget {
         void this.renderMounted();
     }
     reset(axisId) {
+        const resetView = (view) => { if (view.axis.projection === "3d") {
+            this.cameras.delete(view.axis.id);
+            void this.renderAxis(view.axis.id);
+        }
+        else
+            void this.refitAxis(view.axis.id); };
         if (axisId) {
-            void this.refitAxis(axisId);
+            const view = this.views.get(axisId);
+            if (view)
+                resetView(view);
             return;
         }
         for (const view of this.views.values())
             if (view.mounted)
-                void this.refitAxis(view.axis.id);
+                resetView(view);
     }
     destroy() {
         this.source?.close();
@@ -103,6 +113,7 @@ export class MPlotViewer extends EventTarget {
         this.axisTokens.clear();
         this.axisRenders.clear();
         this.dirtyAxes.clear();
+        this.cameras.clear();
         this.element.replaceChildren();
         const shell = document.createElement("div");
         shell.className = "mplot-shell";
@@ -120,7 +131,7 @@ export class MPlotViewer extends EventTarget {
             header.append(this.createNavigator());
         const figuresElement = document.createElement("main");
         figuresElement.className = "mplot-figures";
-        shell.append(header, figuresElement);
+        shell.append(header, figuresElement, this.createMetadataExplorer());
         this.element.append(shell);
         const immediateMounts = [];
         for (const [figureIndex, figure] of this.model.document.figures.entries()) {
@@ -344,11 +355,50 @@ export class MPlotViewer extends EventTarget {
         if (next)
             next.disabled = index < 0 || index >= figures.length - 1;
     }
+    createMetadataExplorer() {
+        const panel = document.createElement("aside");
+        panel.className = "mplot-metadata";
+        panel.hidden = true;
+        const heading = document.createElement("header"), title = document.createElement("h2"), close = document.createElement("button");
+        title.textContent = "Artifact metadata";
+        close.type = "button";
+        close.textContent = "Close";
+        close.onclick = () => { panel.hidden = true; };
+        heading.append(title, close);
+        const body = document.createElement("div");
+        body.className = "mplot-metadata-body";
+        body.append(this.metadataTree(this.model.document.metadata ?? {}, "Metadata"));
+        panel.append(heading, body);
+        return panel;
+    }
+    metadataTree(value, label) {
+        if (value && typeof value === "object") {
+            const details = document.createElement("details"), summary = document.createElement("summary"), list = document.createElement("dl");
+            details.open = label === "Metadata";
+            summary.textContent = label;
+            details.append(summary);
+            for (const [key, item] of Object.entries(value)) {
+                const term = document.createElement("dt"), definition = document.createElement("dd");
+                term.textContent = key;
+                if (item && typeof item === "object")
+                    definition.append(this.metadataTree(item, Array.isArray(item) ? `${item.length} items` : "Details"));
+                else
+                    definition.textContent = item === null ? "null" : String(item);
+                list.append(term, definition);
+            }
+            details.append(list);
+            return details;
+        }
+        const span = document.createElement("span");
+        span.textContent = `${label}: ${String(value)}`;
+        return span;
+    }
     createToolbar() {
         const toolbar = document.createElement("nav");
         toolbar.className = "mplot-toolbar";
         toolbar.setAttribute("aria-label", "Plot tools");
-        const actions = [["Pan", "pan", () => this.setMode("pan")], ["Zoom", "zoom", () => this.setMode("zoom")], ["Select", "select", () => this.setMode("select")], ["Reset", "reset", () => this.reset()]];
+        const actions = [["Pan", "pan", () => this.setMode("pan")], ["Zoom", "zoom", () => this.setMode("zoom")], ["Select", "select", () => this.setMode("select")], ["Reset", "reset", () => this.reset()], ["Metadata", "metadata", () => { const panel = this.element.querySelector(".mplot-metadata"); if (panel)
+                    panel.hidden = !panel.hidden; }]];
         for (const [label, name, action] of actions) {
             const button = document.createElement("button");
             button.type = "button";
@@ -463,40 +513,27 @@ export class MPlotViewer extends EventTarget {
         for (const [tick, label] of this.axisTicks(view, "x", tickCount)) {
             const px = view.x(tick);
             view.plot.append(svg("line", { x1: px, x2: px, y1: top, y2: b, class: "mplot-grid-line" }));
-            const text = svg("text", { x: px, y: b + PLOT_TEXT_SIZE + 5, "text-anchor": "middle", "font-size": PLOT_TEXT_SIZE, class: "mplot-tick" });
-            text.textContent = label;
-            view.plot.append(text);
+            view.plot.append(plotText({ x: px, y: b + PLOT_TEXT_SIZE + 5, "text-anchor": "middle", "font-size": PLOT_TEXT_SIZE }, label, "mplot-tick"));
         }
         for (const [tick, label] of this.axisTicks(view, "y", Math.max(3, Math.floor((b - top) / 80)))) {
             const py = view.y(tick);
             view.plot.append(svg("line", { x1: left, x2: r, y1: py, y2: py, class: "mplot-grid-line" }));
-            const text = svg("text", { x: left - 9, y: py + PLOT_TEXT_SIZE * .34, "text-anchor": "end", "font-size": PLOT_TEXT_SIZE, class: "mplot-tick" });
-            text.textContent = label;
-            view.plot.append(text);
+            view.plot.append(plotText({ x: left - 9, y: py + PLOT_TEXT_SIZE * .34, "text-anchor": "end", "font-size": PLOT_TEXT_SIZE }, label, "mplot-tick"));
         }
         view.plot.append(svg("path", { d: `M${left},${top}H${r}V${b}H${left}Z`, fill: "none", class: "mplot-axis-frame" }));
-        if (view.axis.title) {
-            const text = svg("text", { x: (left + r) / 2, y: Math.max(PLOT_TEXT_SIZE, top - 16), "text-anchor": "middle", "font-size": PLOT_TEXT_SIZE, class: "mplot-axis-title" });
-            text.textContent = view.axis.title;
-            view.plot.append(text);
-        }
-        if (view.axis.xlabel && view.height > 180) {
-            const text = svg("text", { x: (left + r) / 2, y: b + 46, "text-anchor": "middle", "font-size": PLOT_TEXT_SIZE, class: "mplot-label" });
-            text.textContent = view.axis.xlabel;
-            view.plot.append(text);
-        }
-        if (view.axis.ylabel && view.width > 230) {
-            const text = svg("text", { x: 18, y: (top + b) / 2, "text-anchor": "middle", "font-size": PLOT_TEXT_SIZE, class: "mplot-label", transform: `rotate(-90 18 ${(top + b) / 2})` });
-            text.textContent = view.axis.ylabel;
-            view.plot.append(text);
-        }
+        if (view.axis.title)
+            view.plot.append(plotText({ x: (left + r) / 2, y: Math.max(PLOT_TEXT_SIZE, top - 16), "text-anchor": "middle", "font-size": PLOT_TEXT_SIZE }, view.axis.title, "mplot-axis-title"));
+        if (view.axis.xlabel && view.height > 180)
+            view.plot.append(plotText({ x: (left + r) / 2, y: b + 46, "text-anchor": "middle", "font-size": PLOT_TEXT_SIZE }, view.axis.xlabel, "mplot-label"));
+        if (view.axis.ylabel && view.width > 230)
+            view.plot.append(plotText({ x: 18, y: (top + b) / 2, "text-anchor": "middle", "font-size": PLOT_TEXT_SIZE, transform: `rotate(-90 18 ${(top + b) / 2})` }, view.axis.ylabel, "mplot-label"));
     }
     axisTicks(view, dimension, count) {
         const metadata = view.axis.props?.[`${dimension}axis`];
         const scaleType = dimension === "x" ? view.axis.xscale : view.axis.yscale;
         const scale = dimension === "x" ? view.x : view.y;
-        if (scaleType === "date" && metadata?.ticks?.length)
-            return metadata.ticks.map((tick, index) => [tick, metadata.ticklabels?.[index] || formatTick(tick, "date", metadata.date_format)]);
+        if (metadata?.ticks?.length && metadata.ticklabels?.some((label) => label))
+            return metadata.ticks.map((tick, index) => [tick, metadata.ticklabels?.[index] || formatTick(tick, scaleType, metadata.date_format)]);
         const ticks = scale.ticks(count);
         const visibleTicks = scaleType === "symlog" && ticks.length > count && ticks.includes(0) ? [ticks[0], 0, ticks.at(-1)] : ticks;
         return visibleTicks.map((tick) => [tick, formatTick(tick, scaleType)]);
@@ -505,6 +542,10 @@ export class MPlotViewer extends EventTarget {
     drawUnknown(group, artist, view, reason = "Renderer not installed") { const box = svg("g", { class: "mplot-unknown" }); box.append(svg("rect", { x: view.margin.left + 8, y: view.margin.top + 8, width: Math.min(220, view.width - view.margin.left - 20), height: 40, rx: 2 })); const text = svg("text", { x: view.margin.left + 16, y: view.margin.top + 25 }); text.textContent = `Unknown: ${artist.type}`; const detail = svg("text", { x: view.margin.left + 16, y: view.margin.top + 40 }); detail.textContent = reason; box.append(text, detail); group.append(box); }
     drawHitArea(view) { const { left, top, bottom, right } = view.margin; view.overlay.append(svg("rect", { x: left, y: top, width: view.width - right - left, height: view.height - bottom - top, class: "mplot-hit" })); }
     bindInteractions(view) {
+        if (view.axis.projection === "3d") {
+            this.bind3dInteractions(view);
+            return;
+        }
         let start;
         let brush;
         const finish = (event, cancel = false) => { if (!start)
@@ -541,6 +582,28 @@ export class MPlotViewer extends EventTarget {
             return; const factor = Math.exp(event.deltaY * .001), current = this.model.viewports.get(view.axis.id), cx = view.x.invert(p.x), cy = view.y.invert(p.y); this.model.setViewport(view.axis.id, { ...current, x: [cx + (current.x[0] - cx) * factor, cx + (current.x[1] - cx) * factor], y: [cy + (current.y[0] - cy) * factor, cy + (current.y[1] - cy) * factor] }); }, { passive: false });
         view.svg.addEventListener("dblclick", () => this.reset(view.axis.id));
     }
+    bind3dInteractions(view) {
+        let start;
+        const camera = () => this.camera(view);
+        view.svg.classList.add("mplot-3d-view");
+        view.svg.addEventListener("pointerdown", (event) => { const p = this.pointer(view, event), current = camera(); start = { ...p, elev: current.elev, azim: current.azim }; view.svg.setPointerCapture(event.pointerId); });
+        view.svg.addEventListener("pointermove", (event) => { const p = this.pointer(view, event); this.updateCoordinates(view, p.x, p.y); if (!start)
+            return; const current = camera(); current.azim = start.azim + (p.x - start.x) * .45; current.elev = Math.max(-89, Math.min(89, start.elev - (p.y - start.y) * .45)); void this.renderAxis(view.axis.id); });
+        const finish = () => { start = undefined; };
+        view.svg.addEventListener("pointerup", finish);
+        view.svg.addEventListener("pointercancel", finish);
+        view.svg.addEventListener("wheel", (event) => { event.preventDefault(); const current = camera(); current.zoom = Math.max(.4, Math.min(3, current.zoom * Math.exp(-event.deltaY * .001))); void this.renderAxis(view.axis.id); }, { passive: false });
+        view.svg.addEventListener("dblclick", () => { this.cameras.delete(view.axis.id); void this.renderAxis(view.axis.id); });
+    }
+    camera(view) {
+        let camera = this.cameras.get(view.axis.id);
+        if (!camera) {
+            const settings = view.axis.props?.view;
+            camera = { elev: settings?.elev ?? 30, azim: settings?.azim ?? -60, roll: settings?.roll ?? 0, zoom: 1 };
+            this.cameras.set(view.axis.id, camera);
+        }
+        return camera;
+    }
     pointer(view, event) { const rect = view.svg.getBoundingClientRect(); return { x: (event.clientX - rect.left) * view.width / (rect.width || view.width), y: (event.clientY - rect.top) * view.height / (rect.height || view.height) }; }
     plotBounds(view) { return { left: view.margin.left, right: view.width - view.margin.right, top: view.margin.top, bottom: view.height - view.margin.bottom }; }
     inPlot(view, x, y) { const bounds = this.plotBounds(view); return x >= bounds.left && x <= bounds.right && y >= bounds.top && y <= bounds.bottom; }
@@ -576,15 +639,15 @@ export class MPlotViewer extends EventTarget {
         const viewport = this.model.viewports.get(view.axis.id), zlim = viewport.z ?? [0, 1];
         const normalize = (value, limits) => (value - limits[0]) / (limits[1] - limits[0] || 1) - 0.5;
         const xn = normalize(x, viewport.x), yn = normalize(y, viewport.y), zn = normalize(z, zlim);
-        const settings = view.axis.props?.view;
-        const azimuth = (settings?.azim ?? -60) * Math.PI / 180, elevation = (settings?.elev ?? 30) * Math.PI / 180, roll = (settings?.roll ?? 0) * Math.PI / 180;
+        const camera = this.camera(view);
+        const azimuth = camera.azim * Math.PI / 180, elevation = camera.elev * Math.PI / 180, roll = camera.roll * Math.PI / 180;
         const horizontal = -Math.sin(azimuth) * xn + Math.cos(azimuth) * yn;
         const depth = Math.cos(azimuth) * xn + Math.sin(azimuth) * yn;
         const vertical = Math.cos(elevation) * zn - Math.sin(elevation) * depth;
         const rolledX = Math.cos(roll) * horizontal - Math.sin(roll) * vertical;
         const rolledY = Math.sin(roll) * horizontal + Math.cos(roll) * vertical;
         const left = view.margin.left, right = view.width - view.margin.right, top = view.margin.top, bottom = view.height - view.margin.bottom;
-        const scale = Math.min(right - left, bottom - top) * 0.82;
+        const scale = Math.min(right - left, bottom - top) * 0.82 * camera.zoom;
         return [(left + right) / 2 + rolledX * scale, (top + bottom) / 2 - rolledY * scale];
     }
     markActiveAxis() { for (const view of this.views.values())
