@@ -216,9 +216,13 @@ def _extract_artist(artist: Any, axes_id: str, context: ExtractionContext, is_3d
         return _extract_paths("mplot.fill_between", artist, axes_id, context)
     if class_name in {"QuadContourSet", "ContourSet"}:
         return _extract_contour(artist, axes_id, context)
+    if is_3d and class_name == "Poly3DCollection":
+        faces = _poly3d_faces(artist)
+        return _extract_3d_paths("mplot.surface3d", faces, artist, axes_id, context)
+    if is_3d and isinstance(artist, LineCollection) and hasattr(artist, "_segments3d"):
+        return _extract_3d_paths("mplot.mesh3d", list(artist._segments3d), artist, axes_id, context)
     if isinstance(artist, PolyCollection):
-        type_name = "mplot.surface3d" if is_3d and class_name == "Poly3DCollection" else "mplot.mesh3d" if is_3d else "mplot.patch"
-        return _extract_paths(type_name, artist, axes_id, context)
+        return _extract_paths("mplot.patch", artist, axes_id, context)
     if isinstance(artist, LineCollection):
         return context.artist("mplot.contour", axes_id, _collection_props(artist), {"segments": context.array(np.asarray(artist.get_segments()))})
     if isinstance(artist, AxesImage):
@@ -267,6 +271,28 @@ def _extract_paths(type_name: str, artist: Any, axes_id: str, context: Extractio
     lengths = np.asarray([len(path) for path in paths], dtype=np.int64)
     vertices = np.concatenate(paths) if paths else np.empty((0, 2))
     return context.artist(type_name, axes_id, _collection_props(artist), {"vertices": context.array(vertices), "path_lengths": context.array(lengths)})
+
+
+def _poly3d_faces(artist: Any) -> list[np.ndarray]:
+    faces = getattr(artist, "_faces", None)
+    if isinstance(faces, np.ndarray) and faces.ndim == 3 and faces.shape[-1] == 3:
+        return [face for face in faces]
+    vector = getattr(artist, "_vec", None)
+    slices = getattr(artist, "_segslices", None)
+    if vector is not None and slices is not None:
+        values = np.asarray(vector)
+        if values.ndim == 2 and values.shape[0] >= 3:
+            return [values[:3, segment].T for segment in slices]
+    return []
+
+
+def _extract_3d_paths(type_name: str, paths: list[Any], artist: Any, axes_id: str, context: ExtractionContext) -> dict[str, Any]:
+    arrays = [np.asarray(path, dtype=float) for path in paths]
+    arrays = [path for path in arrays if path.ndim == 2 and path.shape[1] == 3 and len(path)]
+    lengths = np.asarray([len(path) for path in arrays], dtype=np.int64)
+    vertices = np.concatenate(arrays) if arrays else np.empty((0, 3))
+    data = {"vertices": context.array(vertices), "path_lengths": context.array(lengths)}
+    return context.artist(type_name, axes_id, _collection_props(artist), data)
 
 
 def _extract_contour(artist: Any, axes_id: str, context: ExtractionContext) -> dict[str, Any]:

@@ -499,7 +499,21 @@ export class MPlotViewer extends EventTarget {
         tooltip.className = "mplot-tooltip";
         view.host.append(tooltip);
     } tooltip.style.left = `${px / view.width * 100}%`; tooltip.style.top = `${py / view.height * 100}%`; tooltip.textContent = `${best.artist.props.label ?? best.artist.id} [${best.index}]  x ${formatTick(best.x, view.axis.xscale)} · y ${formatTick(best.y, view.axis.yscale)}`; }
-    project3d(view, x, y, z) { const viewport = this.model.viewports.get(view.axis.id), zlim = viewport.z ?? [0, 1], zn = (z - zlim[0]) / (zlim[1] - zlim[0] || 1) - .5; return [view.x(x) + zn * 32, view.y(y) - zn * 24]; }
+    project3d(view, x, y, z) {
+        const viewport = this.model.viewports.get(view.axis.id), zlim = viewport.z ?? [0, 1];
+        const normalize = (value, limits) => (value - limits[0]) / (limits[1] - limits[0] || 1) - 0.5;
+        const xn = normalize(x, viewport.x), yn = normalize(y, viewport.y), zn = normalize(z, zlim);
+        const settings = view.axis.props?.view;
+        const azimuth = (settings?.azim ?? -60) * Math.PI / 180, elevation = (settings?.elev ?? 30) * Math.PI / 180, roll = (settings?.roll ?? 0) * Math.PI / 180;
+        const horizontal = -Math.sin(azimuth) * xn + Math.cos(azimuth) * yn;
+        const depth = Math.cos(azimuth) * xn + Math.sin(azimuth) * yn;
+        const vertical = Math.cos(elevation) * zn - Math.sin(elevation) * depth;
+        const rolledX = Math.cos(roll) * horizontal - Math.sin(roll) * vertical;
+        const rolledY = Math.sin(roll) * horizontal + Math.cos(roll) * vertical;
+        const left = view.margin.left, right = view.width - view.margin.right, top = view.margin.top, bottom = view.height - view.margin.bottom;
+        const scale = Math.min(right - left, bottom - top) * 0.82;
+        return [(left + right) / 2 + rolledX * scale, (top + bottom) / 2 - rolledY * scale];
+    }
     markActiveAxis() { for (const view of this.views.values())
         view.host.classList.toggle("mplot-axis--active", view.axis.id === this.activeAxisId); }
     exportSVG(scope = "artifact", id) {

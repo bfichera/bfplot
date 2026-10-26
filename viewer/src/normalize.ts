@@ -42,7 +42,8 @@ function normalizeAxis(rawValue: unknown, figureId: string): Axis {
     ...(ylim ? { ylim } : {}),
     ...(zlim ? { zlim } : {}),
     xscale: scale(x.scale), yscale: scale(y.scale), zscale: scale(z.scale), projection,
-    ...(quad(source.bounds) ? { position: quad(source.bounds)! } : {}), props: normalizeProps(props),
+    ...(quad(source.bounds) ? { position: quad(source.bounds)! } : {}),
+    props: { ...normalizeProps(props), ...(source.view && typeof source.view === "object" ? { view: source.view } : {}) },
   };
 }
 
@@ -103,17 +104,22 @@ export function normalizeArtistData(type: string, source: Record<string, unknown
     data.rects=left.map((x,index)=>[x,bottom[index]??0,width[index]??0,height[index]??0]);
   }
   if (data.position !== undefined) { const position=numbers(data.position); data.x=position[0]??0; data.y=position[1]??0; }
-  if (data.path !== undefined && data.vertices === undefined) data.vertices=data.path;
+  if (data.path !== undefined && data.vertices === undefined) {
+    data.vertices=rows(data.path,arrayShape(source.path)?.[1]??2);
+  }
   if (data.vertices !== undefined && data.path_lengths !== undefined) {
     const vertices=rows(data.vertices,arrayShape(source.vertices)?.[1]??2), lengths=numbers(data.path_lengths), paths:number[][][]=[]; let offset=0;
     for(const length of lengths){paths.push(vertices.slice(offset,offset+length));offset+=length;}
     data.paths=paths;
+  } else if (data.vertices !== undefined && (ArrayBuffer.isView(data.vertices) || !Array.isArray(data.vertices))) {
+    data.vertices=rows(data.vertices,arrayShape(source.vertices)?.[1]??2);
   }
   if (data.segments !== undefined) {
     const shape=arrayShape(source.segments), width=shape?.[shape.length-1]??2, segmentLength=shape?.[shape.length-2]??2;
     const points=rows(data.segments,width); data.paths=Array.from({length:Math.ceil(points.length/segmentLength)},(_,i)=>points.slice(i*segmentLength,(i+1)*segmentLength));
   }
   if (data.error_segments !== undefined) { const points=rows(data.error_segments,2); data.error_paths=Array.from({length:Math.ceil(points.length/2)},(_,i)=>points.slice(i*2,i*2+2)); }
+  if (data.cap_segments !== undefined) { const points=rows(data.cap_segments,2); data.cap_paths=Array.from({length:Math.ceil(points.length/2)},(_,i)=>points.slice(i*2,i*2+2)); }
   const valueShape=arrayShape(source.values); if(valueShape) data.shape=valueShape;
   return data;
 }

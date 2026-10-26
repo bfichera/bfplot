@@ -28,6 +28,19 @@ describe("document normalization",()=>{
     expect(contour.paths).toEqual([]);
   });
 
+  it("reshapes extracted patch paths and applies path lengths to 3D vertices",()=>{
+    const patch=normalizeArtistData("mplot.patch",{path:ref([3,2])},{path:new Float64Array([0,0,1,0,1,1]),transform:[[1,0,.25],[0,1,.5],[0,0,1]]});
+    expect(patch.vertices).toEqual([[0,0],[1,0],[1,1]]);
+    const surface=normalizeArtistData("mplot.surface3d",{vertices:ref([4,3]),path_lengths:ref([1])},{vertices:new Float64Array([0,0,0,1,0,.5,1,1,1,0,1,.5]),path_lengths:new BigInt64Array([4n])});
+    expect(surface.paths).toEqual([[[0,0,0],[1,0,.5],[1,1,1],[0,1,.5]]]);
+  });
+
+  it("normalizes extracted error and cap segments",()=>{
+    const result=normalizeArtistData("mplot.errorbar",{error_segments:ref([1,2,2]),cap_segments:ref([1,2,2])},{error_segments:new Float64Array([1,2,1,4]),cap_segments:new Float64Array([.9,2,1.1,2])});
+    expect(result.error_paths).toEqual([[[1,2],[1,4]]]);
+    expect(result.cap_paths).toEqual([[[.9,2],[1.1,2]]]);
+  });
+
   it("adapts extracted histogram rectangles",()=>{
     const data=normalizeArtistData("mplot.histogram",{},{left:[0,2],bottom:[0,1],width:[1,1],height:[3,4]});
     expect(data.rects).toEqual([[0,0,1,3],[2,1,1,4]]);

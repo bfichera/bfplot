@@ -4,6 +4,8 @@ import json
 import struct
 import tomllib
 
+import zstandard as zstd
+
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
@@ -17,6 +19,13 @@ def _document_from_split(path):
     digest = manifest["document"].split(":", 1)[1]
     document_path = path.parent / ".mplot" / "objects" / "sha256" / digest[:2] / digest
     return manifest, json.loads(document_path.read_text())
+
+
+def _decode_array(path, reference):
+    digest = reference["object"].split(":", 1)[1]
+    object_path = path.parent / ".mplot" / "objects" / "sha256" / digest[:2] / digest
+    raw = zstd.ZstdDecompressor().decompress(object_path.read_bytes())
+    return np.frombuffer(raw, dtype=np.dtype(reference["dtype"]).newbyteorder("<")).reshape(reference["shape"])
 
 
 def test_savefig_extracts_broad_artist_set(tmp_path):
@@ -40,6 +49,29 @@ def test_savefig_extracts_broad_artist_set(tmp_path):
     for axis in document["figures"][0]["axes"]:
         for artist in axis["artists"]:
             assert {"type", "schema_version", "id", "axes_id", "props", "data"} == artist.keys()
+
+
+def test_savefig_preserves_true_3d_surface_and_wire_geometry(tmp_path):
+    figure = plt.figure()
+    surface_axes = figure.add_subplot(1, 2, 1, projection="3d")
+    wire_axes = figure.add_subplot(1, 2, 2, projection="3d")
+    values = np.linspace(-1, 1, 6)
+    x, y = np.meshgrid(values, values)
+    z = np.sin(x) * np.cos(y)
+    surface_axes.plot_surface(x, y, z)
+    wire_axes.plot_wireframe(x, y, z)
+
+    output = mplot.savefig(tmp_path / "three-dimensional", figure, provenance=False)
+    _, document = _document_from_split(output)
+    surface = next(artist for artist in document["figures"][0]["axes"][0]["artists"] if artist["type"] == "mplot.surface3d")
+    wire = next(artist for artist in document["figures"][0]["axes"][1]["artists"] if artist["type"] == "mplot.mesh3d")
+    surface_vertices = _decode_array(output, surface["data"]["vertices"])
+    wire_vertices = _decode_array(output, wire["data"]["vertices"])
+    assert surface_vertices.shape[1] == wire_vertices.shape[1] == 3
+    assert np.ptp(surface_vertices[:, 0]) > 1
+    assert np.ptp(wire_vertices[:, 1]) > 1
+    assert len(_decode_array(output, surface["data"]["path_lengths"])) > 1
+    assert len(_decode_array(output, wire["data"]["path_lengths"])) > 1
 
 
 def test_savefig_preserves_large_multi_figure_collections(tmp_path):

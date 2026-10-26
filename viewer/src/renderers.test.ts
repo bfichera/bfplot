@@ -6,6 +6,43 @@ import { svg } from "./svg.js";
 import { themes } from "./theme.js";
 
 const artist = { type: "mplot.line", schema_version: 1, id: "line", axes_id: "axis", props: {}, data: {} };
+const context = (group: SVGGElement, type: string, data: Record<string, unknown>, props: Record<string, unknown> = {}) => ({
+  group, artist: { ...artist, type, props }, data,
+  x: createScale("linear", [-3, 3], [0, 600]), y: createScale("linear", [-3, 3], [600, 0]),
+  width: 600, height: 600, theme: themes.light, selected: new Set<number>(), pointBudget: 2_000,
+  project3d: (x: number, y: number, z: number) => [300 + x * 80 + z * 20, 300 - y * 80 - z * 20] as [number, number],
+});
+
+describe("artist rendering", () => {
+  it("renders normalized error segments, filled contours, and equal-aspect paths", () => {
+    const errors = svg("g");
+    builtinRenderers["mplot.errorbar"]!(context(errors, "mplot.errorbar", { x: [0, 1], y: [1, 2], error_paths: [[[0, .5], [0, 1.5]], [[1, 1], [1, 3]]] }));
+    expect(errors.querySelectorAll("path").length).toBeGreaterThanOrEqual(2);
+    expect(errors.querySelectorAll("circle")).toHaveLength(2);
+    const contours = svg("g");
+    builtinRenderers["mplot.contourf"]!(context(contours, "mplot.contourf", { paths: [[[-2, -1], [0, 2], [2, -1]]] }));
+    expect(contours.querySelector("path")?.getAttribute("d")).toContain(" Z");
+    const lines = svg("g");
+    builtinRenderers["mplot.line"]!(context(lines, "mplot.line", { x: [-1, 0, 1], y: [0, 1, 0] }));
+    expect(lines.querySelector("path")?.getAttribute("d")).toContain("L300.00,200.00");
+  });
+
+  it("applies affine patch transforms before scaling", () => {
+    const group = svg("g");
+    builtinRenderers["mplot.patch"]!(context(group, "mplot.patch", { vertices: [[0, 0], [1, 0], [1, 1]], transform: [[.5, 0, 1], [0, .25, -1], [0, 0, 1]] }));
+    expect(group.querySelector("path")?.getAttribute("d")).toBe("M400.00,400.00 L450.00,400.00 L450.00,375.00 Z");
+  });
+
+  it("renders true 3D surface faces and wire paths", () => {
+    const paths = [[[0, 0, 0], [1, 0, .5], [1, 1, 1], [0, 1, .5]]];
+    const surface = svg("g"), wire = svg("g");
+    builtinRenderers["mplot.surface3d"]!(context(surface, "mplot.surface3d", { paths }, { facecolors: ["#123456"] }));
+    builtinRenderers["mplot.mesh3d"]!(context(wire, "mplot.mesh3d", { paths }, { color: "#654321" }));
+    expect(surface.querySelector("path")?.getAttribute("d")).toContain(" Z");
+    expect(surface.querySelector("path")?.getAttribute("fill")).toBe("#123456");
+    expect(wire.querySelector("path")?.getAttribute("fill")).toBe("none");
+  });
+});
 
 describe("large data rendering", () => {
   it("limits line path complexity to the screen-space point budget", () => {

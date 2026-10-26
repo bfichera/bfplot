@@ -173,9 +173,28 @@ const text = ({ group, artist, data, x, y, theme }) => {
     element.textContent = String(data.text ?? artist.props.text ?? "");
     group.append(element);
 };
+const transformedPoints = (value, transform) => {
+    const vertices = Array.isArray(value) ? value : [], matrix = Array.isArray(transform) ? transform : [];
+    return vertices.map((point) => {
+        if (!Array.isArray(point))
+            return null;
+        const px = Number(point[0]), py = Number(point[1]);
+        if (!Number.isFinite(px) || !Number.isFinite(py))
+            return null;
+        if (matrix.length < 3 || !matrix.every((row) => Array.isArray(row) && row.length >= 3))
+            return [px, py];
+        const tx = Number(matrix[0][0]) * px + Number(matrix[0][1]) * py + Number(matrix[0][2]);
+        const ty = Number(matrix[1][0]) * px + Number(matrix[1][1]) * py + Number(matrix[1][2]);
+        const tw = Number(matrix[2][0]) * px + Number(matrix[2][1]) * py + Number(matrix[2][2]);
+        return Number.isFinite(tx) && Number.isFinite(ty) && Number.isFinite(tw) && tw !== 0 ? [tx / tw, ty / tw] : null;
+    }).filter((point) => point !== null);
+};
 const patch = ({ group, artist, data, x, y, theme }) => {
-    const vertices = (data.vertices ?? data.points);
-    const points = Array.isArray(vertices) ? vertices.map((p) => Array.isArray(p) ? [x(Number(p[0])), y(Number(p[1]))] : null).filter((p) => p !== null) : pairs(data.x, data.y).map(([a, b]) => [x(a), y(b)]);
+    const vertices = data.vertices ?? data.points;
+    const source = transformedPoints(vertices, data.transform);
+    const points = source.length ? source.map(([px, py]) => [x(px), y(py)]) : pairs(data.x, data.y).map(([a, b]) => [x(a), y(b)]);
+    if (!points.length)
+        return;
     group.append(svg("path", { d: pathFrom(points, prop(artist, "closed", true)), fill: cssColor(artist.props.facecolor ?? artist.props.color, theme.accent), "fill-opacity": prop(artist, "alpha", 0.35), stroke: cssColor(artist.props.edgecolor, theme.accent), "stroke-width": prop(artist, "linewidth", 1.2) }));
 };
 const line3d = ({ group, artist, data, project3d, theme, pointBudget }) => {
@@ -191,20 +210,31 @@ const scatter3d = ({ group, artist, data, project3d, theme, selected, pointBudge
         group.append(svg("circle", { cx, cy, r: prop(artist, "size", 4), fill: cssColor(artist.props.color, theme.accent), opacity: prop(artist, "alpha", .85), class: "mplot-point", "data-index": i, "data-selected": selected.has(i) ? "true" : "false" }));
     }
 };
-const surface3d = ({ group, artist, data, project3d, theme }) => {
-    const xs = numeric(data.x), ys = numeric(data.y), zs = numeric(data.z), faces = (data.faces ?? data.triangles);
-    if (Array.isArray(faces))
-        for (const face of faces) {
-            if (!Array.isArray(face))
-                continue;
-            const points = face.map(Number).map(i => project3d(xs[i] ?? 0, ys[i] ?? 0, zs[i] ?? 0));
-            group.append(svg("path", { d: pathFrom(points, true), fill: cssColor(artist.props.color, theme.accent), "fill-opacity": prop(artist, "alpha", .45), stroke: cssColor(artist.props.edgecolor, theme.grid), "stroke-width": .7 }));
-        }
+const surface3d = (filled) => ({ group, artist, data, project3d, theme, pointBudget }) => {
+    const paths = Array.isArray(data.paths) ? data.paths : [], budget = Math.max(1, Math.min(paths.length, pointBudget));
+    const indices = sampled(paths.map((_, index) => index), budget);
+    for (const index of indices) {
+        const raw = paths[index];
+        if (!Array.isArray(raw))
+            continue;
+        const points = raw.map((point) => Array.isArray(point) && point.length >= 3 ? project3d(Number(point[0]), Number(point[1]), Number(point[2])) : null).filter((point) => point !== null);
+        if (points.length < 2)
+            continue;
+        const facecolors = artist.props.facecolors, edgecolors = artist.props.edgecolors;
+        group.append(svg("path", {
+            d: pathFrom(points, filled),
+            fill: filled ? cssColor(facecolors?.[index] ?? artist.props.facecolor ?? artist.props.color, theme.accent) : "none",
+            "fill-opacity": filled ? prop(artist, "alpha", 0.75) : 0,
+            stroke: cssColor(edgecolors?.[index] ?? artist.props.edgecolor ?? artist.props.color, filled ? theme.grid : theme.accent),
+            "stroke-width": numeric(artist.props.linewidths)[index] ?? (filled ? 0.35 : 0.8),
+            "vector-effect": "non-scaling-stroke",
+        }));
+    }
 };
 export const builtinRenderers = {
     "mplot.line": line, "mplot.scatter": scatter, "mplot.image": image, "mplot.errorbar": errorbar,
     "mplot.fill_between": fillBetween, "mplot.histogram": bars(), "mplot.contour": contour(false), "mplot.contourf": contour(true),
     "mplot.text": text, "mplot.patch": patch, "mplot.line3d": line3d, "mplot.scatter3d": scatter3d,
-    "mplot.surface3d": surface3d, "mplot.mesh3d": surface3d,
+    "mplot.surface3d": surface3d(true), "mplot.mesh3d": surface3d(false),
 };
 //# sourceMappingURL=renderers.js.map

@@ -393,7 +393,21 @@ export class MPlotViewer extends EventTarget {
   private selectedIndices(artistId: string): Set<number> { const values = new Set<number>(); for (const selection of this.model.selections.values()) for (const point of selection) if (point.artistId === artistId) point.indices.forEach((index) => values.add(index)); return values; }
 
   private showTooltip(view: AxisView, px: number, py: number): void { let best: { artist: Artist; index: number; x: number; y: number; distance: number } | undefined; for (const artist of this.model.document.artists.filter((item) => item.axes_id === view.axis.id)) { const data = this.resolvedData.get(artist.id) ?? artist.data, values = pairs(data.x, data.y), stride = Math.max(1, Math.floor(values.length / 5000)); for (let offset = 0; offset < values.length; offset += stride) { const [x, y, index] = values[offset]!, distance = Math.hypot(view.x(x) - px, view.y(y) - py); if (distance < 18 && (!best || distance < best.distance)) best = { artist, index, x, y, distance }; } } let tooltip = view.host.querySelector<HTMLElement>(".mplot-tooltip"); if (!best) { tooltip?.remove(); return; } if (!tooltip) { tooltip = document.createElement("div"); tooltip.className = "mplot-tooltip"; view.host.append(tooltip); } tooltip.style.left = `${px / view.width * 100}%`; tooltip.style.top = `${py / view.height * 100}%`; tooltip.textContent = `${best.artist.props.label ?? best.artist.id} [${best.index}]  x ${formatTick(best.x, view.axis.xscale)} · y ${formatTick(best.y, view.axis.yscale)}`; }
-  private project3d(view: AxisView, x: number, y: number, z: number): [number, number] { const viewport = this.model.viewports.get(view.axis.id)!, zlim = viewport.z ?? [0, 1], zn = (z - zlim[0]) / (zlim[1] - zlim[0] || 1) - .5; return [view.x(x) + zn * 32, view.y(y) - zn * 24]; }
+  private project3d(view: AxisView, x: number, y: number, z: number): [number, number] {
+    const viewport = this.model.viewports.get(view.axis.id)!, zlim = viewport.z ?? [0, 1];
+    const normalize = (value: number, limits: [number, number]) => (value - limits[0]) / (limits[1] - limits[0] || 1) - 0.5;
+    const xn = normalize(x, viewport.x), yn = normalize(y, viewport.y), zn = normalize(z, zlim);
+    const settings = view.axis.props?.view as { elev?: number; azim?: number; roll?: number } | undefined;
+    const azimuth = (settings?.azim ?? -60) * Math.PI / 180, elevation = (settings?.elev ?? 30) * Math.PI / 180, roll = (settings?.roll ?? 0) * Math.PI / 180;
+    const horizontal = -Math.sin(azimuth) * xn + Math.cos(azimuth) * yn;
+    const depth = Math.cos(azimuth) * xn + Math.sin(azimuth) * yn;
+    const vertical = Math.cos(elevation) * zn - Math.sin(elevation) * depth;
+    const rolledX = Math.cos(roll) * horizontal - Math.sin(roll) * vertical;
+    const rolledY = Math.sin(roll) * horizontal + Math.cos(roll) * vertical;
+    const left = view.margin.left, right = view.width - view.margin.right, top = view.margin.top, bottom = view.height - view.margin.bottom;
+    const scale = Math.min(right - left, bottom - top) * 0.82;
+    return [(left + right) / 2 + rolledX * scale, (top + bottom) / 2 - rolledY * scale];
+  }
   private markActiveAxis(): void { for (const view of this.views.values()) view.host.classList.toggle("mplot-axis--active", view.axis.id === this.activeAxisId); }
 
   exportSVG(scope: ExportScope = "artifact", id?: string): string {
