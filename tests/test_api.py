@@ -65,6 +65,17 @@ def test_savefig_extracts_broad_artist_set(tmp_path):
     assert text[0]["data"]["text"] == "label"
 
 
+def test_savefig_always_records_processing_time(tmp_path):
+    figure, axes = plt.subplots()
+    axes.plot([0, 1], [0, 1])
+
+    output = mplot.savefig(tmp_path / "minimal-metadata", figure, provenance=False)
+    manifest = tomllib.loads(output.read_text())
+
+    assert set(manifest["provenance"]) == {"created_utc"}
+    assert manifest["provenance"]["created_utc"].endswith("Z")
+
+
 def test_savefig_marks_colorbars_as_auxiliary_axes(tmp_path):
     figure, (image_axes, scatter_axes) = plt.subplots(1, 2)
     image = image_axes.imshow(np.arange(9).reshape(3, 3), cmap="magma")

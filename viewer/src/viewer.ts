@@ -414,7 +414,16 @@ export class MPlotViewer extends EventTarget {
     heading.className = "mplot-figure-header"; title.className = "mplot-figure-title"; title.textContent = "Artifact metadata"; subtitle.className = "mplot-figure-count"; subtitle.textContent = "provenance and document";
     heading.append(title, subtitle);
     const body = document.createElement("div"); body.className = "mplot-metadata-body";
-    body.append(this.metadataTree(this.model.document.metadata ?? {}, "Metadata"));
+    const embedded = this.model.document.metadata ?? {};
+    const metadata = Object.keys(embedded).length ? embedded : {
+      artifact: { status: "No embedded metadata was found in this legacy or raw document." },
+      document: {
+        figures: this.model.document.figures.length,
+        plots: this.model.document.axes.filter((axis) => axis.role !== "colorbar" && axis.role !== "inset").length,
+        artists: this.model.document.artists.length,
+      },
+    };
+    body.append(this.metadataTree(metadata, "Metadata"));
     page.append(heading, body);
     return page;
   }

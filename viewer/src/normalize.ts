@@ -92,10 +92,22 @@ export function normalizeDocument(value: unknown): MPlotDocument {
   const metadata = { ...record(raw.metadata) };
   delete metadata.plugin_requirements;
   delete metadata.plugins;
+  const hasMetadata = Object.keys(metadata).length > 0;
+  const baseline = hasMetadata ? metadata : {
+    artifact: {
+      schema_version: Number(raw.schema_version ?? 1),
+      status: "No embedded metadata was found in this legacy or raw document.",
+    },
+    document: {
+      figures: figures.length,
+      plots: axes.filter((axis) => axis.role !== "colorbar" && axis.role !== "inset").length,
+      artists: artists.length,
+    },
+  };
   return {
     figures, axes, artists,
     links: list(raw.links) as NonNullable<MPlotDocument["links"]>,
-    ...(text(raw.title) ? { title: text(raw.title) } : {}), metadata,
+    ...(text(raw.title) ? { title: text(raw.title) } : {}), metadata: baseline,
   };
 }
 

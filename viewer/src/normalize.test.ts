@@ -9,6 +9,7 @@ describe("document normalization",()=>{
     expect(result.figures[0]).toMatchObject({id:"f",axes:["a"],size:[600,400]});
     expect(result.axes[0]).toMatchObject({id:"a",figure_id:"f",xlabel:"time",xscale:"log",xlim:[1,10],position:[.1,.2,.8,.7]});
     expect(result.artists[0]?.props.color).toBe("rgba(255, 0, 128, 0.5)");
+    expect(result.metadata).toMatchObject({artifact:{schema_version:1,status:"No embedded metadata was found in this legacy or raw document."},document:{figures:1,plots:1,artists:1}});
   });
 
   it("preserves flat axis limits, scales, dates, positions, and auxiliary colorbars from served artifacts",()=>{

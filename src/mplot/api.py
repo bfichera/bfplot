@@ -14,7 +14,7 @@ from matplotlib.figure import Figure
 
 from .artifact import materialize_document
 from .extract import extract_figures
-from .provenance import collect_provenance
+from .provenance import collect_provenance, processing_metadata
 from .store import ContentStore
 
 
@@ -39,7 +39,8 @@ def savefig(
     """Extract Matplotlib figures into a content-addressed MPlot artifact.
 
     ``*.mplot`` paths are deterministic packed artifacts. Other paths produce a split
-    ``*.mplot.toml`` manifest and a sibling ``.mplot/objects`` store.
+    ``*.mplot.toml`` manifest and a sibling ``.mplot/objects`` store. Passing
+    ``provenance=False`` omits environment details but still records creation time.
     """
     output = Path(path)
     if packed is None:
@@ -50,7 +51,7 @@ def savefig(
         if provenance is True:
             provenance_data = collect_provenance()
         elif provenance is False:
-            provenance_data = {}
+            provenance_data = processing_metadata()
         elif isinstance(provenance, dict):
             provenance_data = collect_provenance(extra=provenance)
         else:

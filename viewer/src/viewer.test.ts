@@ -147,6 +147,20 @@ describe("MPlotViewer", () => {
     viewer.destroy();
   });
 
+  it("shows baseline metadata for documents without an embedded metadata envelope", async () => {
+    const host = window.document.createElement("div");
+    window.document.body.append(host);
+    const viewer = new MPlotViewer(host, document);
+    await viewer.render();
+    host.querySelector<HTMLButtonElement>('[data-page-id="__metadata__"]')!.click();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    const page = host.querySelector<HTMLElement>(".mplot-metadata-page")!;
+    expect(page.textContent).toContain("No embedded metadata was found in this legacy or raw document.");
+    expect(page.textContent).toContain("figures");
+    expect(page.textContent).toContain("artists");
+    viewer.destroy();
+  });
+
   it("renders artifact metadata as a peer navigation page", async () => {
     const host = window.document.createElement("div");
     window.document.body.append(host);

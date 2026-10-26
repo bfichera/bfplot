@@ -178,7 +178,7 @@ mplot.savefig(
 )
 ```
 
-If you do not want provenance in a particular output:
+To omit environment and user details while retaining the artifact's required creation timestamp:
 
 ```python
 mplot.savefig("anonymous_plot", fig, provenance=False)
