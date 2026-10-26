@@ -56,9 +56,19 @@ def _common(artist: Artist) -> dict[str, Any]:
 class ExtractionContext:
     store: ContentStore
     _next_artist: int = 0
+    _artist_ids: dict[int, str] | None = None
 
     def array(self, value: Any) -> dict[str, Any]:
         return encode_array(value, self.store)
+
+    def artist_id(self, source: Any) -> str:
+        if self._artist_ids is None:
+            self._artist_ids = {}
+        source_id = id(source)
+        if source_id not in self._artist_ids:
+            self._artist_ids[source_id] = f"artist-{self._next_artist}"
+            self._next_artist += 1
+        return self._artist_ids[source_id]
 
     def artist(
         self,
@@ -66,9 +76,13 @@ class ExtractionContext:
         axes_id: str,
         props: dict[str, Any],
         data: dict[str, Any],
+        source: Any | None = None,
     ) -> dict[str, Any]:
-        artist_id = f"artist-{self._next_artist}"
-        self._next_artist += 1
+        if source is None:
+            artist_id = f"artist-{self._next_artist}"
+            self._next_artist += 1
+        else:
+            artist_id = self.artist_id(source)
         return {
             "type": type_name,
             "schema_version": 1,
@@ -167,7 +181,7 @@ def _extract_axes(axes: Any, axes_id: str, context: ExtractionContext) -> dict[s
                 "ticklabels": [item.get_text() for item in colorbar.ax.get_yticklabels()] if colorbar.orientation == "vertical" else [item.get_text() for item in colorbar.ax.get_xticklabels()],
                 "cmap": mappable.cmap.name,
                 "colors": [_color(mappable.cmap(value)) for value in np.linspace(0, 1, 64)],
-                "mappable": type(mappable).__name__,
+                "mappable": context.artist_id(mappable),
             }
         return result
     if is_3d:
@@ -286,7 +300,7 @@ def _extract_artist(artist: Any, axes_id: str, context: ExtractionContext, is_3d
         values = artist.get_array()
         if values is not None:
             data["values"] = context.array(values)
-        return context.artist(type_name, axes_id, _collection_props(artist), data)
+        return context.artist(type_name, axes_id, _collection_props(artist), data, source=artist)
     if class_name == "FillBetweenPolyCollection":
         return _extract_paths("mplot.fill_between", artist, axes_id, context)
     if class_name in {"QuadContourSet", "ContourSet"}:
@@ -389,4 +403,4 @@ def _extract_contour(artist: Any, axes_id: str, context: ExtractionContext) -> d
 def _extract_image(image: Any, axes_id: str, context: ExtractionContext) -> dict[str, Any]:
     data = {"values": context.array(image.get_array()), "extent": [_finite(item) for item in image.get_extent()]}
     props = _common(image) | {"cmap": image.get_cmap().name, "clim": [_finite(item) for item in image.get_clim()], "origin": image.origin, "interpolation": image.get_interpolation()}
-    return context.artist("mplot.image", axes_id, props, data)
+    return context.artist("mplot.image", axes_id, props, data, source=image)

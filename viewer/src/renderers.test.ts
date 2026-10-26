@@ -34,6 +34,9 @@ describe("artist rendering", () => {
     builtinRenderers["mplot.text"]!(context(group, "mplot.text", { x: 0, y: 0, text: "$x_1$" }));
     expect(group.querySelector("math")?.textContent).toContain("x1");
     expect(group.textContent).not.toContain("$x_1$");
+    const matplotlib = svg("g");
+    builtinRenderers["mplot.text"]!(context(matplotlib, "mplot.text", { x: 0, y: 0, text: "$\\mathdefault{10^{-2}}$" }));
+    expect(matplotlib.textContent).not.toContain("\\mathdefault");
   });
 
   it("uses a uniform readable baseline for annotations", () => {

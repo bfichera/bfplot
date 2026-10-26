@@ -25,6 +25,8 @@ export class MPlotViewer extends EventTarget {
     axisRenders = new Map();
     dirtyAxes = new Set();
     cameras = new Map();
+    contrastLimits = new Map();
+    metadataPageId = "__metadata__";
     constructor(target, document, options = {}) {
         super();
         this.element = target;
@@ -80,7 +82,8 @@ export class MPlotViewer extends EventTarget {
         void this.renderMounted();
     }
     reset(axisId) {
-        const resetView = (view) => { if (view.axis.projection === "3d") {
+        const resetView = (view) => { for (const artist of this.model.document.artists.filter((candidate) => candidate.axes_id === view.axis.id))
+            this.contrastLimits.delete(artist.id); if (view.axis.projection === "3d") {
             this.cameras.delete(view.axis.id);
             void this.renderAxis(view.axis.id);
         }
@@ -114,6 +117,7 @@ export class MPlotViewer extends EventTarget {
         this.axisRenders.clear();
         this.dirtyAxes.clear();
         this.cameras.clear();
+        this.contrastLimits.clear();
         this.element.replaceChildren();
         const shell = document.createElement("div");
         shell.className = "mplot-shell";
@@ -125,15 +129,16 @@ export class MPlotViewer extends EventTarget {
         header.append(title);
         if (this.options.toolbar !== false)
             header.append(this.createToolbar());
-        if (!this.model.document.figures.some((figure) => figure.id === this.activeFigureIdValue))
+        if (this.activeFigureIdValue !== this.metadataPageId && !this.model.document.figures.some((figure) => figure.id === this.activeFigureIdValue))
             this.activeFigureIdValue = this.model.document.figures[0]?.id;
-        if (this.model.document.figures.length > 1)
-            header.append(this.createNavigator());
+        header.append(this.createNavigator());
         const figuresElement = document.createElement("main");
         figuresElement.className = "mplot-figures";
-        shell.append(header, figuresElement, this.createMetadataExplorer());
+        shell.append(header, figuresElement);
         this.element.append(shell);
         const immediateMounts = [];
+        const metadataPage = this.createMetadataPage();
+        metadataPage.hidden = this.activeFigureIdValue !== this.metadataPageId;
         for (const [figureIndex, figure] of this.model.document.figures.entries()) {
             const figureView = this.createFigure(figure, figureIndex);
             this.figures.set(figure.id, figureView);
@@ -160,6 +165,7 @@ export class MPlotViewer extends EventTarget {
                     immediateMounts.push(this.mountAxis(axis.id));
             }
         }
+        figuresElement.append(metadataPage);
         if (token !== this.documentToken)
             return;
         await Promise.all(immediateMounts);
@@ -203,6 +209,32 @@ export class MPlotViewer extends EventTarget {
         ticks.className = "mplot-colorbar-ticks";
         const values = axis.colorbar?.ticks ?? [], labels = axis.colorbar?.ticklabels ?? [];
         const [lower, upper] = axis.colorbar?.limits ?? [values[0] ?? 0, values.at(-1) ?? 1];
+        const mappable = axis.colorbar?.mappable;
+        if (mappable) {
+            colorbar.tabIndex = 0;
+            colorbar.title = "Scroll to adjust image contrast; double-click to reset";
+            colorbar.addEventListener("wheel", (event) => {
+                event.preventDefault();
+                const artist = this.model.document.artists.find((candidate) => candidate.id === mappable);
+                if (!artist)
+                    return;
+                const original = numericPair(artist.props.clim) ?? [lower, upper];
+                const current = this.contrastLimits.get(mappable) ?? original;
+                const center = (current[0] + current[1]) / 2, factor = Math.exp(event.deltaY * .001);
+                const half = Math.max(Number.EPSILON, (current[1] - current[0]) * factor / 2);
+                const limits = [center - half, center + half];
+                this.contrastLimits.set(mappable, limits);
+                colorbar.dataset.contrastLimits = limits.join(",");
+                void this.renderAxis(artist.axes_id);
+            }, { passive: false });
+            colorbar.addEventListener("dblclick", () => {
+                this.contrastLimits.delete(mappable);
+                delete colorbar.dataset.contrastLimits;
+                const artist = this.model.document.artists.find((candidate) => candidate.id === mappable);
+                if (artist)
+                    void this.renderAxis(artist.axes_id);
+            });
+        }
         values.forEach((value, index) => {
             const tick = document.createElement("span");
             tick.className = "mplot-colorbar-tick";
@@ -296,20 +328,26 @@ export class MPlotViewer extends EventTarget {
         previous.setAttribute("aria-label", "Previous figure");
         const pages = document.createElement("div");
         pages.className = "mplot-page-list";
-        this.model.document.figures.forEach((figure, index) => {
+        const pageEntries = [
+            ...this.model.document.figures.map((figure, index) => ({ id: figure.id, number: String(index + 1).padStart(2, "0"), name: figure.title ?? `Figure ${index + 1}` })),
+            { id: this.metadataPageId, number: "—", name: "Metadata" },
+        ];
+        pageEntries.forEach((page) => {
             const button = document.createElement("button");
             const number = document.createElement("span"), name = document.createElement("span");
             number.className = "mplot-page-number";
-            number.textContent = String(index + 1).padStart(2, "0");
+            number.textContent = page.number;
             name.className = "mplot-page-name";
-            name.textContent = figure.title ?? `Figure ${index + 1}`;
+            name.textContent = page.name;
             button.type = "button";
             button.className = "mplot-page-button";
-            button.dataset.figureId = figure.id;
+            button.dataset.pageId = page.id;
+            if (page.id !== this.metadataPageId)
+                button.dataset.figureId = page.id;
             button.append(number, name);
-            button.title = figure.title ?? `Figure ${index + 1}`;
-            button.setAttribute("aria-label", `Show ${button.title}`);
-            button.onclick = () => void this.showFigure(figure.id);
+            button.title = page.name;
+            button.setAttribute("aria-label", `Show ${page.name}`);
+            button.onclick = () => void this.showPage(page.id);
             pages.append(button);
         });
         const next = document.createElement("button");
@@ -326,50 +364,58 @@ export class MPlotViewer extends EventTarget {
         queueMicrotask(() => this.updateNavigator());
         return navigation;
     }
-    async showFigure(figureId) {
-        if (!this.figures.has(figureId))
+    async showPage(pageId) {
+        if (pageId !== this.metadataPageId && !this.figures.has(pageId))
             return;
-        this.activeFigureIdValue = figureId;
+        this.activeFigureIdValue = pageId;
         for (const [id, figure] of this.figures)
-            figure.element.hidden = id !== figureId;
-        const firstAxis = this.figures.get(figureId)?.axisIds[0];
-        if (firstAxis) {
-            this.activeAxisId = firstAxis;
-            this.markActiveAxis();
+            figure.element.hidden = id !== pageId;
+        const metadata = this.element.querySelector(".mplot-metadata-page");
+        if (metadata)
+            metadata.hidden = pageId !== this.metadataPageId;
+        if (pageId !== this.metadataPageId) {
+            const firstAxis = this.figures.get(pageId)?.axisIds[0];
+            if (firstAxis) {
+                this.activeAxisId = firstAxis;
+                this.markActiveAxis();
+            }
         }
         this.updateNavigator();
-        await this.mountFigure(figureId);
+        if (pageId !== this.metadataPageId)
+            await this.mountFigure(pageId);
     }
+    async showFigure(figureId) { await this.showPage(figureId); }
     stepFigure(offset) {
-        const figures = this.model.document.figures, current = Math.max(0, figures.findIndex((figure) => figure.id === this.activeFigureIdValue));
-        const next = figures[current + offset];
+        const pages = [...this.model.document.figures.map((figure) => figure.id), this.metadataPageId];
+        const current = Math.max(0, pages.indexOf(this.activeFigureIdValue ?? ""));
+        const next = pages[current + offset];
         if (next)
-            void this.showFigure(next.id);
+            void this.showPage(next);
     }
     updateNavigator() {
-        const figures = this.model.document.figures, index = figures.findIndex((figure) => figure.id === this.activeFigureIdValue);
-        this.element.querySelectorAll(".mplot-page-list [data-figure-id]").forEach((button) => button.setAttribute("aria-current", button.dataset.figureId === this.activeFigureIdValue ? "page" : "false"));
+        const pages = [...this.model.document.figures.map((figure) => figure.id), this.metadataPageId], index = pages.indexOf(this.activeFigureIdValue ?? "");
+        this.element.querySelectorAll(".mplot-page-list [data-page-id]").forEach((button) => button.setAttribute("aria-current", button.dataset.pageId === this.activeFigureIdValue ? "page" : "false"));
         const previous = this.element.querySelector('[aria-label="Previous figure"]'), next = this.element.querySelector('[aria-label="Next figure"]');
         if (previous)
             previous.disabled = index <= 0;
         if (next)
-            next.disabled = index < 0 || index >= figures.length - 1;
+            next.disabled = index < 0 || index >= pages.length - 1;
     }
-    createMetadataExplorer() {
-        const panel = document.createElement("aside");
-        panel.className = "mplot-metadata";
-        panel.hidden = true;
-        const heading = document.createElement("header"), title = document.createElement("h2"), close = document.createElement("button");
+    createMetadataPage() {
+        const page = document.createElement("section");
+        page.className = "mplot-metadata-page";
+        const heading = document.createElement("header"), title = document.createElement("h2"), subtitle = document.createElement("span");
+        heading.className = "mplot-figure-header";
+        title.className = "mplot-figure-title";
         title.textContent = "Artifact metadata";
-        close.type = "button";
-        close.textContent = "Close";
-        close.onclick = () => { panel.hidden = true; };
-        heading.append(title, close);
+        subtitle.className = "mplot-figure-count";
+        subtitle.textContent = "provenance and document";
+        heading.append(title, subtitle);
         const body = document.createElement("div");
         body.className = "mplot-metadata-body";
         body.append(this.metadataTree(this.model.document.metadata ?? {}, "Metadata"));
-        panel.append(heading, body);
-        return panel;
+        page.append(heading, body);
+        return page;
     }
     metadataTree(value, label) {
         if (value && typeof value === "object") {
@@ -397,8 +443,7 @@ export class MPlotViewer extends EventTarget {
         const toolbar = document.createElement("nav");
         toolbar.className = "mplot-toolbar";
         toolbar.setAttribute("aria-label", "Plot tools");
-        const actions = [["Pan", "pan", () => this.setMode("pan")], ["Zoom", "zoom", () => this.setMode("zoom")], ["Select", "select", () => this.setMode("select")], ["Reset", "reset", () => this.reset()], ["Metadata", "metadata", () => { const panel = this.element.querySelector(".mplot-metadata"); if (panel)
-                    panel.hidden = !panel.hidden; }]];
+        const actions = [["Pan", "pan", () => this.setMode("pan")], ["Zoom", "zoom", () => this.setMode("zoom")], ["Select", "select", () => this.setMode("select")], ["Reset", "reset", () => this.reset()]];
         for (const [label, name, action] of actions) {
             const button = document.createElement("button");
             button.type = "button";
@@ -494,7 +539,9 @@ export class MPlotViewer extends EventTarget {
                     return;
                 this.resolvedData.set(artist.id, data);
                 const selected = this.selectedIndices(artist.id);
-                await renderer({ ...working, group, artist, data, theme: this.theme, selected, pointBudget: Math.max(500, Math.round(view.width * 4)), project3d: (x, y, z) => this.project3d(view, x, y, z) });
+                const contrast = this.contrastLimits.get(artist.id);
+                const effectiveArtist = contrast ? { ...artist, props: { ...artist.props, clim: contrast } } : artist;
+                await renderer({ ...working, group, artist: effectiveArtist, data, theme: this.theme, selected, pointBudget: Math.max(500, Math.round(view.width * 4)), project3d: (x, y, z) => this.project3d(view, x, y, z) });
             }
             catch (error) {
                 this.drawUnknown(group, artist, working, error instanceof Error ? error.message : "render failed");
@@ -532,8 +579,11 @@ export class MPlotViewer extends EventTarget {
         const metadata = view.axis.props?.[`${dimension}axis`];
         const scaleType = dimension === "x" ? view.axis.xscale : view.axis.yscale;
         const scale = dimension === "x" ? view.x : view.y;
-        if (metadata?.ticks?.length && metadata.ticklabels?.some((label) => label))
-            return metadata.ticks.map((tick, index) => [tick, metadata.ticklabels?.[index] || formatTick(tick, scaleType, metadata.date_format)]);
+        if (metadata?.ticks?.length && metadata.ticklabels?.some((label) => label)) {
+            const viewport = this.model.viewports.get(view.axis.id), domain = dimension === "x" ? viewport?.x : viewport?.y;
+            const lower = Math.min(...domain ?? [-Infinity, Infinity]), upper = Math.max(...domain ?? [-Infinity, Infinity]);
+            return metadata.ticks.map((tick, index) => [tick, metadata.ticklabels?.[index] || formatTick(tick, scaleType, metadata.date_format)]).filter(([tick]) => tick >= lower && tick <= upper);
+        }
         const ticks = scale.ticks(count);
         const visibleTicks = scaleType === "symlog" && ticks.length > count && ticks.includes(0) ? [ticks[0], 0, ticks.at(-1)] : ticks;
         return visibleTicks.map((tick) => [tick, formatTick(tick, scaleType)]);
@@ -554,7 +604,7 @@ export class MPlotViewer extends EventTarget {
         else if (!cancel && this.mode === "select")
             this.selectRect(view, start.x, start.y, p.x, p.y); start = undefined; brush?.remove(); brush = undefined; };
         view.svg.addEventListener("pointerdown", (event) => { this.activeAxisId = view.axis.id; this.markActiveAxis(); const p = this.pointer(view, event); if (!this.inPlot(view, p.x, p.y))
-            return; start = { ...p, viewport: structuredClone(this.model.viewports.get(view.axis.id)) }; view.svg.setPointerCapture(event.pointerId); if (this.mode === "select" || this.mode === "zoom") {
+            return; start = { ...p, viewport: structuredClone(this.model.viewports.get(view.axis.id)), xScale: view.x, yScale: view.y }; view.svg.setPointerCapture(event.pointerId); if (this.mode === "select" || this.mode === "zoom") {
             brush = svg("rect", { x: p.x, y: p.y, width: 0, height: 0, class: `mplot-brush mplot-brush--${this.mode}` });
             view.overlay.append(brush);
         } });
@@ -562,9 +612,9 @@ export class MPlotViewer extends EventTarget {
             this.showTooltip(view, p.x, p.y);
             return;
         } if (this.mode === "pan") {
-            const next = structuredClone(start.viewport), dx = view.x.invert(start.x) - view.x.invert(p.x), dy = view.y.invert(start.y) - view.y.invert(p.y);
-            next.x = [start.viewport.x[0] + dx, start.viewport.x[1] + dx];
-            next.y = [start.viewport.y[0] + dy, start.viewport.y[1] + dy];
+            const next = structuredClone(start.viewport), dx = start.x - p.x, dy = start.y - p.y, bounds = this.plotBounds(view);
+            next.x = [start.xScale.invert(bounds.left + dx), start.xScale.invert(bounds.right + dx)];
+            next.y = [start.yScale.invert(bounds.bottom + dy), start.yScale.invert(bounds.top + dy)];
             this.model.setViewport(view.axis.id, next);
         }
         else if (brush) {
@@ -579,7 +629,7 @@ export class MPlotViewer extends EventTarget {
         view.svg.addEventListener("pointerleave", () => { if (!start)
             this.clearHover(view); });
         view.svg.addEventListener("wheel", (event) => { event.preventDefault(); const p = this.pointer(view, event); if (!this.inPlot(view, p.x, p.y))
-            return; const factor = Math.exp(event.deltaY * .001), current = this.model.viewports.get(view.axis.id), cx = view.x.invert(p.x), cy = view.y.invert(p.y); this.model.setViewport(view.axis.id, { ...current, x: [cx + (current.x[0] - cx) * factor, cx + (current.x[1] - cx) * factor], y: [cy + (current.y[0] - cy) * factor, cy + (current.y[1] - cy) * factor] }); }, { passive: false });
+            return; const factor = Math.exp(event.deltaY * .001), current = this.model.viewports.get(view.axis.id), bounds = this.plotBounds(view); const zoomPixel = (edge, center) => center + (edge - center) * factor; this.model.setViewport(view.axis.id, { ...current, x: [view.x.invert(zoomPixel(bounds.left, p.x)), view.x.invert(zoomPixel(bounds.right, p.x))], y: [view.y.invert(zoomPixel(bounds.bottom, p.y)), view.y.invert(zoomPixel(bounds.top, p.y))] }); }, { passive: false });
         view.svg.addEventListener("dblclick", () => this.reset(view.axis.id));
     }
     bind3dInteractions(view) {
@@ -747,4 +797,5 @@ const emptySvg = () => `<svg xmlns="${SVG_NS}"/>`;
 function inferredPosition(index, count) { const columns = Math.ceil(Math.sqrt(count)), rows = Math.ceil(count / columns), gap = .04, width = (1 - gap * (columns + 1)) / columns, height = (1 - gap * (rows + 1)) / rows, column = index % columns, row = Math.floor(index / columns); return [gap + column * (width + gap), gap + (rows - row - 1) * (height + gap), width, height]; }
 function compactMargins(width, height) { const compact = width < 300 || height < 210; return compact ? { left: 62, right: 14, top: 34, bottom: 56 } : { left: 78, right: 20, top: 40, bottom: 74 }; }
 function insetMargins(width, height) { return { left: Math.min(30, width * .2), right: 5, top: 20, bottom: Math.min(26, height * .25) }; }
+function numericPair(value) { return Array.isArray(value) && value.length >= 2 && value.slice(0, 2).every((item) => typeof item === "number" && Number.isFinite(item)) ? [Number(value[0]), Number(value[1])] : undefined; }
 //# sourceMappingURL=viewer.js.map

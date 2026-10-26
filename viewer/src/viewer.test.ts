@@ -46,7 +46,7 @@ describe("MPlotViewer", () => {
     window.document.body.append(host);
     const viewer = new MPlotViewer(host, { ...document, figures: [{ id: "f", title: "Results", axes: ["a"] }, { id: "g", title: "Appendix", axes: [] }] });
     await viewer.render();
-    expect(Array.from(host.querySelectorAll(".mplot-page-name"), (element) => element.textContent)).toEqual(["Results", "Appendix"]);
+    expect(Array.from(host.querySelectorAll(".mplot-page-name"), (element) => element.textContent)).toEqual(["Results", "Appendix", "Metadata"]);
     expect(host.querySelector(".mplot-page-button[aria-current=page] .mplot-page-number")?.textContent).toBe("01");
     viewer.destroy();
   });
@@ -57,14 +57,20 @@ describe("MPlotViewer", () => {
     const withColorbar: MPlotDocument = {
       ...document,
       figures: [{ id: "f", title: "Results", axes: ["a", "c"] }],
-      axes: [...document.axes, { id: "c", figure_id: "f", role: "colorbar", position: [.82, .1, .03, .8], colorbar: { orientation: "vertical", label: "intensity", limits: [0, 1], ticks: [0, .5, 1], colors: ["#000000", "#ffffff"] } }],
+      axes: [...document.axes, { id: "c", figure_id: "f", role: "colorbar", position: [.82, .1, .03, .8], colorbar: { orientation: "vertical", label: "intensity", limits: [0, 1], ticks: [0, .5, 1], colors: ["#000000", "#ffffff"], mappable: "image" } }],
+      artists: [{ type: "mplot.image", schema_version: 1, id: "image", axes_id: "a", props: { clim: [0, 1] }, data: { values: [[0, 1], [1, 0]], extent: [0, 2, 0, 4] } }],
     };
     const viewer = new MPlotViewer(host, withColorbar);
     await viewer.render();
     expect(host.querySelector(".mplot-figure-count")?.textContent).toBe("1 plot");
     expect(host.querySelectorAll(".mplot-axis")).toHaveLength(1);
-    expect(host.querySelector(".mplot-colorbar")?.getAttribute("style")).toContain("left: 82%");
+    const colorbar = host.querySelector<HTMLElement>(".mplot-colorbar")!;
+    expect(colorbar.getAttribute("style")).toContain("left: 82%");
     expect(host.querySelector(".mplot-colorbar-label")?.textContent).toBe("intensity");
+    colorbar.dispatchEvent(new WheelEvent("wheel", { deltaY: -100, cancelable: true }));
+    expect(colorbar.dataset.contrastLimits).toBeDefined();
+    const [lower, upper] = colorbar.dataset.contrastLimits!.split(",").map(Number);
+    expect(upper! - lower!).toBeLessThan(1);
     viewer.destroy();
   });
 
@@ -90,16 +96,35 @@ describe("MPlotViewer", () => {
     viewer.destroy();
   });
 
-  it("renders artifact metadata in a themed explorer", async () => {
+  it("renders artifact metadata as a peer navigation page", async () => {
     const host = window.document.createElement("div");
     window.document.body.append(host);
     const viewer = new MPlotViewer(host, { ...document, metadata: { provenance: { created_utc: "2026-01-01T00:00:00Z" }, artifact: { version: "0.9.9" } } });
     await viewer.render();
-    host.querySelector<HTMLButtonElement>('[data-action="metadata"]')!.click();
-    const panel = host.querySelector<HTMLElement>(".mplot-metadata")!;
-    expect(panel.hidden).toBe(false);
-    expect(panel.textContent).toContain("created_utc");
-    expect(panel.textContent).toContain("0.9.9");
+    expect(host.querySelector('[data-action="metadata"]')).toBeNull();
+    host.querySelector<HTMLButtonElement>('[data-page-id="__metadata__"]')!.click();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    const page = host.querySelector<HTMLElement>(".mplot-metadata-page")!;
+    expect(page.hidden).toBe(false);
+    expect(host.querySelector<HTMLElement>(".mplot-figure")?.hidden).toBe(true);
+    expect(host.querySelector('[data-page-id="__metadata__"]')?.getAttribute("aria-current")).toBe("page");
+    expect(page.textContent).toContain("created_utc");
+    expect(page.textContent).toContain("0.9.9");
+    viewer.destroy();
+  });
+
+  it("keeps repeated semilog wheel zoom inside the positive domain", async () => {
+    const host = window.document.createElement("div");
+    window.document.body.append(host);
+    const viewer = new MPlotViewer(host, { ...document, axes: [{ ...document.axes[0]!, xlim: [1, 1000], xscale: "log" }] });
+    await viewer.render();
+    const chart = host.querySelector<SVGSVGElement>(".mplot-axis svg")!;
+    Object.defineProperty(chart, "getBoundingClientRect", { value: () => ({ left: 0, top: 0, width: 640, height: 360, right: 640, bottom: 360, x: 0, y: 0, toJSON: () => ({}) }) });
+    for (let index = 0; index < 12; index++) chart.dispatchEvent(new WheelEvent("wheel", { bubbles: true, cancelable: true, clientX: 180, clientY: 170, deltaY: -100 }));
+    const viewport = viewer.model.viewports.get("a")!;
+    expect(viewport.x[0]).toBeGreaterThan(0);
+    expect(viewport.x[1]).toBeGreaterThan(viewport.x[0]);
+    expect(Number.isFinite(viewport.x[0])).toBe(true);
     viewer.destroy();
   });
 

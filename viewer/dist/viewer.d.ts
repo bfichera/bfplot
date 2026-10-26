@@ -29,6 +29,8 @@ export declare class MPlotViewer extends EventTarget {
     private axisRenders;
     private dirtyAxes;
     private cameras;
+    private contrastLimits;
+    private readonly metadataPageId;
     constructor(target: HTMLElement, document: MPlotDocument, options?: ViewerOptions);
     update(document: MPlotDocument): void;
     setTheme(theme: ThemeName | Partial<Theme>): void;
@@ -43,10 +45,11 @@ export declare class MPlotViewer extends EventTarget {
     private mountAxis;
     private refitAxis;
     private createNavigator;
+    private showPage;
     private showFigure;
     private stepFigure;
     private updateNavigator;
-    private createMetadataExplorer;
+    private createMetadataPage;
     private metadataTree;
     private createToolbar;
     private setMode;

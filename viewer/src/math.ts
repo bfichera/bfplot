@@ -10,7 +10,7 @@ export function mathHTML(text: string): string {
   for (const match of text.matchAll(mathPattern)) {
     const index = match.index ?? 0;
     result += escapeHTML(text.slice(offset, index));
-    try { result += temml.renderToString(match[1] ?? "", { displayMode: false, throwOnError: false }); }
+    try { result += temml.renderToString((match[1] ?? "").replaceAll("\\mathdefault", "\\mathrm"), { displayMode: false, throwOnError: false }); }
     catch { result += escapeHTML(match[0]); }
     offset = index + match[0].length;
   }

@@ -66,20 +66,23 @@ def test_savefig_extracts_broad_artist_set(tmp_path):
 
 
 def test_savefig_marks_colorbars_as_auxiliary_axes(tmp_path):
-    figure, axes = plt.subplots()
-    image = axes.imshow(np.arange(9).reshape(3, 3), cmap="magma")
-    figure.colorbar(image, ax=axes, label="intensity")
+    figure, (image_axes, scatter_axes) = plt.subplots(1, 2)
+    image = image_axes.imshow(np.arange(9).reshape(3, 3), cmap="magma")
+    scatter = scatter_axes.scatter([0, 1], [0, 1], c=[2, 4], cmap="viridis")
+    figure.colorbar(image, ax=image_axes, label="intensity")
+    figure.colorbar(scatter, ax=scatter_axes, label="points")
 
     output = mplot.savefig(tmp_path / "colorbar", figure, provenance=False)
     _, document = _document_from_split(output)
-    plot, colorbar = document["figures"][0]["axes"]
-    assert "role" not in plot
-    assert colorbar["role"] == "colorbar"
-    assert colorbar["artists"] == []
-    assert colorbar["colorbar"]["orientation"] == "vertical"
-    assert colorbar["colorbar"]["label"] == "intensity"
-    assert colorbar["colorbar"]["limits"] == [0, 8]
-    assert len(colorbar["colorbar"]["colors"]) == 64
+    plots = [axis for axis in document["figures"][0]["axes"] if axis.get("role") != "colorbar"]
+    colorbars = [axis for axis in document["figures"][0]["axes"] if axis.get("role") == "colorbar"]
+    assert all(colorbar["artists"] == [] for colorbar in colorbars)
+    assert [colorbar["colorbar"]["orientation"] for colorbar in colorbars] == ["vertical", "vertical"]
+    assert [colorbar["colorbar"]["label"] for colorbar in colorbars] == ["intensity", "points"]
+    assert colorbars[0]["colorbar"]["limits"] == [0, 8]
+    assert colorbars[0]["colorbar"]["mappable"] == plots[0]["artists"][0]["id"]
+    assert colorbars[1]["colorbar"]["mappable"] == plots[1]["artists"][0]["id"]
+    assert len(colorbars[0]["colorbar"]["colors"]) == 64
 
 
 def test_savefig_preserves_dates_insets_and_public_labels(tmp_path):
