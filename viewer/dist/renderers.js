@@ -1,5 +1,6 @@
 import { cssColor, numeric, pairs, svg } from "./svg.js";
 const prop = (artist, key, fallback) => artist.props[key] ?? fallback;
+export const PLOT_TEXT_SIZE = 15;
 const pathFrom = (points, close = false) => points.map((p, i) => `${i ? "L" : "M"}${p[0].toFixed(2)},${p[1].toFixed(2)}`).join(" ") + (close ? " Z" : "");
 const sampled = (values, budget) => {
     if (values.length <= budget)
@@ -192,7 +193,7 @@ const contour = (filled) => ({ group, artist, data, x, y, theme, pointBudget }) 
     }
 };
 const text = ({ group, artist, data, x, y, theme }) => {
-    const element = svg("text", { x: x(Number(data.x ?? 0)), y: y(Number(data.y ?? 0)), fill: cssColor(artist.props.color, theme.foreground), "font-size": prop(artist, "fontsize", 12), "font-weight": prop(artist, "fontweight", undefined), "text-anchor": prop(artist, "align", "start"), transform: `rotate(${prop(artist, "rotation", 0)} ${x(Number(data.x ?? 0))} ${y(Number(data.y ?? 0))})` });
+    const element = svg("text", { x: x(Number(data.x ?? 0)), y: y(Number(data.y ?? 0)), fill: cssColor(artist.props.color, theme.foreground), "font-size": Math.max(PLOT_TEXT_SIZE, prop(artist, "fontsize", PLOT_TEXT_SIZE)), "font-weight": prop(artist, "fontweight", undefined), "text-anchor": prop(artist, "align", "start"), transform: `rotate(${prop(artist, "rotation", 0)} ${x(Number(data.x ?? 0))} ${y(Number(data.y ?? 0))})` });
     element.textContent = String(data.text ?? artist.props.text ?? "");
     group.append(element);
 };

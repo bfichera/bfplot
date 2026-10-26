@@ -198,11 +198,11 @@
 .mplot-axis--pending { display: grid; place-items: center; background: #fafaf8; }
 .mplot-axis-placeholder { color: var(--mplot-muted); font-size: 12px; font-style: italic; }
 
-.mplot-colorbar { position: absolute; display: grid; color: var(--mplot-fg); font: 10px "CMU Serif", serif; pointer-events: none; }
+.mplot-colorbar { position: absolute; display: grid; color: var(--mplot-fg); font: 15px "CMU Serif", serif; pointer-events: none; }
 .mplot-colorbar--vertical { grid-template-columns: minmax(8px, 1fr) auto auto; gap: 5px; }
 .mplot-colorbar--horizontal { grid-template-rows: minmax(8px, 1fr) auto auto; gap: 4px; }
 .mplot-colorbar-gradient { min-width: 8px; min-height: 8px; border: .75px solid #25241f; }
-.mplot-colorbar-ticks { position: relative; min-width: 38px; min-height: 100%; }
+.mplot-colorbar-ticks { position: relative; min-width: 54px; min-height: 100%; }
 .mplot-colorbar--horizontal .mplot-colorbar-ticks { min-width: 100%; min-height: 16px; }
 .mplot-colorbar-tick { position: absolute; white-space: nowrap; }
 .mplot-colorbar--vertical .mplot-colorbar-tick { left: 0; bottom: var(--mplot-colorbar-position); transform: translateY(50%); }
@@ -213,9 +213,9 @@
 .mplot-axis svg { display: block; width: 100%; height: 100%; min-height: 0; overflow: visible; user-select: none; shape-rendering: geometricPrecision; text-rendering: geometricPrecision; font-family: "CMU Serif", serif; }
 .mplot-grid-line { stroke: var(--mplot-grid); stroke-width: .65; stroke-dasharray: none; vector-effect: non-scaling-stroke; }
 .mplot-axis-frame { stroke: var(--mplot-fg); stroke-width: .8; vector-effect: non-scaling-stroke; }
-.mplot-tick { fill: var(--mplot-fg); font-size: 10.5px; }
-.mplot-label { fill: var(--mplot-fg); font-size: 12px; font-style: italic; }
-.mplot-axis-title { fill: var(--mplot-fg); font-size: 13px; font-weight: 700; }
+.mplot-tick, .mplot-label, .mplot-axis-title { fill: var(--mplot-fg); font-size: 15px; }
+.mplot-label { font-style: italic; }
+.mplot-axis-title { font-weight: 700; }
 .mplot-hit { fill: transparent; cursor: crosshair; }
 
 .mplot-tooltip { position: absolute; z-index: 4; padding: 5px 7px; border: 1px solid #aaa79e; border-radius: 0; background: #fffffff2; box-shadow: 0 3px 12px #0001; font: 11px "CMU Serif", serif; white-space: nowrap; pointer-events: none; transform: translate(8px, -100%); }

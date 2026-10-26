@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, expect, it, vi } from "vitest";
-import { builtinRenderers } from "./renderers.js";
+import { builtinRenderers, PLOT_TEXT_SIZE } from "./renderers.js";
 import { createScale } from "./scales.js";
 import { svg } from "./svg.js";
 import { themes } from "./theme.js";
@@ -27,6 +27,14 @@ describe("artist rendering", () => {
     const lines = svg("g");
     builtinRenderers["mplot.line"]!(context(lines, "mplot.line", { x: [-1, 0, 1], y: [0, 1, 0] }));
     expect(lines.querySelector("path")?.getAttribute("d")).toContain("L300.00,200.00");
+  });
+
+  it("uses a uniform readable baseline for annotations", () => {
+    const small = svg("g"), large = svg("g");
+    builtinRenderers["mplot.text"]!(context(small, "mplot.text", { x: 0, y: 0, text: "small" }, { fontsize: 7 }));
+    builtinRenderers["mplot.text"]!(context(large, "mplot.text", { x: 0, y: 0, text: "large" }, { fontsize: 18 }));
+    expect(small.querySelector("text")?.getAttribute("font-size")).toBe(String(PLOT_TEXT_SIZE));
+    expect(large.querySelector("text")?.getAttribute("font-size")).toBe("18");
   });
 
   it("applies affine patch transforms and suppresses two-point legacy spines", () => {

@@ -19,6 +19,7 @@ export interface RenderContext {
 export type ArtistRenderer = (context: RenderContext) => void | Promise<void>;
 
 const prop = <T>(artist: Artist, key: string, fallback: T): T => (artist.props[key] as T | undefined) ?? fallback;
+export const PLOT_TEXT_SIZE = 15;
 const pathFrom = (points: Array<[number, number]>, close = false): string => points.map((p, i) => `${i ? "L" : "M"}${p[0].toFixed(2)},${p[1].toFixed(2)}`).join(" ") + (close ? " Z" : "");
 const sampled = <T>(values: T[], budget: number): T[] => {
   if (values.length <= budget) return values;
@@ -187,7 +188,7 @@ const contour = (filled: boolean): ArtistRenderer => ({ group, artist, data, x, 
 };
 
 const text: ArtistRenderer = ({ group, artist, data, x, y, theme }) => {
-  const element = svg("text", { x: x(Number(data.x ?? 0)), y: y(Number(data.y ?? 0)), fill: cssColor(artist.props.color, theme.foreground), "font-size": prop(artist, "fontsize", 12), "font-weight": prop(artist, "fontweight", undefined), "text-anchor": prop(artist, "align", "start"), transform: `rotate(${prop(artist, "rotation", 0)} ${x(Number(data.x ?? 0))} ${y(Number(data.y ?? 0))})` });
+  const element = svg("text", { x: x(Number(data.x ?? 0)), y: y(Number(data.y ?? 0)), fill: cssColor(artist.props.color, theme.foreground), "font-size": Math.max(PLOT_TEXT_SIZE, prop(artist, "fontsize", PLOT_TEXT_SIZE)), "font-weight": prop(artist, "fontweight", undefined), "text-anchor": prop(artist, "align", "start"), transform: `rotate(${prop(artist, "rotation", 0)} ${x(Number(data.x ?? 0))} ${y(Number(data.y ?? 0))})` });
   element.textContent = String(data.text ?? artist.props.text ?? "");
   group.append(element);
 };

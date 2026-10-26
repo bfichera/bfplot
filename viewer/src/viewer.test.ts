@@ -34,6 +34,9 @@ describe("MPlotViewer", () => {
     expect(host.querySelector(".mplot-coordinates")?.textContent).toBe("x — · y —");
     const xLabel = Array.from(host.querySelectorAll(".mplot-label")).find((label) => label.textContent === "time");
     expect(Number(xLabel?.getAttribute("y"))).toBeLessThan(360);
+    expect(host.querySelector(".mplot-tick")?.getAttribute("font-size")).toBe("15");
+    expect(host.querySelector(".mplot-label")?.getAttribute("font-size")).toBe("15");
+    expect(host.querySelector(".mplot-axis-title")?.getAttribute("font-size")).toBe("15");
     expect(viewer.exportSVG()).toContain(">Signal</text>");
     viewer.destroy();
   });

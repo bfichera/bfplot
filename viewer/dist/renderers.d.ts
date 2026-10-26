@@ -14,4 +14,5 @@ export interface RenderContext {
     project3d(x: number, y: number, z: number): [number, number];
 }
 export type ArtistRenderer = (context: RenderContext) => void | Promise<void>;
+export declare const PLOT_TEXT_SIZE = 15;
 export declare const builtinRenderers: Readonly<Record<string, ArtistRenderer>>;

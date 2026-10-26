@@ -14,7 +14,7 @@
   },
   "files": ["dist"],
   "scripts": {
-    "build": "tsc -p tsconfig.json && cp src/style.css app/index.html dist/ && mkdir -p dist/fonts && cp node_modules/computer-modern/fonts/cmu-serif-{500-roman,500-italic,700-roman}.woff2 dist/fonts/ && cp node_modules/computer-modern/OFL.txt dist/fonts/ && cp node_modules/fzstd/esm/index.mjs dist/fzstd.js && sed -i.bak 's/from \"fzstd\"/from \".\\/fzstd.js\"/' dist/loader.js && rm -f dist/loader.js.bak",
+    "build": "tsc -p tsconfig.json && cp src/style.css app/index.html dist/ && mkdir -p dist/fonts && cp node_modules/computer-modern/fonts/cmu-serif-{500-roman,500-italic,700-roman}.woff2 dist/fonts/ && cp node_modules/computer-modern/OFL.txt dist/fonts/ && sed -i.bak 's/[[:space:]]*$//' dist/fonts/OFL.txt && rm -f dist/fonts/OFL.txt.bak && cp node_modules/fzstd/esm/index.mjs dist/fzstd.js && sed -i.bak 's/from \"fzstd\"/from \".\\/fzstd.js\"/' dist/loader.js && rm -f dist/loader.js.bak",
     "test": "vitest run",
     "test:watch": "vitest",
     "typecheck": "tsc -p tsconfig.json --noEmit"

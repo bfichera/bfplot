@@ -1,5 +1,5 @@
 import { ViewerModel } from "./model.js";
-import { builtinRenderers } from "./renderers.js";
+import { builtinRenderers, PLOT_TEXT_SIZE } from "./renderers.js";
 import { createScale, formatTick } from "./scales.js";
 import { resolveTheme } from "./theme.js";
 import { cssColor, pairs, SVG_NS, svg } from "./svg.js";
@@ -444,34 +444,34 @@ export class MPlotViewer extends EventTarget {
     }
     drawAxes(view) {
         const { left, top, bottom, right } = view.margin, b = view.height - bottom, r = view.width - right;
-        const tickCount = Math.max(3, Math.floor((r - left) / 90));
+        const tickCount = Math.max(3, Math.floor((r - left) / 110));
         for (const tick of view.x.ticks(tickCount)) {
             const px = view.x(tick);
             view.plot.append(svg("line", { x1: px, x2: px, y1: top, y2: b, class: "mplot-grid-line" }));
-            const text = svg("text", { x: px, y: b + 15, "text-anchor": "middle", class: "mplot-tick" });
+            const text = svg("text", { x: px, y: b + PLOT_TEXT_SIZE + 5, "text-anchor": "middle", "font-size": PLOT_TEXT_SIZE, class: "mplot-tick" });
             text.textContent = formatTick(tick, view.axis.xscale);
             view.plot.append(text);
         }
-        for (const tick of view.y.ticks(Math.max(3, Math.floor((b - top) / 65)))) {
+        for (const tick of view.y.ticks(Math.max(3, Math.floor((b - top) / 80)))) {
             const py = view.y(tick);
             view.plot.append(svg("line", { x1: left, x2: r, y1: py, y2: py, class: "mplot-grid-line" }));
-            const text = svg("text", { x: left - 7, y: py + 4, "text-anchor": "end", class: "mplot-tick" });
+            const text = svg("text", { x: left - 9, y: py + PLOT_TEXT_SIZE * .34, "text-anchor": "end", "font-size": PLOT_TEXT_SIZE, class: "mplot-tick" });
             text.textContent = formatTick(tick, view.axis.yscale);
             view.plot.append(text);
         }
         view.plot.append(svg("path", { d: `M${left},${top}H${r}V${b}H${left}Z`, fill: "none", class: "mplot-axis-frame" }));
         if (view.axis.title) {
-            const text = svg("text", { x: (left + r) / 2, y: Math.max(14, top - 9), "text-anchor": "middle", class: "mplot-axis-title" });
+            const text = svg("text", { x: (left + r) / 2, y: Math.max(PLOT_TEXT_SIZE, top - 16), "text-anchor": "middle", "font-size": PLOT_TEXT_SIZE, class: "mplot-axis-title" });
             text.textContent = view.axis.title;
             view.plot.append(text);
         }
         if (view.axis.xlabel && view.height > 180) {
-            const text = svg("text", { x: (left + r) / 2, y: b + 38, "text-anchor": "middle", class: "mplot-label" });
+            const text = svg("text", { x: (left + r) / 2, y: b + 46, "text-anchor": "middle", "font-size": PLOT_TEXT_SIZE, class: "mplot-label" });
             text.textContent = view.axis.xlabel;
             view.plot.append(text);
         }
         if (view.axis.ylabel && view.width > 230) {
-            const text = svg("text", { x: 14, y: (top + b) / 2, "text-anchor": "middle", class: "mplot-label", transform: `rotate(-90 14 ${(top + b) / 2})` });
+            const text = svg("text", { x: 18, y: (top + b) / 2, "text-anchor": "middle", "font-size": PLOT_TEXT_SIZE, class: "mplot-label", transform: `rotate(-90 18 ${(top + b) / 2})` });
             text.textContent = view.axis.ylabel;
             view.plot.append(text);
         }
@@ -656,5 +656,5 @@ const safeId = (value) => value.replace(/[^a-zA-Z0-9_-]/g, "-");
 const serializeSvg = (element) => new XMLSerializer().serializeToString(element);
 const emptySvg = () => `<svg xmlns="${SVG_NS}"/>`;
 function inferredPosition(index, count) { const columns = Math.ceil(Math.sqrt(count)), rows = Math.ceil(count / columns), gap = .04, width = (1 - gap * (columns + 1)) / columns, height = (1 - gap * (rows + 1)) / rows, column = index % columns, row = Math.floor(index / columns); return [gap + column * (width + gap), gap + (rows - row - 1) * (height + gap), width, height]; }
-function compactMargins(width, height) { const compact = width < 300 || height < 210; return compact ? { left: 48, right: 12, top: 25, bottom: 42 } : { left: 64, right: 18, top: 30, bottom: 62 }; }
+function compactMargins(width, height) { const compact = width < 300 || height < 210; return compact ? { left: 62, right: 14, top: 34, bottom: 56 } : { left: 78, right: 20, top: 40, bottom: 74 }; }
 //# sourceMappingURL=viewer.js.map
