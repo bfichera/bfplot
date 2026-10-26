@@ -38,7 +38,7 @@ def savefig(
 ) -> Path:
     """Extract Matplotlib figures into a content-addressed MPlot artifact.
 
-    ``*.mplot`` paths are packed ZIP artifacts. Other paths produce a split
+    ``*.mplot`` paths are deterministic packed artifacts. Other paths produce a split
     ``*.mplot.toml`` manifest and a sibling ``.mplot/objects`` store.
     """
     output = Path(path)

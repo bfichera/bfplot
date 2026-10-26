@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import os
 import shutil
+import struct
 import tempfile
-import zipfile
 from pathlib import Path
 from typing import Any
 
@@ -76,14 +76,27 @@ def write_packed(path: Path, document: dict[str, Any], provenance: dict[str, Any
     path.parent.mkdir(parents=True, exist_ok=True)
     document_ref = source_store.put(canonical_json(document))
     manifest = manifest_bytes(document_ref, provenance)
-    fd, temporary = tempfile.mkstemp(prefix=".mplot-", suffix=".zip", dir=path.parent)
-    os.close(fd)
+    objects: dict[str, bytes] = {}
+    for object_path in source_store.root.glob("sha256/*/*"):
+        data = object_path.read_bytes()
+        digest = object_path.name
+        if source_store.put(data).split(":", 1)[1] != digest:
+            raise ValueError(f"object digest mismatch: {object_path}")
+        objects[digest] = data
+    fd, temporary = tempfile.mkstemp(prefix=".mplot-", suffix=".mplot", dir=path.parent)
     try:
-        with zipfile.ZipFile(temporary, "w", compression=zipfile.ZIP_STORED) as archive:
-            _zip_write(archive, "manifest.toml", manifest)
-            for object_path in sorted(source_store.root.glob("sha256/*/*")):
-                relative = object_path.relative_to(source_store.root).as_posix()
-                _zip_write(archive, f"objects/{relative}", object_path.read_bytes())
+        with os.fdopen(fd, "wb") as handle:
+            handle.write(b"MPLOT\0\x09\x09")
+            handle.write(struct.pack("<Q", len(manifest)))
+            handle.write(manifest)
+            handle.write(struct.pack("<Q", len(objects)))
+            for digest in sorted(objects):
+                data = objects[digest]
+                handle.write(bytes.fromhex(digest))
+                handle.write(struct.pack("<Q", len(data)))
+                handle.write(data)
+            handle.flush()
+            os.fsync(handle.fileno())
         os.replace(temporary, path)
     finally:
         try:
@@ -116,10 +129,3 @@ def _atomic_write(path: Path, data: bytes) -> None:
             os.unlink(temporary)
         except FileNotFoundError:
             pass
-
-
-def _zip_write(archive: zipfile.ZipFile, name: str, data: bytes) -> None:
-    info = zipfile.ZipInfo(name, date_time=(1980, 1, 1, 0, 0, 0))
-    info.compress_type = zipfile.ZIP_STORED
-    info.external_attr = 0o644 << 16
-    archive.writestr(info, data)

@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 import json
+import struct
 import tomllib
-import zipfile
 
 import matplotlib
 matplotlib.use("Agg")
@@ -46,12 +46,19 @@ def test_packed_artifact_contains_manifest_and_all_objects(tmp_path):
     figure, axes = plt.subplots()
     axes.plot([1, 2], [3, 4])
     output = mplot.savefig(tmp_path / "figure.mplot", figure, provenance=False)
-    with zipfile.ZipFile(output) as archive:
-        names = archive.namelist()
-        assert "manifest.toml" in names
-        manifest = tomllib.loads(archive.read("manifest.toml").decode())
-        assert f"objects/sha256/{manifest['document'][7:9]}/{manifest['document'][7:]}" in names
-        assert len([name for name in names if name.startswith("objects/")]) >= 3
+    with output.open("rb") as handle:
+        assert handle.read(8) == b"MPLOT\0\x09\x09"
+        manifest_size = struct.unpack("<Q", handle.read(8))[0]
+        manifest = tomllib.loads(handle.read(manifest_size).decode())
+        object_count = struct.unpack("<Q", handle.read(8))[0]
+        objects = {}
+        for _ in range(object_count):
+            digest = handle.read(32).hex()
+            size = struct.unpack("<Q", handle.read(8))[0]
+            objects[digest] = handle.read(size)
+        assert handle.read() == b""
+    assert manifest["document"].split(":", 1)[1] in objects
+    assert len(objects) >= 3
 
 
 def test_show_can_avoid_viewer_side_effect(tmp_path):
