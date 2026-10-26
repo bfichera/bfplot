@@ -4,6 +4,12 @@ set -euo pipefail
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$root"
 
+# Some newer Command Line Tools SDKs require a newer linker than the bundled one.
+# Respect an explicit SDKROOT; otherwise prefer the broadly compatible SDK when present.
+if [[ "$(uname -s)" == Darwin && -z "${SDKROOT:-}" && -d /Library/Developer/CommandLineTools/SDKs/MacOSX15.4.sdk ]]; then
+  export SDKROOT=/Library/Developer/CommandLineTools/SDKs/MacOSX15.4.sdk
+fi
+
 usage() {
   printf 'Usage: %s <version>\n' "$0" >&2
   printf 'Validates version metadata and builds release artifacts without publishing.\n' >&2
