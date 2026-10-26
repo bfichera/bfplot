@@ -67,6 +67,8 @@ impl<'de> Deserialize<'de> for ObjectId {
 pub struct Manifest {
     pub format: String,
     pub version: String,
+    #[serde(default = "default_schema_version")]
+    pub schema_version: u32,
     pub document: ObjectId,
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub provenance: BTreeMap<String, Value>,
@@ -77,6 +79,7 @@ impl Manifest {
         Self {
             format: "mplot".into(),
             version: "0.9.9".into(),
+            schema_version: default_schema_version(),
             document,
             provenance: BTreeMap::new(),
         }
@@ -93,41 +96,67 @@ impl Manifest {
                 "unsupported version",
             ));
         }
+        if self.schema_version != 1 {
+            issues.push(ValidationIssue::new(
+                "manifest.schema_version",
+                "unsupported schema version",
+            ));
+        }
         issues
     }
 }
 
-#[derive(Clone, Debug, Default, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Document {
+    #[serde(default = "default_schema_version")]
+    pub schema_version: u32,
     #[serde(default)]
     pub figures: Vec<Figure>,
     #[serde(default)]
     pub links: Vec<Value>,
     #[serde(default)]
     pub selections: Vec<Selection>,
-    #[serde(default)]
-    pub plugins: Vec<PluginRequirement>,
+    #[serde(default, alias = "plugins")]
+    pub plugin_requirements: Vec<PluginRequirement>,
+    #[serde(default, flatten)]
+    pub metadata: BTreeMap<String, Value>,
+}
+
+impl Default for Document {
+    fn default() -> Self {
+        Self {
+            schema_version: default_schema_version(),
+            figures: Vec::new(),
+            links: Vec::new(),
+            selections: Vec::new(),
+            plugin_requirements: Vec::new(),
+            metadata: BTreeMap::new(),
+        }
+    }
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
 pub struct Figure {
     pub id: String,
     #[serde(default)]
     pub props: BTreeMap<String, Value>,
     #[serde(default)]
     pub axes: Vec<Axes>,
+    /// Direct figure metadata emitted by Python, such as size_inches and dpi.
+    #[serde(default, flatten)]
+    pub metadata: BTreeMap<String, Value>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
 pub struct Axes {
     pub id: String,
     #[serde(default)]
     pub props: BTreeMap<String, Value>,
     #[serde(default)]
     pub artists: Vec<Artist>,
+    /// Direct axes metadata emitted by Python, such as projection, bounds, x, y and z.
+    #[serde(default, flatten)]
+    pub metadata: BTreeMap<String, Value>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -154,11 +183,22 @@ pub struct ArrayRef {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
-pub struct PluginRequirement {
-    pub name: String,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub version: Option<String>,
+#[serde(untagged)]
+pub enum PluginRequirement {
+    Name(String),
+    Detailed {
+        name: String,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        version: Option<String>,
+    },
+}
+
+impl PluginRequirement {
+    pub fn name(&self) -> &str {
+        match self {
+            Self::Name(name) | Self::Detailed { name, .. } => name,
+        }
+    }
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -188,6 +228,10 @@ impl fmt::Display for ValidationIssue {
     }
 }
 
+const fn default_schema_version() -> u32 {
+    1
+}
+
 const BUILT_INS: &[&str] = &[
     "line",
     "scatter",
@@ -207,6 +251,20 @@ const BUILT_INS: &[&str] = &[
 
 pub fn validate_document(document: &Document) -> Vec<ValidationIssue> {
     let mut issues = Vec::new();
+    if document.schema_version != 1 {
+        issues.push(ValidationIssue::new(
+            "schema_version",
+            "unsupported schema version",
+        ));
+    }
+    for (index, requirement) in document.plugin_requirements.iter().enumerate() {
+        if requirement.name().trim().is_empty() {
+            issues.push(ValidationIssue::new(
+                format!("plugin_requirements[{index}]"),
+                "plugin requirement must not be empty",
+            ));
+        }
+    }
     let mut ids = HashSet::new();
     for (fi, figure) in document.figures.iter().enumerate() {
         unique_id(
@@ -376,9 +434,11 @@ mod tests {
             figures: vec![Figure {
                 id: "figure".into(),
                 props: BTreeMap::new(),
+                metadata: BTreeMap::new(),
                 axes: vec![Axes {
                     id: "axes".into(),
                     props: BTreeMap::new(),
+                    metadata: BTreeMap::new(),
                     artists: vec![Artist {
                         artist_type: "mplot.line".into(),
                         schema_version: 1,
