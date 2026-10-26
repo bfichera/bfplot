@@ -1,72 +1,138 @@
-# MPlot 0.9.9 artifact format
+# How MPlot files work
 
-This guide expands the invariants in [`ARCHITECTURE.md`](../ARCHITECTURE.md). The architecture contract takes precedence if this guide and the contract disagree.
+You do **not** need to understand the file format to use MPlot. If this is your first visit, go back to the [front page](../README.md), call `mplot.savefig()`, and make yourself an interactive plot!
 
-MPlot is pre-1.0. Producers should record their format version, and consumers should reject unsupported major or schema versions rather than guessing.
+Still here? Great. This page explains what MPlot puts on disk and why it looks a little different from a PDF.
 
-## Split artifacts
+> This is the friendly format guide. [`ARCHITECTURE.md`](../ARCHITECTURE.md) is the precise internal contract if you are implementing a reader or writer.
 
-A split artifact has a UTF-8 TOML manifest named `*.mplot.toml`. Objects shared by artifacts live below the artifact workspace:
+## The short version
 
-```text
-.mplot/objects/sha256/<first-two-hex-digits>/<64-hex-digit-digest>
+When you run:
+
+```python
+mplot.savefig("experiment", fig)
 ```
 
-The filename is the lowercase SHA-256 digest of the object's **exact stored bytes**. Compression is part of those bytes: verification occurs before decompression or decoding. An existing object at a digest path is immutable and must never be silently replaced with different bytes.
+MPlot creates:
 
-Paths read from manifests or archives must be normalized and confined to their intended root. Consumers must reject traversal, absolute-path injection, malformed digests, and links that escape the object store.
+```text
+experiment.mplot.toml
+.mplot/objects/sha256/ab/abcdef...
+```
 
-## Manifest and document
+The TOML file is a small, readable manifest. The object directory contains the plot document and compressed numerical arrays. Every object is named using its SHA-256 hash.
 
-The manifest owns artifact-level provenance and references exactly one document object. The document is UTF-8 JSON containing figures, axes, artists, links, selections, plugin requirements, and typed-array references.
+Why split things up? Scientific arrays can be enormous, while manifests are small and useful to inspect in Git. Keeping those jobs separate works rather nicely.
 
-Whenever JSON bytes participate in identity, they are canonicalized using:
+## The manifest
 
-- recursively sorted object keys;
-- compact separators (no insignificant whitespace);
-- finite JSON numbers only;
-- deterministic UTF-8 serialization.
+The `*.mplot.toml` file is the front door to an artifact. It tells MPlot:
 
-NaN and positive or negative infinity are not valid JSON values. Producers must encode missing or exceptional scientific values according to the applicable artist/array schema rather than emitting non-standard JSON.
+- which format and MPlot version created the output;
+- which content-addressed object contains the plot document;
+- what provenance was recorded when the figure was saved.
+
+A manifest looks roughly like this:
+
+```toml
+format = "mplot"
+version = "0.9.9"
+schema_version = 1
+document = "sha256:0123456789abcdef..."
+
+[provenance]
+python = "3.14.6"
+script = "/path/to/analysis.py"
+```
+
+The manifest is intended to be small enough to read, diff, and commit.
+
+## The plot document
+
+The document is canonical JSON describing the figures, axes, artists, links, selections, plugin requirements, and references to numerical arrays.
+
+“Canonical” sounds fancy, but it just means MPlot writes equivalent JSON in one predictable way:
+
+- object keys are sorted;
+- unnecessary whitespace is removed;
+- text is encoded as UTF-8;
+- numbers must be finite.
+
+Predictable bytes give predictable hashes. That makes verification and deduplication possible.
 
 ## Artists
 
-Every artist object has these fields:
+In Matplotlib, a line, scatter plot, image, and piece of text are all “artists.” MPlot uses the same general idea.
 
-| Field | Meaning |
+Every saved artist includes:
+
+| Field | What it means |
 | --- | --- |
-| `type` | Artist type. Built-ins begin with `mplot.`; plugins use reverse-DNS names. |
-| `schema_version` | Version of this artist's data and property schema. |
-| `id` | Stable identifier within the document. |
-| `axes_id` | Identifier of the owning axes. |
-| `props` | Rendering properties. |
-| `data` | Inline JSON values and/or typed-array references. |
+| `type` | What kind of artist this is, such as `mplot.line`. |
+| `schema_version` | Which version of that artist’s data layout is being used. |
+| `id` | The artist’s identifier inside this document. |
+| `axes_id` | The axes that owns the artist. |
+| `props` | Colors, line widths, labels, and other display properties. |
+| `data` | Inline values or references to larger arrays. |
 
-The required built-ins are line, scatter, image, errorbar, fill-between, histogram, contour, filled contour, text, patch, 3D line, 3D scatter, surface, and 3D mesh artists. Consumers should preserve artists they do not understand and must show a visible unsupported-artist placeholder rather than silently omitting them.
+MPlot 0.9.9 includes artists for lines, scatter plots, images, error bars, filled regions, histograms, contours, text, patches, and common 3D plots.
 
-## Typed arrays
+A viewer should never silently hide an artist it does not understand. It should show a useful placeholder instead. A missing curve can change the scientific meaning of a figure, and “I quietly ignored it” is not an acceptable rendering strategy.
 
-Array data may be referenced as:
+## Numerical arrays
+
+Large arrays are stored separately and referenced like this:
 
 ```json
 {
-  "object": "sha256:<64 lowercase hexadecimal digits>",
+  "object": "sha256:<64 hexadecimal digits>",
   "dtype": "f8",
   "shape": [1024],
   "codec": "zstd"
 }
 ```
 
-`object` identifies the exact stored bytes. `dtype`, `shape`, and `codec` describe safe decoding. Decoders must validate these values, apply allocation and decompression limits, verify that decoded byte length agrees with dtype and shape, and fail closed on overflow or mismatch.
+This says, “fetch this object, verify its hash, decompress it with Zstandard, and interpret it as 1,024 double-precision values.”
 
-## Packed artifacts
+MPlot verifies the stored bytes *before* decoding them. Readers also check the dtype, shape, decoded length, and allocation limits. That may sound fussy, but scientific software should be fussy about corrupted data.
 
-A `*.mplot` packed artifact carries the same manifest, document, and content-addressed object identities as the split representation. Packing must not alter object contents or hashes. Unpacking must validate all entry paths and digests before making data available.
+## What does the hash do?
 
-A split-to-packed-to-split round trip is semantically lossless: verification of the same manifest and referenced objects must produce the same identities.
+An object’s filename is the lowercase SHA-256 digest of its exact stored bytes. If even one byte changes, verification fails:
 
-## Provenance and trust
+```console
+$ mplot verify experiment.mplot.toml
+verified 12 objects (22907 bytes)
+```
 
-Provenance is metadata, not proof. Digests detect accidental or malicious byte changes after identity is established, but do not establish who created an artifact. Applications needing authenticity should sign and distribute the artifact through a trusted mechanism external to the 0.9.9 format.
+The hash provides integrity. It tells you whether the bytes still match their recorded identity. It does **not** tell you who created them; use an external signature if authorship matters.
 
-Artifacts do not contain executable Python or native code. Plugin requirements name separately installed viewer software; they do not authorize fetching or executing it.
+## Packed files
+
+Sometimes you do not want a manifest plus an object directory. You want one file that you can attach to an email or copy onto a drive:
+
+```python
+mplot.savefig("experiment.mplot", fig)
+```
+
+A packed `*.mplot` file contains the same manifest and objects in a deterministic binary container. Packing does not change object contents or hashes.
+
+```console
+$ mplot pack experiment.mplot.toml experiment.mplot
+$ mplot unpack experiment.mplot restored/experiment.mplot.toml
+```
+
+A split → packed → split trip should preserve the scientific artifact. No numerical luggage should go missing along the way.
+
+## Are MPlot files safe to open?
+
+MPlot artifacts contain data, not executable Python or native code. A plugin requirement names separately installed software; it does not give the artifact permission to download or run anything.
+
+Files are still untrusted input, so readers must validate hashes, paths, array sizes, and schemas. See the [security policy](../SECURITY.md) if you are writing a server or opening artifacts from strangers on the internet.
+
+## Compatibility
+
+MPlot 0.9.9 is pre-1.0. Producers record their version, and readers reject unsupported schemas instead of making a heroic—and potentially incorrect—guess.
+
+The goal for 1.0 is a format that can be opened for a long time. The point of saving a scientific result is, after all, to be able to look at it later.

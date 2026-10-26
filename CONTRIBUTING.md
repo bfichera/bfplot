@@ -1,45 +1,105 @@
-# Contributing to MPlot
+# How to contribute to MPlot
 
-Thank you for helping improve MPlot.
+First: thank you! Scientific software gets better when the people who actually use it report confusing behavior, improve an example, add a test, or fix the thing that has been annoying them all week.
 
-## Before starting
+You do not need to arrive with a giant Rust feature. Documentation fixes and small reproducible bug reports are extremely useful.
 
-For substantial format or public API changes, open an issue first so compatibility and ownership can be discussed. Security vulnerabilities follow [`SECURITY.md`](SECURITY.md), not the public issue tracker.
+## Before you start
 
-Read [`ARCHITECTURE.md`](ARCHITECTURE.md) before changing behavior. Its artifact layout, hashing, artist protocol, and safety statements are contract-level requirements.
+For a small bug fix, test, or documentation improvement, feel free to get started.
 
-## Repository areas
+For a new public API, artist schema, or file-format change, please open an issue first. These choices affect compatibility, and a short discussion can save everybody from implementing the same idea twice.
 
-- `crates/`: Rust format/store, validation, packing, serving, streams, and CLI.
-- Python package sources: Matplotlib extraction, provenance, plugin registry, typed arrays, and public Python API.
-- Browser/viewer sources: dependency-light UI and renderers.
-- `docs/`, `.github/`, and `scripts/`: documentation, automation, and release/smoke tooling.
+Security vulnerabilities should follow [`SECURITY.md`](SECURITY.md) instead of the public issue tracker.
 
-Keep a change focused and avoid unrelated formatting or generated-file churn.
+If your change affects artifact behavior, read [`ARCHITECTURE.md`](ARCHITECTURE.md). It is less cheerful than this page because it defines the precise hashing, storage, artist, and safety contracts.
 
-## Development checks
+## Finding your way around
 
-Install the toolchains needed by the component you change, then run:
-
-```sh
-./scripts/smoke.sh
+```text
+crates/          Rust format, verification, packing, server, streams, and CLI
+src/mplot/       Python API, Matplotlib extraction, provenance, and plugins
+viewer/          Browser interface and artist renderers
+docs/            Friendly explanations of formats and plugins
+tests/           Python and integration tests
+scripts/         Smoke checks and release helpers
 ```
 
-The smoke script detects present components and runs their standard checks. Before submitting, also run focused tests for changed behavior. Changes to parsing or storage should include malformed-input and limit tests; renderer changes should test visible fallback for unsupported artists.
+Try to keep changes focused. A patch that fixes contour rendering is much easier to review when it does not also reformat half the repository.
 
-Documentation should use relative links and examples that can be copied. Do not document uncommitted interfaces as stable.
+## Setting up a development checkout
 
-## Compatibility and safety
+You will need Python 3.10 or newer, Rust, and Node.js for viewer development.
 
-- Hash exact stored bytes and verify before decode.
-- Preserve canonical JSON requirements.
-- Never add artifact-triggered code execution or automatic plugin installation.
-- Keep network serving loopback-only by default.
-- Normalize archive and object paths and apply resource limits.
-- Treat unknown artist types/schema versions visibly and losslessly where practical.
+```console
+$ python -m venv .venv
+$ . .venv/bin/activate
+$ python -m pip install -e '.[test]'
+$ npm install --prefix viewer
+```
 
-A format contract change requires updates to architecture and format documentation, compatibility tests, and an explicit versioning decision.
+Then run everything:
+
+```console
+$ ./scripts/smoke.sh
+```
+
+The smoke script checks Rust formatting, tests, and lints; compiles and tests the Python package; and type-checks, tests, and builds the viewer.
+
+If you only changed one component, focused tests are faster while you work:
+
+```console
+$ cargo test --workspace
+$ python -m pytest
+$ npm --prefix viewer test
+```
+
+Run the complete smoke script before submitting the change.
+
+## What makes a good test?
+
+A good test explains the behavior you care about and fails for the bug you fixed.
+
+- Parser and storage changes should include malformed and truncated inputs.
+- Numerical changes should test dtype, shape, non-finite values, and empty arrays.
+- Renderer changes should test ordinary output and the visible fallback for bad data.
+- Plugin changes should test unsupported schema versions.
+- Format changes need a packed/split round trip and compatibility fixture.
+
+Please do not rely only on a screenshot. A screenshot can tell us that pixels moved; a semantic test can tell us whether the data remained correct.
+
+## A few rules that are not negotiable
+
+MPlot handles scientific artifacts, sometimes from untrusted sources. Please preserve these boundaries:
+
+- Verify the SHA-256 hash before decoding an object.
+- Keep canonical JSON deterministic.
+- Never let an artifact trigger code execution or automatic plugin installation.
+- Keep network serving on loopback unless the user explicitly chooses otherwise.
+- Normalize paths and enforce file, allocation, and decompression limits.
+- Show unsupported artists visibly instead of quietly dropping them.
+
+If a change needs to alter one of these rules, it needs a format/security discussion and an explicit versioning decision.
+
+## Documentation
+
+Documentation should be friendly, accurate, and easy to copy from. Lead with the task the user came to accomplish. Explain jargon when it is unavoidable. A person should not need to understand content-addressed storage before seeing:
+
+```python
+mplot.savefig("my_plot", fig)
+```
+
+Also, please do not document planned functionality as if it already works. Honest limitations are much more useful than impressive fiction.
 
 ## Pull requests
 
-Explain the problem and approach, identify compatibility/security effects, and list tests performed. Add release notes when user-visible behavior changes. By submitting a contribution, you agree that it may be licensed under either Apache-2.0 or MIT, at the user's option, as described in the repository license files.
+Tell us:
+
+- what problem you are solving;
+- what approach you took;
+- whether compatibility or security behavior changes;
+- which tests you ran.
+
+Add release notes for user-visible changes. By submitting a contribution, you agree that it may be licensed under either Apache-2.0 or MIT, at the user’s option, as described in the repository license files.
+
+Thanks again for helping. We hope working on MPlot is fun—or at least more fun than debugging a mysteriously empty Matplotlib axes!
