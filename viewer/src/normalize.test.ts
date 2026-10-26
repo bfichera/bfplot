@@ -13,7 +13,7 @@ describe("document normalization",()=>{
 
   it("preserves flat axis limits, scales, dates, positions, and auxiliary colorbars from served artifacts",()=>{
     const result=normalizeDocument({figures:[{id:"f",axes:["a","c"]}],axes:[{id:"a",figure_id:"f",xlim:[-2,8],ylim:[10,20],xscale:"symlog",yscale:"log",xticks:[0,1],xticklabels:["Jan 01","Jan 02"],xdate_format:"%b %d",position:[.1,.2,.7,.7]},{id:"c",figure_id:"f",role:"colorbar",position:[.82,.2,.03,.7],colorbar:{orientation:"vertical",label:"intensity",limits:[-1,1],ticks:[-1,0,1],ticklabels:["−1","0","1"],cmap:"magma",colors:[[0,0,0,1],[1,1,1,1]]}}],artists:[]});
-    expect(result.axes[0]).toMatchObject({id:"a",xlim:[-2,8],ylim:[10,20],xscale:"symlog",yscale:"log",position:[.1,.2,.7,.7],props:{xaxis:{ticks:[0,1],ticklabels:["Jan 01","Jan 02"],date_format:"%b %d"}}});
+    expect(result.axes[0]).toMatchObject({id:"a",xlim:[-2,8],ylim:[10,20],xscale:"symlog",yscale:"log",position:[.1,.2,.7,.7],props:{xaxis:{ticks:[0,1],ticklabels:["Jan 01","Jan 02"],provided:true,date_format:"%b %d"}}});
     expect(result.axes[1]).toMatchObject({id:"c",role:"colorbar",position:[.82,.2,.03,.7],colorbar:{orientation:"vertical",label:"intensity",limits:[-1,1],ticks:[-1,0,1]}});
   });
 

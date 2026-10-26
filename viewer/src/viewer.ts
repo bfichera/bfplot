@@ -207,40 +207,64 @@ export class MPlotViewer extends EventTarget {
     gradient.style.background = `linear-gradient(${axis.colorbar?.orientation === "horizontal" ? "to right" : "to top"}, ${colors.length > 1 ? colors.join(", ") : "#440154, #21918c, #fde725"})`;
     const ticks = document.createElement("div");
     ticks.className = "mplot-colorbar-ticks";
-    const values = axis.colorbar?.ticks ?? [], labels = axis.colorbar?.ticklabels ?? [];
-    const [lower, upper] = axis.colorbar?.limits ?? [values[0] ?? 0, values.at(-1) ?? 1];
+    const originalValues = axis.colorbar?.ticks ?? [], originalLabels = axis.colorbar?.ticklabels ?? [];
+    const originalLimits = axis.colorbar?.limits ?? [originalValues[0] ?? 0, originalValues.at(-1) ?? 1];
     const mappable = axis.colorbar?.mappable;
+    const redraw = () => {
+      const limits = mappable ? this.contrastLimits.get(mappable) ?? originalLimits : originalLimits;
+      const overridden = Boolean(mappable && this.contrastLimits.has(mappable));
+      const values = overridden ? Array.from({ length: 5 }, (_, index) => limits[0] + (limits[1] - limits[0]) * index / 4) : originalValues;
+      ticks.replaceChildren();
+      values.forEach((value, index) => {
+        const tick = document.createElement("span");
+        tick.className = "mplot-colorbar-tick";
+        const fraction = (value - limits[0]) / (limits[1] - limits[0] || 1);
+        tick.style.setProperty("--mplot-colorbar-position", `${Math.max(0, Math.min(1, fraction)) * 100}%`);
+        const displayValue = Math.abs(value) < Math.abs(limits[1] - limits[0]) * 1e-12 ? 0 : Number(value.toPrecision(4));
+        tick.textContent = overridden ? formatTick(displayValue, "linear") : originalLabels[index] ?? formatTick(value, "linear");
+        ticks.append(tick);
+      });
+      if (overridden) colorbar.dataset.contrastLimits = limits.join(","); else delete colorbar.dataset.contrastLimits;
+    };
     if (mappable) {
+      colorbar.dataset.mappableId = mappable;
       colorbar.tabIndex = 0;
-      colorbar.title = "Scroll to adjust image contrast; double-click to reset";
-      colorbar.addEventListener("wheel", (event) => {
-        event.preventDefault();
+      colorbar.title = "With Zoom active, drag across the colorbar to select contrast limits; double-click to reset";
+      let start: number | undefined, brush: HTMLDivElement | undefined;
+      const fraction = (event: PointerEvent): number => {
+        const bounds = gradient.getBoundingClientRect();
+        return axis.colorbar?.orientation === "horizontal" ? Math.max(0, Math.min(1, (event.clientX - bounds.left) / (bounds.width || 1))) : Math.max(0, Math.min(1, (bounds.bottom - event.clientY) / (bounds.height || 1)));
+      };
+      const moveBrush = (from: number, to: number) => {
+        if (!brush) { brush = document.createElement("div"); brush.className = "mplot-colorbar-brush"; gradient.append(brush); }
+        const low = Math.min(from, to), size = Math.abs(to - from);
+        if (axis.colorbar?.orientation === "horizontal") { brush.style.left = `${low * 100}%`; brush.style.width = `${size * 100}%`; }
+        else { brush.style.bottom = `${low * 100}%`; brush.style.height = `${size * 100}%`; }
+      };
+      gradient.addEventListener("pointerdown", (event) => {
+        if (this.mode !== "zoom") return;
+        event.preventDefault(); start = fraction(event); moveBrush(start, start); gradient.setPointerCapture(event.pointerId);
+      });
+      gradient.addEventListener("pointermove", (event) => { if (start !== undefined) moveBrush(start, fraction(event)); });
+      const finish = (event: PointerEvent, cancel = false) => {
+        if (start === undefined) return;
+        const end = fraction(event), from = start; start = undefined; brush?.remove(); brush = undefined;
+        if (cancel || Math.abs(end - from) < .01) return;
+        const current = this.contrastLimits.get(mappable) ?? originalLimits;
+        const selected = [current[0] + Math.min(from, end) * (current[1] - current[0]), current[0] + Math.max(from, end) * (current[1] - current[0])] as [number, number];
+        this.contrastLimits.set(mappable, selected); redraw();
         const artist = this.model.document.artists.find((candidate) => candidate.id === mappable);
-        if (!artist) return;
-        const original = numericPair(artist.props.clim) ?? [lower, upper];
-        const current = this.contrastLimits.get(mappable) ?? original;
-        const center = (current[0] + current[1]) / 2, factor = Math.exp(event.deltaY * .001);
-        const half = Math.max(Number.EPSILON, (current[1] - current[0]) * factor / 2);
-        const limits: [number, number] = [center - half, center + half];
-        this.contrastLimits.set(mappable, limits);
-        colorbar.dataset.contrastLimits = limits.join(",");
-        void this.renderAxis(artist.axes_id);
-      }, { passive: false });
+        if (artist) void this.renderAxis(artist.axes_id);
+      };
+      gradient.addEventListener("pointerup", (event) => finish(event));
+      gradient.addEventListener("pointercancel", (event) => finish(event, true));
       colorbar.addEventListener("dblclick", () => {
-        this.contrastLimits.delete(mappable);
-        delete colorbar.dataset.contrastLimits;
+        this.contrastLimits.delete(mappable); redraw();
         const artist = this.model.document.artists.find((candidate) => candidate.id === mappable);
         if (artist) void this.renderAxis(artist.axes_id);
       });
     }
-    values.forEach((value, index) => {
-      const tick = document.createElement("span");
-      tick.className = "mplot-colorbar-tick";
-      const fraction = (value - lower) / (upper - lower || 1);
-      tick.style.setProperty("--mplot-colorbar-position", `${Math.max(0, Math.min(1, fraction)) * 100}%`);
-      tick.textContent = labels[index] ?? formatTick(value, "linear");
-      ticks.append(tick);
-    });
+    redraw();
     colorbar.append(gradient, ticks);
     if (axis.colorbar?.label) {
       const label = document.createElement("div");
@@ -307,6 +331,20 @@ export class MPlotViewer extends EventTarget {
   private async refitAxis(axisId: string): Promise<void> {
     await this.model.fitViewport(axisId);
     await this.renderAxis(axisId);
+    for (const colorbar of this.element.querySelectorAll<HTMLElement>(`.mplot-colorbar[data-mappable-id]`)) {
+      const mappable = colorbar.dataset.mappableId;
+      if (mappable && this.model.document.artists.find((artist) => artist.id === mappable)?.axes_id === axisId) this.refreshColorbar(colorbar);
+    }
+  }
+
+  private refreshColorbar(colorbar: HTMLElement): void {
+    const mappable = colorbar.dataset.mappableId;
+    const axisId = colorbar.dataset.axesId;
+    const axis = this.model.document.axes.find((candidate) => candidate.id === axisId);
+    if (!mappable || !axis) return;
+    const replacement = this.createColorbar(axis);
+    replacement.style.cssText = colorbar.style.cssText;
+    colorbar.replaceWith(replacement);
   }
 
   private createNavigator(): HTMLElement {
@@ -455,7 +493,7 @@ export class MPlotViewer extends EventTarget {
     this.axisTokens.set(axisId, token);
     view.width = Math.max(180, view.host.clientWidth || 640);
     view.height = Math.max(150, view.host.clientHeight || 360);
-    view.margin = view.axis.role === "inset" ? insetMargins(view.width, view.height) : compactMargins(view.width, view.height);
+    view.margin = view.axis.role === "inset" ? insetMargins(view.axis, view.width, view.height) : compactMargins(view.width, view.height);
     const viewport = this.model.viewports.get(axisId) ?? this.model.defaultViewport(view.axis);
     const right = view.width - view.margin.right, bottom = view.height - view.margin.bottom;
     view.x = createScale(view.axis.xscale, viewport.x, [view.margin.left, right]);
@@ -498,9 +536,10 @@ export class MPlotViewer extends EventTarget {
   }
 
   private axisTicks(view: AxisView, dimension: "x" | "y", count: number): Array<[number, string]> {
-    const metadata = view.axis.props?.[`${dimension}axis`] as { ticks?: number[]; ticklabels?: string[]; date_format?: string } | undefined;
+    const metadata = view.axis.props?.[`${dimension}axis`] as { ticks?: number[]; ticklabels?: string[]; provided?: boolean; date_format?: string } | undefined;
     const scaleType = dimension === "x" ? view.axis.xscale : view.axis.yscale;
     const scale = dimension === "x" ? view.x : view.y;
+    if (metadata?.provided && metadata.ticks?.length === 0) return [];
     if (metadata?.ticks?.length && metadata.ticklabels?.some((label) => label)) {
       const viewport = this.model.viewports.get(view.axis.id), domain = dimension === "x" ? viewport?.x : viewport?.y;
       const lower = Math.min(...domain ?? [-Infinity, Infinity]), upper = Math.max(...domain ?? [-Infinity, Infinity]);
@@ -618,5 +657,8 @@ const serializeSvg = (element: SVGSVGElement): string => new XMLSerializer().ser
 const emptySvg = (): string => `<svg xmlns="${SVG_NS}"/>`;
 function inferredPosition(index: number, count: number): [number, number, number, number] { const columns = Math.ceil(Math.sqrt(count)), rows = Math.ceil(count / columns), gap = .04, width = (1 - gap * (columns + 1)) / columns, height = (1 - gap * (rows + 1)) / rows, column = index % columns, row = Math.floor(index / columns); return [gap + column * (width + gap), gap + (rows - row - 1) * (height + gap), width, height]; }
 function compactMargins(width: number, height: number): Margins { const compact = width < 300 || height < 210; return compact ? { left: 62, right: 14, top: 34, bottom: 56 } : { left: 78, right: 20, top: 40, bottom: 74 }; }
-function insetMargins(width: number, height: number): Margins { return { left: Math.min(30, width * .2), right: 5, top: 20, bottom: Math.min(26, height * .25) }; }
-function numericPair(value: unknown): [number, number] | undefined { return Array.isArray(value) && value.length >= 2 && value.slice(0, 2).every((item) => typeof item === "number" && Number.isFinite(item)) ? [Number(value[0]), Number(value[1])] : undefined; }
+function insetMargins(axis: Axis, width: number, height: number): Margins {
+  const x = axis.props?.xaxis as { ticks?: number[]; provided?: boolean } | undefined, y = axis.props?.yaxis as { ticks?: number[]; provided?: boolean } | undefined;
+  const noX = x?.provided && x.ticks?.length === 0 && !axis.xlabel, noY = y?.provided && y.ticks?.length === 0 && !axis.ylabel;
+  return { left: noY ? 5 : Math.min(30, width * .2), right: 5, top: axis.title ? 20 : 5, bottom: noX ? 5 : Math.min(26, height * .25) };
+}

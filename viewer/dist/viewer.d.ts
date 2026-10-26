@@ -44,6 +44,7 @@ export declare class MPlotViewer extends EventTarget {
     private positionAxis;
     private mountAxis;
     private refitAxis;
+    private refreshColorbar;
     private createNavigator;
     private showPage;
     private showFigure;

@@ -67,10 +67,37 @@ describe("MPlotViewer", () => {
     const colorbar = host.querySelector<HTMLElement>(".mplot-colorbar")!;
     expect(colorbar.getAttribute("style")).toContain("left: 82%");
     expect(host.querySelector(".mplot-colorbar-label")?.textContent).toBe("intensity");
-    colorbar.dispatchEvent(new WheelEvent("wheel", { deltaY: -100, cancelable: true }));
-    expect(colorbar.dataset.contrastLimits).toBeDefined();
-    const [lower, upper] = colorbar.dataset.contrastLimits!.split(",").map(Number);
-    expect(upper! - lower!).toBeLessThan(1);
+    const wheel = new WheelEvent("wheel", { deltaY: -100, cancelable: true });
+    colorbar.dispatchEvent(wheel);
+    expect(wheel.defaultPrevented).toBe(false);
+    expect(colorbar.dataset.contrastLimits).toBeUndefined();
+    host.querySelector<HTMLButtonElement>('[data-action="zoom"]')!.click();
+    const gradient = colorbar.querySelector<HTMLElement>(".mplot-colorbar-gradient")!;
+    Object.defineProperty(gradient, "getBoundingClientRect", { value: () => ({ left: 0, top: 0, width: 20, height: 100, right: 20, bottom: 100, x: 0, y: 0, toJSON: () => ({}) }) });
+    gradient.setPointerCapture = () => undefined;
+    gradient.dispatchEvent(pointer("pointerdown", { bubbles: true, pointerId: 1, clientX: 10, clientY: 80 }));
+    gradient.dispatchEvent(pointer("pointermove", { bubbles: true, pointerId: 1, clientX: 10, clientY: 20 }));
+    expect(gradient.querySelector(".mplot-colorbar-brush")).not.toBeNull();
+    gradient.dispatchEvent(pointer("pointerup", { bubbles: true, pointerId: 1, clientX: 10, clientY: 20 }));
+    expect(colorbar.dataset.contrastLimits).toBe("0.2,0.8");
+    expect(Array.from(colorbar.querySelectorAll(".mplot-colorbar-tick"), (tick) => tick.textContent)).toEqual(["0.2", "0.35", "0.5", "0.65", "0.8"]);
+    colorbar.dispatchEvent(new MouseEvent("dblclick", { bubbles: true }));
+    expect(host.querySelector(".mplot-colorbar")?.getAttribute("data-contrast-limits")).toBeNull();
+    viewer.destroy();
+  });
+
+  it("honors explicitly empty inset ticks", async () => {
+    const host = window.document.createElement("div");
+    window.document.body.append(host);
+    const withInset: MPlotDocument = {
+      ...document,
+      figures: [{ id: "f", axes: ["i"] }],
+      axes: [{ id: "i", figure_id: "f", role: "inset", xlim: [0, 1], ylim: [0, 1], props: { xaxis: { ticks: [], ticklabels: [], provided: true }, yaxis: { ticks: [], ticklabels: [], provided: true } } }],
+      artists: [],
+    };
+    const viewer = new MPlotViewer(host, withInset);
+    await viewer.render();
+    expect(host.querySelector('[data-axes-id="i"] .mplot-tick')).toBeNull();
     viewer.destroy();
   });
 
