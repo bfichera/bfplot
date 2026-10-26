@@ -73,7 +73,7 @@ if [[ -f pyproject.toml ]]; then
 fi
 
 if [[ -f viewer/package.json ]]; then
-  npm --prefix viewer pack --pack-destination "$root/release-dist"
+  npm pack ./viewer --pack-destination "$root/release-dist"
 fi
 
 if [[ -f Cargo.toml ]]; then
