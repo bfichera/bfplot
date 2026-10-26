@@ -1,0 +1,50 @@
+const finiteDomain = (domain) => {
+    const a = Number.isFinite(domain[0]) ? domain[0] : 0;
+    const b = Number.isFinite(domain[1]) ? domain[1] : 1;
+    return a === b ? [a - 0.5, b + 0.5] : [a, b];
+};
+function niceTicks(domain, count = 6) {
+    const [a, b] = finiteDomain(domain);
+    const reverse = b < a;
+    const lo = Math.min(a, b), hi = Math.max(a, b);
+    const rough = (hi - lo) / Math.max(1, count);
+    const power = 10 ** Math.floor(Math.log10(rough));
+    const error = rough / power;
+    const step = (error >= 7.5 ? 10 : error >= 3.5 ? 5 : error >= 1.5 ? 2 : 1) * power;
+    const result = [];
+    for (let value = Math.ceil(lo / step) * step; value <= hi + step * 1e-8; value += step) {
+        result.push(Number(value.toPrecision(12)));
+    }
+    return reverse ? result.reverse() : result;
+}
+export function createScale(type = "linear", domain, range) {
+    const [d0, d1] = finiteDomain(domain);
+    const [r0, r1] = range;
+    const symlog = (x) => Math.sign(x) * Math.log1p(Math.abs(x));
+    const symexp = (x) => Math.sign(x) * Math.expm1(Math.abs(x));
+    const transform = type === "log" ? (x) => Math.log10(Math.max(Number.MIN_VALUE, x))
+        : type === "symlog" ? symlog : (x) => x;
+    const untransform = type === "log" ? (x) => 10 ** x : type === "symlog" ? symexp : (x) => x;
+    const t0 = transform(d0), t1 = transform(d1);
+    const span = t1 - t0 || 1;
+    const scale = ((value) => r0 + ((transform(value) - t0) / span) * (r1 - r0));
+    scale.invert = (pixel) => untransform(t0 + ((pixel - r0) / (r1 - r0 || 1)) * span);
+    scale.ticks = (count = 6) => {
+        if (type !== "log")
+            return niceTicks([d0, d1], count);
+        const lo = Math.ceil(Math.log10(Math.min(d0, d1)));
+        const hi = Math.floor(Math.log10(Math.max(d0, d1)));
+        const ticks = Array.from({ length: Math.max(0, hi - lo + 1) }, (_, i) => 10 ** (lo + i));
+        return d1 < d0 ? ticks.reverse() : ticks;
+    };
+    return scale;
+}
+export function formatTick(value, type = "linear") {
+    if (type === "date")
+        return new Date(value).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
+    const magnitude = Math.abs(value);
+    if ((magnitude !== 0 && magnitude < 1e-3) || magnitude >= 1e5)
+        return value.toExponential(2);
+    return new Intl.NumberFormat(undefined, { maximumSignificantDigits: 6 }).format(value);
+}
+//# sourceMappingURL=scales.js.map

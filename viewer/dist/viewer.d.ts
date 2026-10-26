@@ -1,0 +1,50 @@
+import { ViewerModel } from "./model.js";
+import { type ArtistRenderer } from "./renderers.js";
+import type { ArrayResolver, MPlotDocument, Theme, ThemeName } from "./types.js";
+export interface ViewerOptions {
+    theme?: ThemeName | Partial<Theme>;
+    arrayResolver?: ArrayResolver;
+    renderers?: Record<string, ArtistRenderer>;
+    interactive?: boolean;
+    toolbar?: boolean;
+    liveUrl?: string;
+}
+export declare class MPlotViewer extends EventTarget {
+    readonly element: HTMLElement;
+    readonly model: ViewerModel;
+    private options;
+    private theme;
+    private renderers;
+    private views;
+    private mode;
+    private source?;
+    private resize?;
+    private renderToken;
+    constructor(target: HTMLElement, document: MPlotDocument, options?: ViewerOptions);
+    registerRenderer(type: string, renderer: ArtistRenderer): this;
+    unregisterRenderer(type: string): boolean;
+    update(document: MPlotDocument): void;
+    setTheme(theme: ThemeName | Partial<Theme>): void;
+    reset(): void;
+    destroy(): void;
+    render(): Promise<void>;
+    private createToolbar;
+    private setMode;
+    private renderPlots;
+    private drawAxes;
+    private drawUnknown;
+    private drawHitArea;
+    private bindInteractions;
+    private pointer;
+    private selectRect;
+    private selectedIndices;
+    private showTooltip;
+    private project3d;
+    exportSVG(): string;
+    downloadSVG(filename?: string): void;
+    exportPNG(scale?: number): Promise<Blob>;
+    downloadPNG(filename?: string): Promise<void>;
+    private download;
+    connectLive(url: string): void;
+    private applyTheme;
+}
