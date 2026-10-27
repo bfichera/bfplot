@@ -305,6 +305,23 @@ describe("MPlotViewer", () => {
     viewer.destroy();
   });
 
+  it("rotates 3D plots like Matplotlib, dragging the box along with the pointer", async () => {
+    const host = window.document.createElement("div");
+    window.document.body.append(host);
+    // The point sits on the front-bottom corner of the box at the default view.
+    const viewer = new MPlotViewer(host, { ...document, axes: [{ ...document.axes[0]!, projection: "3d", zlim: [0, 2], props: { view: { elev: 30, azim: -60 } } }], artists: [{ type: "mplot.scatter3d", id: "corner", axes_id: "a", props: {}, data: { x: [2], y: [0], z: [0] } }] });
+    await viewer.render();
+    const chart = host.querySelector<SVGSVGElement>(".mplot-axis svg")!, corner = () => host.querySelector('[data-artist-id="corner"] circle')!;
+    const before = { x: Number(corner().getAttribute("cx")), y: Number(corner().getAttribute("cy")) };
+    chart.setPointerCapture = () => undefined;
+    chart.dispatchEvent(pointer("pointerdown", { bubbles: true, pointerId: 1, clientX: 200, clientY: 150 }));
+    chart.dispatchEvent(pointer("pointermove", { bubbles: true, pointerId: 1, clientX: 230, clientY: 170 }));
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(Number(corner().getAttribute("cx"))).toBeGreaterThan(before.x);
+    expect(Number(corner().getAttribute("cy"))).toBeGreaterThan(before.y);
+    viewer.destroy();
+  });
+
   it("rotates 3D plots by dragging", async () => {
     const host = window.document.createElement("div");
     window.document.body.append(host);

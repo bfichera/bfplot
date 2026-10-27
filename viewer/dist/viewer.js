@@ -983,7 +983,7 @@ export class MPlotViewer extends EventTarget {
         view.svg.classList.add("mplot-3d-view");
         view.svg.addEventListener("pointerdown", (event) => { const p = this.pointer(view, event), current = camera(); start = { ...p, elev: current.elev, azim: current.azim }; view.svg.setPointerCapture(event.pointerId); });
         view.svg.addEventListener("pointermove", (event) => { const p = this.pointer(view, event); this.updateCoordinates(view, p.x, p.y); if (!start)
-            return; const current = camera(); current.azim = start.azim + (p.x - start.x) * .45; current.elev = Math.max(-89, Math.min(89, start.elev - (p.y - start.y) * .45)); void this.renderAxis(view.axis.id); });
+            return; const current = camera(); current.azim = start.azim - (p.x - start.x) * .45; current.elev = Math.max(-89, Math.min(89, start.elev + (p.y - start.y) * .45)); void this.renderAxis(view.axis.id); });
         const finish = () => { start = undefined; };
         view.svg.addEventListener("pointerup", finish);
         view.svg.addEventListener("pointercancel", finish);
