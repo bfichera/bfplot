@@ -110,7 +110,7 @@ pub fn read_packed_manifest(path: &Path) -> Result<Vec<u8>> {
 fn parse_manifest(bytes: &[u8]) -> Result<Manifest> {
     let text = std::str::from_utf8(bytes)
         .map_err(|_| Error::InvalidPack("manifest is not UTF-8".into()))?;
-    Ok(toml::from_str(text)?)
+    Manifest::parse(text)
 }
 
 fn read_pack(path: &Path) -> Result<(Vec<u8>, Objects)> {

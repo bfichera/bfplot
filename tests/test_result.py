@@ -35,7 +35,7 @@ def test_directory_result_is_self_contained_and_ignores_its_objects(tmp_path):
     assert not (tmp_path / ".bfplot").exists()
     assert [item.name for item in tmp_path.iterdir()] == ["fit.bfplot"]
     manifest, document = read_result(output)
-    assert set(manifest) == {"format", "document", "provenance"}
+    assert set(manifest) == {"format", "version", "document", "provenance"}
     assert document["figures"]
 
 

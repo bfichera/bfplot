@@ -23,6 +23,7 @@ Every object is named by the SHA-256 hash of its bytes. Objects belong to this r
 
 ```toml
 format = "bfplot"
+version = 1
 document = "sha256:0123456789abcdef…"
 
 [provenance]
@@ -32,6 +33,15 @@ python = "3.14.6"
 ```
 
 The manifest names the document object and records [provenance](guides/provenance.md). It is small and meant to be read, diffed and committed.
+
+`version` is the format version. Every writer, in any language, records the version it writes, and the `bfplot` app refuses a result whose version is newer than it understands:
+
+```console
+$ bfplot verify experiment.bfplot
+error: this result uses BFPlot format version 2, but this bfplot only reads up to version 1; please update bfplot
+```
+
+Newer versions of `bfplot` keep reading older versions.
 
 ## The document
 

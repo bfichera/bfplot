@@ -7,6 +7,7 @@ import numpy as np
 import pytest
 
 import bfplot
+from bfplot.artifact import FORMAT_VERSION
 from bfplot.mir import MirBuilder
 from helpers import read_array, read_result
 
@@ -29,6 +30,16 @@ def test_compile_resolves_all_mir_buffers_and_preserves_metadata(tmp_path) -> No
     assert "$buffer" not in json.dumps(document)
     line = document["figures"][0]["axes"][0]["artists"][0]
     assert set(line["data"]["x"]) == {"object", "dtype", "shape", "codec"}
+
+
+def test_manifest_starts_with_format_and_version(tmp_path) -> None:
+    figure, axes = plt.subplots()
+    axes.plot([0, 1], [2, 3])
+    output = bfplot.compile(bfplot.translate(figure), tmp_path / "compiled.bfplot")
+
+    lines = (output / "manifest.toml").read_text().splitlines()
+    assert lines[:2] == ['format = "bfplot"', f"version = {FORMAT_VERSION}"]
+    assert read_result(output)[0]["version"] == FORMAT_VERSION == 1
 
 
 def test_compile_adds_missing_baseline_git_metadata(tmp_path) -> None:

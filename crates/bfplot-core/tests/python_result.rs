@@ -35,7 +35,7 @@ fn verifies_python_shaped_result_end_to_end() {
     let document_id = store.put_json(&document).unwrap();
     fs::write(
         result.join("manifest.toml"),
-        format!("format = \"bfplot\"\ndocument = \"{document_id}\"\n\n[provenance]\ncreated_utc = \"2026-01-01T00:00:00Z\"\n"),
+        format!("format = \"bfplot\"\nversion = 1\ndocument = \"{document_id}\"\n\n[provenance]\ncreated_utc = \"2026-01-01T00:00:00Z\"\n"),
     )
     .unwrap();
 

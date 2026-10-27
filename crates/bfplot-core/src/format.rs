@@ -59,11 +59,17 @@ impl<'de> Deserialize<'de> for ObjectId {
     }
 }
 
+/// The newest format version this library reads and the one it writes.
+///
+/// Raise it whenever a change would make an older `bfplot` misread a result.
+pub const FORMAT_VERSION: u64 = 1;
+
 /// `manifest.toml`: the only part of a result that is meant to be committed.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Manifest {
     pub format: String,
+    pub version: u64,
     pub document: ObjectId,
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub provenance: BTreeMap<String, Value>,
@@ -73,9 +79,46 @@ impl Manifest {
     pub fn new(document: ObjectId) -> Self {
         Self {
             format: "bfplot".into(),
+            version: FORMAT_VERSION,
             document,
             provenance: BTreeMap::new(),
         }
+    }
+
+    /// Parse `manifest.toml`, checking `format` and `version` before anything else, so a
+    /// result from a newer writer reports that `bfplot` is out of date instead of an
+    /// unknown field.
+    pub fn parse(text: &str) -> Result<Self> {
+        let table: toml::Table = toml::from_str(text)?;
+        match table.get("format").and_then(toml::Value::as_str) {
+            Some("bfplot") => {}
+            Some(other) => {
+                return Err(Error::Validation(format!(
+                    "format: expected \"bfplot\", got {other:?}"
+                )));
+            }
+            None => {
+                return Err(Error::Validation(
+                    "format: missing; not a BFPlot result".into(),
+                ));
+            }
+        }
+        let version = match table.get("version") {
+            Some(toml::Value::Integer(version)) if *version >= 1 => *version as u64,
+            Some(other) => {
+                return Err(Error::Validation(format!(
+                    "version: expected a positive integer, got {other}"
+                )));
+            }
+            None => return Err(Error::Validation("version: missing".into())),
+        };
+        if version > FORMAT_VERSION {
+            return Err(Error::UnsupportedVersion {
+                found: version,
+                supported: FORMAT_VERSION,
+            });
+        }
+        Ok(toml::Value::Table(table).try_into()?)
     }
 }
 
@@ -343,6 +386,41 @@ mod tests {
             ]}]}]
         }))
         .unwrap()
+    }
+
+    #[test]
+    fn manifest_parse_checks_format_and_version_first() {
+        let document = ObjectId::of(b"document");
+        let current = toml::to_string(&Manifest::new(document.clone())).unwrap();
+        assert!(current.starts_with("format = \"bfplot\"\nversion = 1\n"));
+        let manifest = Manifest::parse(&current).unwrap();
+        assert_eq!(
+            (manifest.version, manifest.document),
+            (FORMAT_VERSION, document)
+        );
+
+        // A newer writer may add fields this version does not know: report the version.
+        let newer = format!(
+            "format = \"bfplot\"\nversion = {}\ndocument = 1\nfuture = true\n",
+            FORMAT_VERSION + 1
+        );
+        let error = Manifest::parse(&newer).unwrap_err();
+        assert!(
+            matches!(error, Error::UnsupportedVersion { found, supported }
+            if found == FORMAT_VERSION + 1 && supported == FORMAT_VERSION)
+        );
+        assert!(error.to_string().contains("please update bfplot"));
+
+        for (text, message) in [
+            ("format = \"other\"\nversion = 1\n", "expected \"bfplot\""),
+            ("version = 1\n", "format: missing"),
+            ("format = \"bfplot\"\n", "version: missing"),
+            ("format = \"bfplot\"\nversion = 0\n", "positive integer"),
+            ("format = \"bfplot\"\nversion = \"1\"\n", "positive integer"),
+        ] {
+            let error = Manifest::parse(text).unwrap_err().to_string();
+            assert!(error.contains(message), "{text:?}: {error}");
+        }
     }
 
     #[test]

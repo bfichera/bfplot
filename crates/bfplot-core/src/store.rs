@@ -89,7 +89,7 @@ pub fn locate_artifact(path: &Path) -> (PathBuf, ObjectStore) {
 pub fn load_artifact(path: &Path) -> Result<Artifact> {
     let (manifest_path, store) = locate_artifact(path);
     let text = fs::read_to_string(&manifest_path).map_err(|e| io(&manifest_path, e))?;
-    let manifest: Manifest = toml::from_str(&text)?;
+    let manifest = Manifest::parse(&text)?;
     let document = serde_json::from_slice(&store.get(&manifest.document)?)?;
     Ok(Artifact {
         manifest,

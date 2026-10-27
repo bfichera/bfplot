@@ -22,6 +22,10 @@ pub enum Error {
     Validation(String),
     #[error("invalid packed file: {0}")]
     InvalidPack(String),
+    #[error(
+        "this result uses BFPlot format version {found}, but this bfplot only reads up to version {supported}; please update bfplot"
+    )]
+    UnsupportedVersion { found: u64, supported: u64 },
 }
 
 pub type Result<T> = std::result::Result<T, Error>;

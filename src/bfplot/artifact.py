@@ -31,6 +31,8 @@ from .provenance import processing_metadata
 Layout = Literal["directory", "file"]
 PACKED_MAGIC = b"BFPLOT\0\0"
 MANIFEST_PREFIX = b'format = "bfplot"'
+# The format version this writer produces; see docs/format.md.
+FORMAT_VERSION = 1
 
 
 def canonical_json(value: Any) -> bytes:
@@ -103,7 +105,7 @@ def _toml_table(name: str, table: dict[str, Any], lines: list[str]) -> None:
 
 
 def manifest_bytes(document: str, provenance: dict[str, Any]) -> bytes:
-    lines = ['format = "bfplot"', f'document = "{document}"']
+    lines = ['format = "bfplot"', f"version = {FORMAT_VERSION}", f'document = "{document}"']
     _toml_table("provenance", provenance, lines)
     return ("\n".join(lines) + "\n").encode("utf-8")
 

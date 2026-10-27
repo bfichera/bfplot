@@ -10,8 +10,8 @@ mod store;
 
 pub use error::{Error, Result};
 pub use format::{
-    ArrayRef, Artist, Axes, Document, Figure, Manifest, ObjectId, Timeline, TimelineFrame,
-    TimelineUpdate, validate_document,
+    ArrayRef, Artist, Axes, Document, FORMAT_VERSION, Figure, Manifest, ObjectId, Timeline,
+    TimelineFrame, TimelineUpdate, validate_document,
 };
 pub use pack::{pack_artifact, read_packed_manifest, unpack_artifact, verify_packed};
 pub use store::{

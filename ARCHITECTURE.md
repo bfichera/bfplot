@@ -50,11 +50,14 @@ The manifest is TOML:
 
 ```toml
 format = "bfplot"
+version = 1
 document = "sha256:<hex>"
 
 [provenance]
 created_utc = "2026-01-01T00:00:00Z"
 ```
+
+`format` and `version` always come first. `version` is the format version (currently 1); it is raised whenever a change would make an older reader misread a result, and readers reject versions newer than their own `FORMAT_VERSION` with an "update bfplot" error before looking at anything else.
 
 Every object is named by the SHA-256 of its exact bytes. The document object is canonical JSON (sorted keys, compact separators, finite numbers). Arrays are little-endian, C-ordered and zstd-compressed, referenced as `{"object": "sha256:<hex>", "dtype": "f8", "shape": [N], "codec": "zstd"}`.
 
