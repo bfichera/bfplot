@@ -7,7 +7,7 @@ It is **not**:
 - **a replacement for Matplotlib.** Matplotlib still makes and styles the figure.
 - **a notebook system.** Notebook integration is not a goal.
 - **a reproducibility machine.** A result cannot recreate code or data that were never kept.
-- **finished.** 0.9.9 is a release candidate; check the plots that matter to you.
+- **finished.** BFPlot is young; check the plots that matter to you.
 
 ## Principles
 

@@ -1,6 +1,6 @@
 # Supported plots
 
-BFPlot 0.9.9 understands the common Matplotlib artists below.
+BFPlot understands the common Matplotlib artists below.
 
 | Plot | BFPlot artist | Notes |
 | --- | --- | --- |

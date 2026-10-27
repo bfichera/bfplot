@@ -1,70 +1,42 @@
 # Releasing BFPlot
 
-A release is a `vX.Y.Z` tag. Pushing it runs `.github/workflows/release.yml`, which compiles the `bfplot` app once per platform and ships those binaries everywhere:
+## Releasing a version
 
-| Where | What | Published |
-| --- | --- | --- |
-| PyPI | `bfplot-cli`: the app as wheels for 8 platforms, plus an sdist. `bfplot`: the pure-Python writer. | When `PUBLISH_PYPI` is `true`. `bfplot-cli` goes first, so `bfplot` never appears without its app. |
-| GitHub release | `bfplot-<target>.tar.gz` (+ `.sha256`) for macOS and Linux, x86_64 and arm64; `install.sh`; `uninstall.sh`. | Always, for a tag. |
-| crates.io | `bfplot-core` and `bfplot-cli`, the Rust source. | When `PUBLISH_CRATES` is `true`. `bfplot-core` goes first. |
+1. On GitHub, open **Actions → Release → Run workflow**.
+2. Type the version, such as `1.0.0`, and press **Run workflow**.
 
-Pull requests that touch packaging run the same workflow without publishing: every package is built and test-installed, and `install.sh` / `uninstall.sh` are run against the freshly built archives.
+That's all. The workflow sets the version everywhere, builds the app for every platform and tests every package. Only if everything passes does it commit the version to `main`, tag it, create the GitHub release (with `install.sh` and `uninstall.sh`) and publish to PyPI. If anything fails, nothing is published; fix it and run it again.
 
-`install.sh` downloads from `releases/latest`, so it always gets the newest non-pre-release. Its URL never changes:
+Tick **Dry run** to do everything except publishing.
 
-```text
-https://github.com/bfplot-dev/bfplot/releases/latest/download/install.sh
-```
+A version such as `1.1.0-rc.1` is a pre-release: pip and `install.sh` ignore it unless asked for it (`pip install --pre bfplot`, `BFPLOT_VERSION=1.1.0-rc.1`).
 
 ## One-time setup
 
-Nothing below exists yet; do it once before the first release.
+Before the first release:
 
-1. **GitHub repository.** Create `bfplot-dev/bfplot` and push `main`. Enable GitHub Pages with "GitHub Actions" as the source (for `docs.yml`).
-2. **PyPI.** On <https://pypi.org/manage/account/publishing/>, add a *pending* trusted publisher for **each** of `bfplot` and `bfplot-cli`:
-   - owner `bfplot-dev`, repository `bfplot`, workflow `release.yml`, environment `pypi`.
-3. **crates.io.** The first version of each crate must be published by hand, because trusted publishing can only be set up for an existing crate:
+1. **GitHub.** Create the public repository `bfplot-dev/bfplot` and push `main`. In **Settings → Pages**, set the source to **GitHub Actions** for the documentation site.
+2. **PyPI.** Sign in to <https://pypi.org>, open [Publishing](https://pypi.org/manage/account/publishing/), and add a pending publisher for `bfplot-cli`, then the same for `bfplot`:
 
-   ```console
-   $ bash scripts/stage-crates.sh
-   $ cargo login
-   $ cargo publish --locked --allow-dirty -p bfplot-core
-   $ cargo publish --locked --allow-dirty -p bfplot-cli
-   ```
+   | Field | Value |
+   | --- | --- |
+   | PyPI project name | `bfplot-cli` (then `bfplot`) |
+   | Owner | `bfplot-dev` |
+   | Repository name | `bfplot` |
+   | Workflow name | `release.yml` |
+   | Environment name | `pypi` |
 
-   Then, for both crates, add a trusted publisher in the crate's settings on crates.io: repository `bfplot-dev/bfplot`, workflow `release.yml`, environment `crates-io`. Later releases are published by CI.
-4. **Environments and switches.** In the repository settings, create the environments `pypi` and `crates-io` (adding required reviewers gives a manual approval step before each upload). Then create these Actions *variables*:
-   - `PUBLISH_PYPI` = `true`
-   - `PUBLISH_CRATES` = `true` (after step 3)
+   No passwords or tokens are stored anywhere: PyPI trusts this workflow directly.
 
-   While a variable is unset, tag builds still create the GitHub release but skip that upload.
+Optionally, in **Settings → Environments → pypi**, add yourself as a required reviewer to approve each upload by hand.
 
-## Each release
+### crates.io (optional)
 
-1. Set the new version everywhere, then check it:
+To also publish the Rust crates, create an API token at <https://crates.io/settings/tokens> (scopes `publish-new` and `publish-update`) and save it in **Settings → Secrets and variables → Actions** as `CARGO_REGISTRY_TOKEN`. Without that secret, releases skip crates.io.
 
-   ```console
-   $ python scripts/check_versions.py 1.0.0
-   ```
+## Details
 
-   This lists every place that needs updating: `Cargo.toml`, the `bfplot-core` dependency in `crates/bfplot-cli/Cargo.toml`, `Cargo.lock` (run `cargo update -w`), `pyproject.toml` (the version and the `bfplot-cli==` pin), `src/bfplot/__init__.py`, the fallback in `src/bfplot/provenance.py`, and `viewer/package.json` (run `npm --prefix viewer install` to update the lockfile).
-
-   Also update the version in the docs (`README.md`, `docs/index.md`, `docs/getting-started/installation.md`, ...).
-2. If the result format changed in a way older readers would misread, raise `FORMAT_VERSION` in `crates/bfplot-core/src/format.rs` and `src/bfplot/artifact.py` together, and describe the change in `docs/format.md`.
-3. Do a local dry run. It builds everything for this machine into `release-dist/`, tries `install.sh` and `uninstall.sh` against the result, and publishes nothing:
-
-   ```console
-   $ python -m pip install --group release
-   $ scripts/release.sh 1.0.0
-   ```
-
-4. Commit, merge to `main`, then tag and push:
-
-   ```console
-   $ git tag v1.0.0
-   $ git push origin v1.0.0
-   ```
-
-5. Watch the workflow. If a publish step fails partway, fix the cause and rerun only the failed jobs; PyPI and crates.io never accept the same version twice, so do not retag a version that was already uploaded.
-
-A pre-release uses a tag such as `v1.0.0-rc.1` (Cargo) with `1.0.0rc1` in `pyproject.toml`; `check_versions.py` treats them as equal. It becomes a GitHub pre-release, which `install.sh` skips unless asked for it with `BFPLOT_VERSION=1.0.0-rc.1`.
+- If the result format changed in a way older readers would misread, raise `FORMAT_VERSION` in `crates/bfplot-core/src/format.rs` and `src/bfplot/artifact.py` together, and describe the change in `docs/format.md`, before releasing.
+- `python scripts/set_version.py X.Y.Z` is what the workflow uses to set the version; `python scripts/check_versions.py` checks that every package agrees.
+- `scripts/release.sh` builds everything for your own machine into `release-dist/` and publishes nothing. It is a local dry run, not part of releasing.
+- PyPI and crates.io never accept the same version twice. If a run fails after the PyPI upload (rare), release the next patch version.

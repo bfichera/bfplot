@@ -55,7 +55,7 @@ $ bfplot view results/sine_wave.bfplot
   </article>
 </div>
 
-!!! note "BFPlot 0.9.9 is a release candidate"
+!!! note "BFPlot is new"
     Please try it on real plots and tell us what behaves strangely.
 
 ## Supported plots

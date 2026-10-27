@@ -12,10 +12,12 @@ Check both parts:
 
 ```console
 $ python -c "import bfplot; print(bfplot.__version__)"
-0.9.9
+1.0.0
 $ bfplot --version
-bfplot-cli 0.9.9
+bfplot-cli 1.0.0
 ```
+
+Both print the same version.
 
 If your shell can't find `bfplot`, the environment you installed into is probably not activated. `bfplot.show()` still works, because Python looks for the app in its own environment first.
 

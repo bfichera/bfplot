@@ -1,23 +1,27 @@
-# Build every release artifact, and on a release tag publish them.
+# Release BFPlot: Actions → Release → Run workflow, type the version, press Run.
 #
-# The `bfplot` app is compiled once per platform, as a bfplot-cli wheel. The same binaries
-# are repackaged as the archives that install.sh downloads.
+# The workflow sets that version everywhere, builds and tests every package, and only if
+# all of it passes commits the version to main, tags it, creates the GitHub release and
+# publishes to PyPI (and crates.io, if a CARGO_REGISTRY_TOKEN secret exists). Tick
+# "dry run" to do everything except publishing. Pull requests that touch packaging run
+# the build and tests too. See RELEASING.md.
 #
-# * bfplot-cli (PyPI): the app as platform wheels, plus an sdist.
-# * bfplot (PyPI):     the pure-Python writer; depends on bfplot-cli of the same version.
-# * GitHub release:    macOS and Linux archives, install.sh and uninstall.sh.
-# * crates.io:         bfplot-core and bfplot-cli, for Rust users.
-#
-# Every run builds and test-installs everything. Only a `v*` tag publishes: the GitHub
-# release always, PyPI and crates.io only when the repository variables PUBLISH_PYPI /
-# PUBLISH_CRATES are "true" (trusted publishing, no stored tokens). See RELEASING.md.
-# Trusted publishing does not work from reusable workflows, so everything lives here.
+# The `bfplot` app is compiled once per platform, as a bfplot-cli wheel; the macOS and
+# static Linux binaries are repackaged as the archives that install.sh downloads.
 
 name: Release
 
 on:
-  push:
-    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to release, such as 1.0.0 (or 1.1.0-rc.1 for a pre-release)"
+        required: true
+        type: string
+      dry-run:
+        description: "Dry run: build and test everything, publish nothing"
+        type: boolean
+        default: false
   pull_request:
     paths:
       - ".github/workflows/release.yml"
@@ -25,37 +29,54 @@ on:
       - "Cargo.toml"
       - "Cargo.lock"
       - "pyproject.toml"
-      - "scripts/stage-crates.sh"
-      - "scripts/check_versions.py"
-      - "scripts/install.sh"
-      - "scripts/uninstall.sh"
-  workflow_dispatch:
+      - "scripts/**"
 
 permissions:
   contents: read
 
 concurrency:
   group: release-${{ github.ref }}
-  cancel-in-progress: ${{ !startsWith(github.ref, 'refs/tags/') }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
-  versions:
-    name: Check versions
+  plan:
+    name: Check the version
     runs-on: ubuntu-latest
+    outputs:
+      # The version without a leading "v"; empty for pull requests.
+      version: ${{ steps.version.outputs.version }}
     steps:
       - uses: actions/checkout@v7
         with:
           persist-credentials: false
+          fetch-depth: 0
       - uses: actions/setup-python@v7
         with:
           python-version: "3.13"
       - run: python -m pip install packaging
-      - name: All packages declare one version (and match the tag)
-        run: python scripts/check_versions.py ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || '' }}
+      - name: Releases come from main and use a new version
+        id: version
+        if: github.event_name == 'workflow_dispatch'
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          VERSION="$(echo "$VERSION" | tr -d '[:space:]')"
+          VERSION="${VERSION#v}"
+          if [[ "$GITHUB_REF" != refs/heads/main && "${{ inputs.dry-run }}" != true ]]; then
+            echo "::error::Run releases from the main branch (this is $GITHUB_REF_NAME)."; exit 1
+          fi
+          if git rev-parse -q --verify "refs/tags/v$VERSION" >/dev/null; then
+            echo "::error::v$VERSION has already been released; pick a new version."; exit 1
+          fi
+          python scripts/set_version.py "$VERSION"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+      - run: python scripts/check_versions.py
 
   cli-wheels:
     name: bfplot-cli wheel (${{ matrix.name }})
-    needs: versions
+    needs: plan
+    env:
+      VERSION: ${{ needs.plan.outputs.version }}
     runs-on: ${{ matrix.runner }}
     strategy:
       fail-fast: false
@@ -73,12 +94,16 @@ jobs:
       - uses: actions/checkout@v7
         with:
           persist-credentials: false
-      - name: Stage crate files
-        shell: bash
-        run: bash scripts/stage-crates.sh
       - uses: actions/setup-python@v7
         with:
           python-version: "3.13"
+      - name: Set the version
+        if: env.VERSION != ''
+        shell: bash
+        run: python -m pip install -q packaging && python scripts/set_version.py "$VERSION"
+      - name: Stage crate files
+        shell: bash
+        run: bash scripts/stage-crates.sh
       # Linux wheels build in maturin's manylinux/musllinux containers; elsewhere maturin
       # builds on the runner, which needs rustup (windows-11-arm has none preinstalled).
       - uses: dtolnay/rust-toolchain@stable
@@ -131,7 +156,9 @@ jobs:
 
   sdists:
     name: bfplot sdists and pure-Python wheel
-    needs: versions
+    needs: plan
+    env:
+      VERSION: ${{ needs.plan.outputs.version }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -140,9 +167,12 @@ jobs:
       - uses: actions/setup-python@v7
         with:
           python-version: "3.13"
+      - run: python -m pip install build "maturin>=1.9,<2" packaging
+      - name: Set the version
+        if: env.VERSION != ''
+        run: python scripts/set_version.py "$VERSION"
       - name: Stage crate files
         run: bash scripts/stage-crates.sh
-      - run: python -m pip install build "maturin>=1.9,<2"
       - name: bfplot-cli sdist
         run: maturin sdist -m crates/bfplot-cli/Cargo.toml --out dist-cli
       - name: bfplot wheel and sdist
@@ -160,8 +190,10 @@ jobs:
 
   check:
     name: Check and test-install the packages
-    needs: [cli-wheels, sdists]
+    needs: [plan, cli-wheels, sdists]
     runs-on: ubuntu-latest
+    env:
+      VERSION: ${{ needs.plan.outputs.version }}
     steps:
       - uses: actions/checkout@v7
         with:
@@ -194,45 +226,64 @@ jobs:
           "
           "$RUNNER_TEMP/venv/bin/bfplot" verify check.bfplot
           "$RUNNER_TEMP/venv/bin/bfplot" verify check-packed.bfplot
+      - name: The packages carry the requested version
+        if: env.VERSION != ''
+        run: |
+          test "$("$RUNNER_TEMP/venv/bin/bfplot" --version)" = "bfplot-cli $VERSION"
+          "$RUNNER_TEMP/venv/bin/python" -c "
+          import bfplot, sys
+          from packaging.version import Version
+          sys.exit(Version(bfplot.__version__) != Version('$VERSION'))
+          "
       - name: The bfplot-cli sdist builds on its own
         run: |
           python -m venv "$RUNNER_TEMP/sdist-venv"
           "$RUNNER_TEMP/sdist-venv/bin/python" -m pip install --no-binary bfplot-cli dist-cli/*.tar.gz
           "$RUNNER_TEMP/sdist-venv/bin/bfplot" --version
 
-  github-release:
-    name: Publish the GitHub release
-    needs: check
-    if: startsWith(github.ref, 'refs/tags/v')
+  release:
+    name: Commit, tag and create the GitHub release
+    needs: [plan, check]
+    if: github.event_name == 'workflow_dispatch' && !inputs.dry-run
     runs-on: ubuntu-latest
     permissions:
       contents: write
+    env:
+      VERSION: ${{ needs.plan.outputs.version }}
     steps:
       - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
-          persist-credentials: false
+          python-version: "3.13"
+      - run: python -m pip install packaging
       - uses: actions/download-artifact@v8
         with:
           pattern: app-*
-          path: release
+          path: ${{ runner.temp }}/release
           merge-multiple: true
-      - name: Create the release
+      - name: Commit the version and tag it
+        run: |
+          python scripts/set_version.py "$VERSION"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -am "chore: release $VERSION" || echo "the version was already $VERSION"
+          git tag -a "v$VERSION" -m "BFPlot $VERSION"
+          # Fails, publishing nothing, if main moved on while this ran; just run it again.
+          git push origin HEAD:main "v$VERSION"
+      - name: Create the GitHub release
         env:
           GH_TOKEN: ${{ github.token }}
-          TAG: ${{ github.ref_name }}
         run: |
-          cp scripts/install.sh scripts/uninstall.sh release/
-          # A version with a suffix (v1.0.0-rc.1) is a pre-release, which
-          # releases/latest (and so install.sh without BFPLOT_VERSION) skips.
+          cp scripts/install.sh scripts/uninstall.sh "$RUNNER_TEMP/release/"
+          # A pre-release (1.1.0-rc.1) is skipped by releases/latest, and so by install.sh.
           prerelease=()
-          if [[ "$TAG" == *-* ]]; then prerelease=(--prerelease); fi
-          gh release create "$TAG" --repo "$GITHUB_REPOSITORY" --verify-tag \
-            --title "BFPlot ${TAG#v}" --generate-notes "${prerelease[@]}" release/*
+          if [[ "$VERSION" == *-* ]]; then prerelease=(--prerelease); fi
+          gh release create "v$VERSION" --verify-tag --title "BFPlot $VERSION" \
+            --generate-notes "${prerelease[@]}" "$RUNNER_TEMP"/release/*
 
   publish-pypi:
     name: Publish to PyPI
-    needs: check
-    if: startsWith(github.ref, 'refs/tags/v') && vars.PUBLISH_PYPI == 'true'
+    needs: release
     runs-on: ubuntu-latest
     environment:
       name: pypi
@@ -261,30 +312,25 @@ jobs:
 
   publish-crates:
     name: Publish to crates.io
-    needs: check
-    if: startsWith(github.ref, 'refs/tags/v') && vars.PUBLISH_CRATES == 'true'
+    needs: [plan, release]
     runs-on: ubuntu-latest
-    environment:
-      name: crates-io
-      url: https://crates.io/crates/bfplot-cli
-    permissions:
-      id-token: write
+    env:
+      CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
     steps:
       - uses: actions/checkout@v7
         with:
+          ref: v${{ needs.plan.outputs.version }}
           persist-credentials: false
+      - name: Skip without a crates.io token
+        if: env.CARGO_REGISTRY_TOKEN == ''
+        run: echo "::notice::No CARGO_REGISTRY_TOKEN secret, so the crates were not published."
       - uses: dtolnay/rust-toolchain@stable
-      - name: Stage crate files
-        run: bash scripts/stage-crates.sh
-      - uses: rust-lang/crates-io-auth-action@v1
-        id: auth
+        if: env.CARGO_REGISTRY_TOKEN != ''
       # bfplot-cli depends on bfplot-core, so bfplot-core goes first. --allow-dirty because
-      # the staged files are ignored by Git.
-      - name: Publish bfplot-core
-        run: cargo publish --locked --allow-dirty -p bfplot-core
-        env:
-          CARGO_REGISTRY_TOKEN: ${{ steps.auth.outputs.token }}
-      - name: Publish bfplot-cli
-        run: cargo publish --locked --allow-dirty -p bfplot-cli
-        env:
-          CARGO_REGISTRY_TOKEN: ${{ steps.auth.outputs.token }}
+      # the staged license texts and viewer are ignored by Git.
+      - name: Publish bfplot-core and bfplot-cli
+        if: env.CARGO_REGISTRY_TOKEN != ''
+        run: |
+          bash scripts/stage-crates.sh
+          cargo publish --locked --allow-dirty -p bfplot-core
+          cargo publish --locked --allow-dirty -p bfplot-cli

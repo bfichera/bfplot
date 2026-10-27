@@ -18,7 +18,7 @@ bfplot.savefig("my_plot.bfplot", fig)
 $ bfplot view my_plot.bfplot
 ```
 
-BFPlot 0.9.9 is the release candidate for 1.0. Please try it on real plots and tell us what behaves strangely.
+BFPlot is new. Please try it on real plots and tell us what behaves strangely.
 
 ## Installation
 

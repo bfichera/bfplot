@@ -1,23 +1,14 @@
 #!/usr/bin/env bash
 # Build every release artifact for this machine into release-dist/, without publishing.
 #
-#   scripts/release.sh 1.0.0
+#   scripts/release.sh
 #
-# CI builds the full set (all platforms) in .github/workflows/release.yml; this is the
-# local dry run. See RELEASING.md.
+# A local dry run of the current version. Real releases are made by the Release workflow
+# on GitHub, which builds every platform; see RELEASING.md.
 set -euo pipefail
 
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$root"
-
-usage() {
-  printf 'Usage: %s <version>\n' "$0" >&2
-  printf 'Checks versions and builds release artifacts without publishing.\n' >&2
-  exit 2
-}
-
-[[ $# -eq 1 ]] || usage
-version="${1#v}"
 
 if [[ -n "$(git status --porcelain --untracked-files=no)" ]]; then
   printf 'Release builds require a clean working tree.\n' >&2
@@ -35,7 +26,8 @@ for module in build maturin twine packaging; do
   fi
 done
 
-"$python_bin" scripts/check_versions.py "$version"
+"$python_bin" scripts/check_versions.py
+version="$("$python_bin" -c 'import tomllib; print(tomllib.load(open("Cargo.toml", "rb"))["workspace"]["package"]["version"])')"
 ./scripts/smoke.sh
 bash scripts/stage-crates.sh
 
@@ -56,7 +48,7 @@ printf '\n==> Test install\n'
 work="$(mktemp -d)"
 trap 'rm -rf "$work"' EXIT
 "$python_bin" -m venv "$work/venv"
-"$work/venv/bin/python" -m pip install -q --only-binary bfplot-cli --find-links "$out/python" "bfplot==$version"
+"$work/venv/bin/python" -m pip install -q --only-binary bfplot-cli --find-links "$out/python" "bfplot==$("$python_bin" -c 'import tomllib; print(tomllib.load(open("pyproject.toml", "rb"))["project"]["version"])')"
 "$work/venv/bin/bfplot" --version
 
 printf '\n==> App archive, install.sh and uninstall.sh\n'
@@ -90,4 +82,4 @@ printf '\n==> Viewer npm package\n'
 npm pack ./viewer --pack-destination "$out/npm"
 
 printf '\nRelease artifacts are in %s\n' "$out"
-printf 'Nothing was published. To release, push the v%s tag (see RELEASING.md).\n' "$version"
+printf 'Nothing was published. To release, run the Release workflow on GitHub (see RELEASING.md).\n'
