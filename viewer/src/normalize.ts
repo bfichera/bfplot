@@ -71,7 +71,7 @@ function normalizeArtist(rawValue: unknown, axesId: string): Artist {
   };
 }
 
-/** Accepts both the nested artifact schema emitted by Python/Rust and the viewer's flat schema. */
+/** Accepts both the nested document written by Python/Rust and the viewer's flat schema. */
 export function normalizeDocument(value: unknown): MPlotDocument {
   const raw = record(value), figures: Figure[] = [], axes: Axis[] = [], artists: Artist[] = [];
   for (const [figureIndex, figureValue] of list(raw.figures).entries()) {

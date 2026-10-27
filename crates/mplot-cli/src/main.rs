@@ -364,7 +364,7 @@ fn viewer_document(document: &Document, manifest: &Manifest) -> anyhow::Result<V
         "artists": artists,
         "timeline": document.timeline,
         "metadata": {
-            "artifact": {"document": manifest.document.to_string()},
+            "result": {"document": manifest.document.to_string()},
             "provenance": manifest.provenance,
         },
     }))

@@ -68,7 +68,7 @@ function normalizeArtist(rawValue, axesId) {
         axes_id: text(raw.axes_id, axesId), props: normalizeProps(raw.props), data: { ...record(raw.data) },
     };
 }
-/** Accepts both the nested artifact schema emitted by Python/Rust and the viewer's flat schema. */
+/** Accepts both the nested document written by Python/Rust and the viewer's flat schema. */
 export function normalizeDocument(value) {
     const raw = record(value), figures = [], axes = [], artists = [];
     for (const [figureIndex, figureValue] of list(raw.figures).entries()) {

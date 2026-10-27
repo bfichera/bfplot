@@ -533,7 +533,7 @@ export class MPlotViewer extends EventTarget {
     const page = document.createElement("section");
     page.className = "mplot-metadata-page";
     const heading = document.createElement("header"), title = document.createElement("h2"), subtitle = document.createElement("span");
-    heading.className = "mplot-figure-header"; title.className = "mplot-figure-title"; title.textContent = "Artifact metadata"; subtitle.className = "mplot-figure-count"; subtitle.textContent = "provenance and document";
+    heading.className = "mplot-figure-header"; title.className = "mplot-figure-title"; title.textContent = "Result metadata"; subtitle.className = "mplot-figure-count"; subtitle.textContent = "provenance and document";
     heading.append(title, subtitle);
     const body = document.createElement("div"); body.className = "mplot-metadata-body";
     body.append(this.metadataTree(this.model.document.metadata ?? {}, "Metadata"));
@@ -602,7 +602,7 @@ export class MPlotViewer extends EventTarget {
     const select = document.createElement("select");
     select.className = "mplot-export-scope";
     select.setAttribute("aria-label", "Export scope");
-    for (const [value, label] of [["axis", "Current plot"], ["figure", "Current figure"], ["artifact", "Entire artifact"], ["figures", "Each figure"]] as const) {
+    for (const [value, label] of [["axis", "Current plot"], ["figure", "Current figure"], ["artifact", "Entire result"], ["figures", "Each figure"]] as const) {
       const option = document.createElement("option"); option.value = value; option.textContent = label; option.selected = value === this.exportScope; select.append(option);
     }
     select.onchange = () => { this.exportScope = select.value as ExportScope | "figures"; };
@@ -682,9 +682,11 @@ export class MPlotViewer extends EventTarget {
     if (pending) { this.dirtyAxes.add(axisId); return pending; }
     const operation = (async () => {
       try {
-        this.dirtyAxes.delete(axisId);
-        await this.renderAxisNow(axisId);
-        this.dirtyAxes.delete(axisId);
+        // Requests that arrive mid-render mark the axis dirty; draw again until it is current.
+        do {
+          this.dirtyAxes.delete(axisId);
+          await this.renderAxisNow(axisId);
+        } while (this.dirtyAxes.has(axisId));
       } finally { this.axisRenders.delete(axisId); }
     })();
     this.axisRenders.set(axisId, operation);
@@ -694,7 +696,7 @@ export class MPlotViewer extends EventTarget {
   private async renderAxisNow(axisId: string): Promise<void> {
     const view = this.views.get(axisId);
     if (!view?.mounted || view.figureId !== this.activeFigureIdValue) return;
-    const token = (this.axisTokens.get(axisId) ?? 0) + 1, documentToken = this.documentToken;
+    const token = (this.axisTokens.get(axisId) ?? 0) + 1, documentToken = this.documentToken, source = this.model.document;
     this.axisTokens.set(axisId, token);
     view.width = Math.max(180, view.host.clientWidth || 640);
     view.height = Math.max(150, view.host.clientHeight || 360);
@@ -718,7 +720,7 @@ export class MPlotViewer extends EventTarget {
       if (!renderer) { this.drawUnknown(group, artist, working); continue; }
       try {
         const data = this.resolvedData.get(artist.id) ?? await this.model.resolveData(artist.data, artist);
-        if (documentToken !== this.documentToken || this.views.get(axisId) !== view || view.figureId !== this.activeFigureIdValue) return;
+        if (documentToken !== this.documentToken || source !== this.model.document || this.views.get(axisId) !== view || view.figureId !== this.activeFigureIdValue) return;
         this.resolvedData.set(artist.id, data);
         const contrast = this.contrastLimits.get(artist.id);
         const effectiveArtist = contrast ? { ...artist, props: { ...artist.props, clim: contrast } } : artist;
@@ -737,7 +739,7 @@ export class MPlotViewer extends EventTarget {
         }
       } catch (error) { this.drawUnknown(group, artist, working, error instanceof Error ? error.message : "render failed"); }
     }
-    if (documentToken !== this.documentToken || this.views.get(axisId) !== view || view.figureId !== this.activeFigureIdValue || this.axisTokens.get(axisId) !== token) return;
+    if (documentToken !== this.documentToken || source !== this.model.document || this.views.get(axisId) !== view || view.figureId !== this.activeFigureIdValue || this.axisTokens.get(axisId) !== token) return;
     this.drawHitArea(working);
     view.svg.setAttribute("viewBox", `0 0 ${view.width} ${view.height}`);
     view.plot.replaceChildren(...plot.childNodes);

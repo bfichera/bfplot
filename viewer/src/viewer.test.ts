@@ -178,10 +178,10 @@ describe("MPlotViewer", () => {
     viewer.destroy();
   });
 
-  it("renders artifact metadata as a peer navigation page", async () => {
+  it("renders result metadata as a peer navigation page", async () => {
     const host = window.document.createElement("div");
     window.document.body.append(host);
-    const viewer = new MPlotViewer(host, { ...document, metadata: { provenance: { created_utc: "2026-01-01T00:00:00Z" }, artifact: { version: "0.9.9" } } });
+    const viewer = new MPlotViewer(host, { ...document, metadata: { provenance: { created_utc: "2026-01-01T00:00:00Z" }, result: { document: "sha256:abc" } } });
     await viewer.render();
     expect(host.querySelector('[data-action="metadata"]')).toBeNull();
     expect(host.querySelector('[data-action="select"]')).toBeNull();
@@ -193,9 +193,9 @@ describe("MPlotViewer", () => {
     expect(host.querySelector('[data-page-id="__metadata__"]')?.getAttribute("aria-current")).toBe("page");
     expect(page.textContent).toContain("created_utc");
     expect(page.textContent).toContain("2026-01-01T00:00:00Z");
-    expect(page.textContent).toContain("0.9.9");
+    expect(page.textContent).toContain("sha256:abc");
     expect(page.querySelector("details")).toBeNull();
-    expect(Array.from(page.querySelectorAll("h4"), (heading) => heading.textContent)).toEqual(["provenance", "artifact"]);
+    expect(Array.from(page.querySelectorAll("h4"), (heading) => heading.textContent)).toEqual(["provenance", "result"]);
     viewer.destroy();
   });
 
@@ -227,6 +227,28 @@ describe("MPlotViewer", () => {
     range.value = "0"; range.dispatchEvent(new window.Event("input"));
     await new Promise((resolve) => setTimeout(resolve, 0));
     expect(viewer.model.document.artists[0]?.data.y).toEqual([0, 2, 4]);
+    viewer.destroy();
+  });
+
+  it("draws the last frame after rapid timeline steps", async () => {
+    const host = window.document.createElement("div");
+    window.document.body.append(host);
+    const update = (time: number, y: number[]) => ({ time, updates: [{ target_kind: "artist" as const, target: "line", path: ["data", "y"], value: y }] });
+    const viewer = new MPlotViewer(host, { ...document, timeline: { fps: 2, duration: 1, frames: [update(.5, [4, 2, 0]), update(1, [1, 1, 1])] } });
+    await viewer.render();
+    const path = () => host.querySelector("[data-artist-id='line'] path:not(.mplot-line-hit)")?.getAttribute("d");
+    const step = host.querySelectorAll<HTMLButtonElement>(".mplot-timeline .mplot-button")[2]!;
+    step.click(); step.click();
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(host.querySelector(".mplot-timeline-time")?.textContent).toBe("1.00 / 1.00 s");
+    const rapid = path();
+    const range = host.querySelector<HTMLInputElement>(".mplot-timeline-range")!;
+    range.value = "0"; range.dispatchEvent(new window.Event("input"));
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(path()).not.toBe(rapid);
+    step.click(); await new Promise((resolve) => setTimeout(resolve, 20));
+    step.click(); await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(rapid).toBe(path());
     viewer.destroy();
   });
 

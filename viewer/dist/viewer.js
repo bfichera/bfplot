@@ -587,7 +587,7 @@ export class MPlotViewer extends EventTarget {
         const heading = document.createElement("header"), title = document.createElement("h2"), subtitle = document.createElement("span");
         heading.className = "mplot-figure-header";
         title.className = "mplot-figure-title";
-        title.textContent = "Artifact metadata";
+        title.textContent = "Result metadata";
         subtitle.className = "mplot-figure-count";
         subtitle.textContent = "provenance and document";
         heading.append(title, subtitle);
@@ -676,7 +676,7 @@ export class MPlotViewer extends EventTarget {
         const select = document.createElement("select");
         select.className = "mplot-export-scope";
         select.setAttribute("aria-label", "Export scope");
-        for (const [value, label] of [["axis", "Current plot"], ["figure", "Current figure"], ["artifact", "Entire artifact"], ["figures", "Each figure"]]) {
+        for (const [value, label] of [["axis", "Current plot"], ["figure", "Current figure"], ["artifact", "Entire result"], ["figures", "Each figure"]]) {
             const option = document.createElement("option");
             option.value = value;
             option.textContent = label;
@@ -766,9 +766,11 @@ export class MPlotViewer extends EventTarget {
         }
         const operation = (async () => {
             try {
-                this.dirtyAxes.delete(axisId);
-                await this.renderAxisNow(axisId);
-                this.dirtyAxes.delete(axisId);
+                // Requests that arrive mid-render mark the axis dirty; draw again until it is current.
+                do {
+                    this.dirtyAxes.delete(axisId);
+                    await this.renderAxisNow(axisId);
+                } while (this.dirtyAxes.has(axisId));
             }
             finally {
                 this.axisRenders.delete(axisId);
@@ -781,7 +783,7 @@ export class MPlotViewer extends EventTarget {
         const view = this.views.get(axisId);
         if (!view?.mounted || view.figureId !== this.activeFigureIdValue)
             return;
-        const token = (this.axisTokens.get(axisId) ?? 0) + 1, documentToken = this.documentToken;
+        const token = (this.axisTokens.get(axisId) ?? 0) + 1, documentToken = this.documentToken, source = this.model.document;
         this.axisTokens.set(axisId, token);
         view.width = Math.max(180, view.host.clientWidth || 640);
         view.height = Math.max(150, view.host.clientHeight || 360);
@@ -811,7 +813,7 @@ export class MPlotViewer extends EventTarget {
             }
             try {
                 const data = this.resolvedData.get(artist.id) ?? await this.model.resolveData(artist.data, artist);
-                if (documentToken !== this.documentToken || this.views.get(axisId) !== view || view.figureId !== this.activeFigureIdValue)
+                if (documentToken !== this.documentToken || source !== this.model.document || this.views.get(axisId) !== view || view.figureId !== this.activeFigureIdValue)
                     return;
                 this.resolvedData.set(artist.id, data);
                 const contrast = this.contrastLimits.get(artist.id);
@@ -834,7 +836,7 @@ export class MPlotViewer extends EventTarget {
                 this.drawUnknown(group, artist, working, error instanceof Error ? error.message : "render failed");
             }
         }
-        if (documentToken !== this.documentToken || this.views.get(axisId) !== view || view.figureId !== this.activeFigureIdValue || this.axisTokens.get(axisId) !== token)
+        if (documentToken !== this.documentToken || source !== this.model.document || this.views.get(axisId) !== view || view.figureId !== this.activeFigureIdValue || this.axisTokens.get(axisId) !== token)
             return;
         this.drawHitArea(working);
         view.svg.setAttribute("viewBox", `0 0 ${view.width} ${view.height}`);
