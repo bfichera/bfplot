@@ -89,6 +89,8 @@ MIR is described by `src/mplot/mir.schema.json`, so producers for other language
 
 Lines, scatter plots, images, error bars, filled regions, histograms, contours, text, patches and common 3D plots. Anything else is shown as a visible placeholder, never silently dropped.
 
+To see them all, run the [example gallery](examples/gallery.py): `python examples/gallery.py`, then `mplot view gallery.mplot`.
+
 ## More
 
 - [Contributing](CONTRIBUTING.md)

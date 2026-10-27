@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - "docs/**"
+      - "examples/**"
       - "mkdocs.yml"
       - "pyproject.toml"
       - "README.md"
@@ -15,6 +16,7 @@ on:
   pull_request:
     paths:
       - "docs/**"
+      - "examples/**"
       - "mkdocs.yml"
       - "pyproject.toml"
       - "README.md"

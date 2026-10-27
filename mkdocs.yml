@@ -66,6 +66,7 @@ nav:
       - Provenance and metadata: guides/provenance.md
       - Using MPlot with Snakemake: guides/snakemake.md
       - Serving plots: guides/serving.md
+      - Example gallery: guides/gallery.md
   - Reference:
       - Python API: reference/python-api.md
       - Command-line interface: reference/cli.md

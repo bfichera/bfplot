@@ -22,3 +22,4 @@ $ mplot view my_plot.mplot
 - [Your first MPlot](first-plot.md): labels, metadata and choosing what to save.
 - [Choosing a file type](../guides/file-types.md): directories or single files.
 - [Using MPlot with Git](../guides/version-control.md): commit manifests, not arrays.
+- [Example gallery](../guides/gallery.md): every supported plot type in one result.

@@ -21,6 +21,8 @@ MPlot 0.9.9 understands the common Matplotlib artists below.
 
 MPlot also records linear, logarithmic, symmetric-log, and common Matplotlib axis information.
 
+The [example gallery](../guides/gallery.md) uses every artist in this table.
+
 ## What happens to an unsupported artist?
 
 MPlot does not silently remove unsupported data. The viewer displays a placeholder containing the artist type and ID, so it is clear that the saved figure contains something the current renderer cannot draw.

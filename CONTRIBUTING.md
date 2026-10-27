@@ -38,7 +38,7 @@ $ npm --prefix viewer test
 $ mkdocs build --strict
 ```
 
-Format with `cargo fmt --all` and `python -m ruff format src tests`. Edit `viewer/src`, not `viewer/dist`; rebuild with `npm --prefix viewer run build`.
+Format with `cargo fmt --all` and `python -m ruff format src tests examples`. Edit `viewer/src`, not `viewer/dist`; rebuild with `npm --prefix viewer run build`.
 
 ## Tests
 
