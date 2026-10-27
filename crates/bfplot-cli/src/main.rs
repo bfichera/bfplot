@@ -1,4 +1,5 @@
 use std::{
+    borrow::Cow,
     fs,
     io::{self, Read, Write},
     net::IpAddr,
@@ -50,8 +51,9 @@ enum Command {
         bind: IpAddr,
         #[arg(long, default_value_t = 8080)]
         port: u16,
-        /// Directory containing the built viewer's index.js and style.css.
-        #[arg(long)]
+        /// Serve the viewer from this built directory instead of the copy embedded in
+        /// bfplot (for viewer development; also read from BFPLOT_VIEWER_DIR).
+        #[arg(long, env = "BFPLOT_VIEWER_DIR")]
         viewer_dir: Option<PathBuf>,
     },
     /// Serve a result and open it in the default browser.
@@ -61,7 +63,8 @@ enum Command {
         bind: IpAddr,
         #[arg(long, default_value_t = 8080)]
         port: u16,
-        #[arg(long)]
+        /// Serve the viewer from this built directory instead of the embedded copy.
+        #[arg(long, env = "BFPLOT_VIEWER_DIR")]
         viewer_dir: Option<PathBuf>,
     },
 }
@@ -141,7 +144,7 @@ struct ServeState {
     manifest: Arc<Vec<u8>>,
     document: Arc<Vec<u8>>,
     objects: ObjectStore,
-    viewer_dir: Option<PathBuf>,
+    viewer: Viewer,
     _unpacked: Option<Arc<tempfile::TempDir>>,
 }
 
@@ -163,17 +166,12 @@ async fn serve(
 ) -> anyhow::Result<()> {
     let artifact = prepare_serve_artifact(&path)?;
     let viewer_document_bytes = viewer_document(&artifact.document, &artifact.manifest_data)?;
-    let viewer_dir = discover_viewer_dir(viewer_dir);
-    if viewer_dir.is_none() {
-        eprintln!(
-            "warning: viewer assets not found; set --viewer-dir or BFPLOT_VIEWER_DIR (the JSON endpoints still work)"
-        );
-    }
+    let viewer = Viewer::new(viewer_dir)?;
     let state = ServeState {
         manifest: Arc::new(artifact.manifest),
         document: Arc::new(viewer_document_bytes),
         objects: artifact.objects,
-        viewer_dir,
+        viewer,
         _unpacked: artifact.unpacked,
     };
     let app = Router::new()
@@ -217,22 +215,15 @@ fn prepare_serve_artifact(path: &Path) -> anyhow::Result<ServeArtifact> {
 }
 
 async fn index(State(state): State<ServeState>) -> Response {
-    let Some(viewer_dir) = state.viewer_dir else {
-        return bytes_response(
-            b"<!doctype html><title>BFPlot</title><h1>BFPlot result</h1><p>Viewer assets are unavailable.</p><ul><li><a href='/manifest'>manifest</a></li><li><a href='/document'>document</a></li></ul>".to_vec(),
+    match state.viewer.asset("index.html") {
+        Some(index) => bytes_response(
+            String::from_utf8_lossy(&index)
+                .replace("\"./", "\"/viewer/")
+                .into_bytes(),
             "text/html; charset=utf-8",
-        );
-    };
-    if let Ok(index) = fs::read_to_string(viewer_dir.join("index.html")) {
-        return bytes_response(
-            index.replace("\"./", "\"/viewer/").into_bytes(),
-            "text/html; charset=utf-8",
-        );
+        ),
+        None => StatusCode::NOT_FOUND.into_response(),
     }
-    bytes_response(
-        br#"<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>BFPlot</title><link rel="stylesheet" href="/viewer/style.css"></head><body><div id="bfplot"></div><script type="module">import {createViewer} from '/viewer/index.js'; const document=await fetch('/document').then(r=>r.json()); createViewer('#bfplot',document);</script></body></html>"#.to_vec(),
-        "text/html; charset=utf-8",
-    )
 }
 async fn manifest(State(state): State<ServeState>) -> Response {
     bytes_response(state.manifest.as_ref().clone(), "application/toml")
@@ -259,31 +250,28 @@ async fn viewer_asset(
     State(state): State<ServeState>,
     AxumPath(path): AxumPath<String>,
 ) -> Response {
-    let Some(root) = state.viewer_dir else {
-        return StatusCode::NOT_FOUND.into_response();
-    };
-    let relative = Path::new(&path);
-    if relative
+    if Path::new(&path)
         .components()
         .any(|component| !matches!(component, std::path::Component::Normal(_)))
     {
         return StatusCode::BAD_REQUEST.into_response();
     }
-    let asset = root.join(relative);
-    let bytes = match fs::read(&asset) {
-        Ok(bytes) => bytes,
-        Err(error) if error.kind() == io::ErrorKind::NotFound => {
-            return StatusCode::NOT_FOUND.into_response();
-        }
-        Err(_) => return StatusCode::INTERNAL_SERVER_ERROR.into_response(),
+    let Some(bytes) = state.viewer.asset(&path) else {
+        return StatusCode::NOT_FOUND.into_response();
     };
-    let content_type = match asset.extension().and_then(|value| value.to_str()) {
+    let content_type = match Path::new(&path)
+        .extension()
+        .and_then(|value| value.to_str())
+    {
+        Some("html") => "text/html; charset=utf-8",
         Some("js") => "text/javascript; charset=utf-8",
         Some("css") => "text/css; charset=utf-8",
         Some("map") | Some("json") => "application/json",
+        Some("woff2") => "font/woff2",
+        Some("txt") => "text/plain; charset=utf-8",
         _ => "application/octet-stream",
     };
-    bytes_response(bytes, content_type)
+    bytes_response(bytes.into_owned(), content_type)
 }
 
 fn open_default_browser(url: &str) -> anyhow::Result<()> {
@@ -302,18 +290,42 @@ fn open_default_browser(url: &str) -> anyhow::Result<()> {
     Ok(())
 }
 
-fn discover_viewer_dir(explicit: Option<PathBuf>) -> Option<PathBuf> {
-    explicit
-        .or_else(|| std::env::var_os("BFPLOT_VIEWER_DIR").map(PathBuf::from))
-        .or_else(|| {
-            let local = PathBuf::from("viewer/dist");
-            viewer_entry_exists(&local).then_some(local)
-        })
-        .filter(|directory| viewer_entry_exists(directory))
+mod embedded {
+    include!(concat!(env!("OUT_DIR"), "/viewer_assets.rs"));
 }
 
-fn viewer_entry_exists(directory: &Path) -> bool {
-    directory.join("app.js").is_file() || directory.join("index.js").is_file()
+/// Where the browser viewer's files come from.
+#[derive(Clone, Debug)]
+enum Viewer {
+    /// The copy compiled into this binary.
+    Embedded,
+    /// A built `viewer/dist`, for viewer development.
+    Directory(PathBuf),
+}
+
+impl Viewer {
+    fn new(directory: Option<PathBuf>) -> anyhow::Result<Self> {
+        let Some(directory) = directory else {
+            return Ok(Self::Embedded);
+        };
+        anyhow::ensure!(
+            directory.join("index.html").is_file(),
+            "{} is not a built viewer (no index.html); run `npm --prefix viewer run build`",
+            directory.display()
+        );
+        Ok(Self::Directory(directory))
+    }
+
+    /// The bytes of `path` (relative, `/`-separated), if the viewer has that file.
+    fn asset(&self, path: &str) -> Option<Cow<'static, [u8]>> {
+        match self {
+            Self::Embedded => embedded::ASSETS
+                .iter()
+                .find(|(name, _)| *name == path)
+                .map(|(_, bytes)| Cow::Borrowed(*bytes)),
+            Self::Directory(root) => fs::read(root.join(path)).ok().map(Cow::Owned),
+        }
+    }
 }
 
 /// Flatten a document into the `figures`/`axes`/`artists` lists the viewer expects.
@@ -487,6 +499,101 @@ mod tests {
             .unwrap();
             assert_eq!(value["figures"][0]["name"], "spectrum");
         }
+    }
+
+    fn serve_state(viewer: Viewer) -> ServeState {
+        let directory = tempfile::tempdir().unwrap();
+        let result = directory.path().join("fit.bfplot");
+        let id = ObjectStore::for_result_dir(&result)
+            .put_json(&Document::default())
+            .unwrap();
+        let manifest = toml::to_string(&Manifest::new(id)).unwrap();
+        fs::write(result.join("manifest.toml"), &manifest).unwrap();
+        fs::write(result.join(".gitignore"), "/objects/\n").unwrap();
+        let artifact = prepare_serve_artifact(&result).unwrap();
+        ServeState {
+            manifest: Arc::new(artifact.manifest),
+            document: Arc::new(Vec::new()),
+            objects: artifact.objects,
+            viewer,
+            _unpacked: Some(Arc::new(directory)),
+        }
+    }
+
+    async fn body(response: Response) -> (StatusCode, String, Vec<u8>) {
+        let status = response.status();
+        let content_type = response
+            .headers()
+            .get(header::CONTENT_TYPE)
+            .map(|value| value.to_str().unwrap().to_owned())
+            .unwrap_or_default();
+        let bytes = axum::body::to_bytes(response.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        (status, content_type, bytes.to_vec())
+    }
+
+    #[test]
+    fn embeds_only_the_runtime_viewer_files() {
+        let names: Vec<_> = embedded::ASSETS.iter().map(|(name, _)| *name).collect();
+        for required in ["index.html", "app.js", "index.js", "style.css", "fzstd.js"] {
+            assert!(names.contains(&required), "missing {required}");
+        }
+        assert!(names.iter().any(|name| name.starts_with("fonts/")));
+        assert!(
+            !names
+                .iter()
+                .any(|name| name.ends_with(".map") || name.ends_with(".d.ts"))
+        );
+    }
+
+    #[tokio::test]
+    async fn serves_the_embedded_viewer_without_any_files_on_disk() {
+        let state = serve_state(Viewer::new(None).unwrap());
+
+        let (status, content_type, page) = body(index(State(state.clone())).await).await;
+        let page = String::from_utf8(page).unwrap();
+        assert_eq!(status, StatusCode::OK);
+        assert!(content_type.starts_with("text/html"));
+        assert!(page.contains("src=\"/viewer/app.js\""));
+        assert!(!page.contains("\"./"));
+
+        let asset = |path: &str| viewer_asset(State(state.clone()), AxumPath(path.to_string()));
+        let (status, content_type, script) = body(asset("app.js").await).await;
+        assert_eq!(status, StatusCode::OK);
+        assert!(content_type.starts_with("text/javascript"));
+        assert_eq!(script, fs::read("../../viewer/dist/app.js").unwrap());
+        let (_, content_type, _) = body(asset("fonts/cmu-serif-500-roman.woff2").await).await;
+        assert_eq!(content_type, "font/woff2");
+        assert_eq!(
+            body(asset("missing.js").await).await.0,
+            StatusCode::NOT_FOUND
+        );
+        assert_eq!(
+            body(asset("../Cargo.toml").await).await.0,
+            StatusCode::BAD_REQUEST
+        );
+    }
+
+    #[tokio::test]
+    async fn a_viewer_directory_overrides_the_embedded_copy() {
+        let viewer = tempfile::tempdir().unwrap();
+        fs::write(
+            viewer.path().join("index.html"),
+            "<script src=\"./app.js\"></script>",
+        )
+        .unwrap();
+        fs::write(viewer.path().join("app.js"), "// development build").unwrap();
+        let state = serve_state(Viewer::new(Some(viewer.path().to_path_buf())).unwrap());
+
+        let (_, _, page) = body(index(State(state.clone())).await).await;
+        assert_eq!(page, b"<script src=\"/viewer/app.js\"></script>");
+        let (_, _, script) =
+            body(viewer_asset(State(state), AxumPath("app.js".into())).await).await;
+        assert_eq!(script, b"// development build");
+
+        let error = Viewer::new(Some(viewer.path().join("absent"))).unwrap_err();
+        assert!(error.to_string().contains("is not a built viewer"));
     }
 
     #[test]

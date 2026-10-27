@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import os
 import shutil
 import subprocess
+import sysconfig
 import tempfile
 from collections.abc import Callable, Iterable
 from pathlib import Path
@@ -129,11 +131,29 @@ def show(
         layout = "file"
     output = savefig(path, figure, layout=layout)
     if open_browser:
-        executable = shutil.which("bfplot")
+        executable = _find_executable()
         if executable is None:
-            raise RuntimeError("the bfplot CLI is not installed; use open_browser=False")
+            raise RuntimeError(
+                "the bfplot app is not installed (pip install bfplot-cli); use open_browser=False"
+            )
         subprocess.Popen([executable, "view", str(output)], start_new_session=True)
     return output
+
+
+def _find_executable() -> str | None:
+    """The ``bfplot`` app, preferring the one installed in this Python environment.
+
+    The ``bfplot-cli`` dependency installs it next to this interpreter's scripts, which may
+    not be on ``PATH`` when the environment is not activated.
+    """
+    name = "bfplot.exe" if os.name == "nt" else "bfplot"
+    for scheme in dict.fromkeys(
+        [sysconfig.get_default_scheme(), sysconfig.get_preferred_scheme("user")]
+    ):
+        candidate = Path(sysconfig.get_path("scripts", scheme)) / name
+        if candidate.is_file() and os.access(candidate, os.X_OK):
+            return str(candidate)
+    return shutil.which("bfplot")
 
 
 __all__ = [

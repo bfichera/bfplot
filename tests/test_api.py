@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import os
 from datetime import datetime, timedelta
+from pathlib import Path
 
 import matplotlib.dates as mdates
 import matplotlib.pyplot as plt
@@ -229,3 +231,33 @@ def test_show_can_avoid_viewer_side_effect(tmp_path):
     figure, axes = plt.subplots()
     axes.plot([0, 1])
     assert bfplot.show(figure, path=tmp_path / "shown.bfplot", open_browser=False).exists()
+
+
+def test_show_prefers_the_app_installed_in_this_environment(tmp_path, monkeypatch):
+    from bfplot import api
+
+    scripts = tmp_path / "scripts"
+    elsewhere = tmp_path / "elsewhere"
+    for directory in (scripts, elsewhere):
+        directory.mkdir()
+        app = directory / ("bfplot.exe" if os.name == "nt" else "bfplot")
+        app.write_text("")
+        app.chmod(0o755)
+    monkeypatch.setenv("PATH", str(elsewhere))
+
+    monkeypatch.setattr(api.sysconfig, "get_path", lambda name, scheme: str(scripts))
+    assert Path(api._find_executable()).parent == scripts
+
+    # Without one in the environment, fall back to PATH.
+    monkeypatch.setattr(api.sysconfig, "get_path", lambda name, scheme: str(tmp_path / "none"))
+    assert Path(api._find_executable()).parent == elsewhere
+
+    figure, axes = plt.subplots()
+    axes.plot([0, 1])
+    launched = []
+    with monkeypatch.context() as patch:
+        patch.setattr(api.subprocess, "Popen", lambda args, **kwargs: launched.append(args))
+        patch.setattr(api, "savefig", lambda path, figure, layout: Path(path))
+        output = bfplot.show(figure, path=tmp_path / "shown.bfplot")
+    assert launched == [[api._find_executable(), "view", str(output)]]
+    plt.close(figure)

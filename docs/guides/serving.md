@@ -12,12 +12,12 @@ The server listens on `127.0.0.1:8080`. Use `--port` to pick another port:
 $ bfplot serve result.bfplot --port 9000
 ```
 
-## Viewer assets
+## The viewer
 
-Outside the repository, tell the CLI where the built viewer is:
+The viewer is built into the `bfplot` app and needs no internet connection. When working on the viewer itself, you can serve a build of it instead:
 
 ```console
-$ bfplot view result.bfplot --viewer-dir /path/to/bfplot/viewer/dist
+$ bfplot view result.bfplot --viewer-dir viewer/dist
 $ export BFPLOT_VIEWER_DIR=/path/to/bfplot/viewer/dist
 ```
 

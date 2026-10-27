@@ -19,7 +19,7 @@ Every command that reads a result accepts a result directory or a packed file. R
 | --- | --- |
 | `--bind ADDRESS` | Listening address. Defaults to `127.0.0.1`. |
 | `--port PORT` | Listening port. Defaults to `8080`. |
-| `--viewer-dir PATH` | Directory with the built viewer. Defaults to `BFPLOT_VIEWER_DIR` or `./viewer/dist`. |
+| `--viewer-dir PATH` | Serve the viewer from this built directory instead of the copy inside `bfplot`. For viewer development. Also read from `BFPLOT_VIEWER_DIR`. |
 
 ## Diffing packed files in Git
 
