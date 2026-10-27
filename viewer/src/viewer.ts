@@ -13,7 +13,6 @@ export interface ViewerOptions {
   arrayResolver?: ArrayResolver;
   interactive?: boolean;
   toolbar?: boolean;
-  liveUrl?: string;
 }
 
 export type ExportScope = "axis" | "figure" | "artifact";
@@ -35,7 +34,6 @@ export class MPlotViewer extends EventTarget {
   private exportScope: ExportScope | "figures" = "figure";
   private activeAxisId: string | undefined;
   private activeFigureIdValue: string | undefined;
-  private source?: EventSource;
   private resize?: ResizeObserver;
   private intersection?: IntersectionObserver;
   private documentToken = 0;
@@ -65,8 +63,7 @@ export class MPlotViewer extends EventTarget {
     this.element.setAttribute("aria-label", document.title ?? "Interactive scientific plot collection");
     this.applyTheme();
     this.model.addEventListener("viewport", (event) => {
-      const detail = (event as CustomEvent<{ axisId: string; affected?: string[] }>).detail;
-      for (const axisId of detail.affected ?? [detail.axisId]) void this.renderAxis(axisId);
+      void this.renderAxis((event as CustomEvent<{ axisId: string }>).detail.axisId);
     });
     this.model.addEventListener("change", () => { void this.render(); });
     if (typeof ResizeObserver !== "undefined") {
@@ -87,7 +84,6 @@ export class MPlotViewer extends EventTarget {
         }
       }, { rootMargin: "600px 0px" });
     }
-    if (options.liveUrl) this.connectLive(options.liveUrl);
     void this.render();
   }
 
@@ -119,7 +115,6 @@ export class MPlotViewer extends EventTarget {
 
   destroy(): void {
     this.timeline.pause();
-    this.source?.close();
     this.resize?.disconnect();
     this.intersection?.disconnect();
     this.element.replaceChildren();
@@ -541,16 +536,7 @@ export class MPlotViewer extends EventTarget {
     heading.className = "mplot-figure-header"; title.className = "mplot-figure-title"; title.textContent = "Artifact metadata"; subtitle.className = "mplot-figure-count"; subtitle.textContent = "provenance and document";
     heading.append(title, subtitle);
     const body = document.createElement("div"); body.className = "mplot-metadata-body";
-    const embedded = this.model.document.metadata ?? {};
-    const metadata = Object.keys(embedded).length ? embedded : {
-      artifact: { status: "No embedded metadata was found in this legacy or raw document." },
-      document: {
-        figures: this.model.document.figures.length,
-        plots: this.model.document.axes.filter((axis) => axis.role !== "colorbar" && axis.role !== "inset").length,
-        artists: this.model.document.artists.length,
-      },
-    };
-    body.append(this.metadataTree(metadata, "Metadata"));
+    body.append(this.metadataTree(this.model.document.metadata ?? {}, "Metadata"));
     page.append(heading, body);
     return page;
   }
@@ -914,7 +900,6 @@ export class MPlotViewer extends EventTarget {
   private activeFigureId(): string | undefined { return this.activeFigureIdValue ?? (this.activeAxisId ? this.views.get(this.activeAxisId)?.figureId : this.model.document.figures[0]?.id); }
   private download(blob: Blob, filename: string): void { const link = document.createElement("a"), url = URL.createObjectURL(blob); link.href = url; link.download = filename; link.click(); setTimeout(() => URL.revokeObjectURL(url), 0); }
 
-  connectLive(url: string): void { this.source?.close(); if (typeof EventSource === "undefined") return; this.source = new EventSource(url); const update = (event: MessageEvent) => { try { const payload = JSON.parse(String(event.data)) as MPlotDocument | { document: MPlotDocument }; this.update("document" in payload ? payload.document : payload); } catch (error) { this.dispatchEvent(new CustomEvent("mplot:error", { detail: error })); } }; this.source.addEventListener("document", update as EventListener); this.source.onmessage = update; this.source.onerror = () => this.dispatchEvent(new Event("mplot:disconnect")); }
   private figureAxisIds(figure: Figure): string[] { return (figure.axes ?? this.model.document.axes.filter((axis) => !axis.figure_id || axis.figure_id === figure.id)).map((axis) => typeof axis === "string" ? axis : axis.id); }
   private applyTheme(): void { const values: Record<string, string> = { "--mplot-bg": this.theme.background, "--mplot-panel": this.theme.panel, "--mplot-fg": this.theme.foreground, "--mplot-muted": this.theme.muted, "--mplot-grid": this.theme.grid, "--mplot-accent": this.theme.accent, "font-family": this.theme.fontFamily }; for (const [key, value] of Object.entries(values)) this.element.style.setProperty(key, value); }
 }

@@ -1,3 +1,7 @@
+//! The packed single-file layout: magic, u64 manifest length, manifest, u64 object
+//! count, then per object its 32-byte SHA-256 digest, u64 length and bytes. All
+//! integers are little-endian.
+
 use std::{
     collections::{BTreeMap, BTreeSet},
     fs,
@@ -6,84 +10,58 @@ use std::{
 };
 
 use crate::{
-    Error, Manifest, ObjectId, ObjectStore, Result, VerificationReport, error::io,
-    format::referenced_objects, load_artifact, locate_artifact, store::verify_bytes,
+    Error, Manifest, ObjectId, ObjectStore, Result, VerificationReport,
+    error::io,
+    format::array_refs,
+    load_artifact, locate_artifact,
+    store::{validate, verify_bytes},
     verify_artifact,
 };
 
 const MAGIC: &[u8; 8] = b"MPLOT\0\x09\x09";
 const MANIFEST_PREFIX: &[u8] = b"format = \"mplot\"";
-const GITIGNORE: &str = "/objects/\n";
-type PackedObjects = BTreeMap<ObjectId, Vec<u8>>;
+type Objects = BTreeMap<ObjectId, Vec<u8>>;
 
-#[derive(Clone, Copy, Debug)]
-pub struct PackLimits {
-    pub max_manifest_bytes: u64,
-    pub max_objects: u64,
-    pub max_object_bytes: u64,
-    pub max_total_bytes: u64,
-}
-impl Default for PackLimits {
-    fn default() -> Self {
-        Self {
-            max_manifest_bytes: 4 << 20,
-            max_objects: 100_000,
-            max_object_bytes: 1 << 30,
-            max_total_bytes: 8 << 30,
-        }
-    }
-}
-
+/// Pack a result directory into one file at `output`.
 pub fn pack_artifact(source: &Path, output: &Path) -> Result<VerificationReport> {
-    let verified = verify_artifact(source)?;
+    let report = verify_artifact(source)?;
     let artifact = load_artifact(source)?;
     let (manifest_path, _) = locate_artifact(source);
-    let manifest = fs::read(&manifest_path).map_err(|error| io(&manifest_path, error))?;
+    let manifest = fs::read(&manifest_path).map_err(|e| io(&manifest_path, e))?;
     let ids: BTreeSet<_> = std::iter::once(artifact.manifest.document.clone())
-        .chain(referenced_objects(&artifact.document))
+        .chain(array_refs(&artifact.document).0)
         .collect();
-    let mut packed = Vec::new();
-    packed.extend_from_slice(MAGIC);
-    write_u64(&mut packed, manifest.len() as u64);
-    packed.extend_from_slice(&manifest);
-    write_u64(&mut packed, ids.len() as u64);
+    let mut packed = MAGIC.to_vec();
+    packed.extend((manifest.len() as u64).to_le_bytes());
+    packed.extend(&manifest);
+    packed.extend((ids.len() as u64).to_le_bytes());
     for id in ids {
         let bytes = artifact.store.get(&id)?;
-        packed.extend_from_slice(id.as_bytes());
-        write_u64(&mut packed, bytes.len() as u64);
-        packed.extend_from_slice(&bytes);
+        packed.extend(id.0);
+        packed.extend((bytes.len() as u64).to_le_bytes());
+        packed.extend(bytes);
     }
     ensure_replaceable(output)?;
-    let temporary = sibling(output, "tmp")?;
-    let result = fs::write(&temporary, packed)
-        .map_err(|e| io(&temporary, e))
-        .and_then(|()| install(&temporary, output));
+    let staging = sibling(output, "partial")?;
+    let result = fs::write(&staging, packed)
+        .map_err(|e| io(&staging, e))
+        .and_then(|()| install(&staging, output));
     if result.is_err() {
-        remove_any(&temporary);
+        remove_any(&staging);
     }
-    result.map(|()| verified)
+    result.map(|()| report)
 }
 
 /// Unpack a packed file into a result directory at `destination`.
 ///
 /// An existing MPlot result at `destination` is replaced; anything else is left untouched.
-pub fn unpack_artifact(
-    packed_path: &Path,
-    destination: &Path,
-    limits: PackLimits,
-) -> Result<VerificationReport> {
-    let (manifest_bytes, objects) = read_pack(packed_path, limits)?;
-    let manifest: Manifest = toml::from_str(
-        std::str::from_utf8(&manifest_bytes)
-            .map_err(|_| Error::InvalidPack("manifest is not UTF-8".into()))?,
-    )?;
-    if !objects.contains_key(&manifest.document) {
-        return Err(Error::InvalidPack("document object is absent".into()));
-    }
+pub fn unpack_artifact(packed: &Path, destination: &Path) -> Result<VerificationReport> {
+    let (manifest, objects) = read_pack(packed)?;
+    parse_manifest(&manifest)?;
     ensure_replaceable(destination)?;
     let staging = sibling(destination, "partial")?;
     remove_any(&staging);
-    let result = build_result(&staging, &manifest_bytes, objects)
+    let result = write_directory(&staging, &manifest, objects)
         .and_then(|report| install(&staging, destination).map(|()| report));
     if result.is_err() {
         remove_any(&staging);
@@ -91,46 +69,104 @@ pub fn unpack_artifact(
     result
 }
 
-/// Read only the header and manifest bytes of a packed file.
-pub fn read_packed_manifest(path: &Path, limits: PackLimits) -> Result<Vec<u8>> {
+/// Validate a packed file and check that it contains every referenced object.
+pub fn verify_packed(path: &Path) -> Result<VerificationReport> {
+    let (manifest, objects) = read_pack(path)?;
+    let manifest = parse_manifest(&manifest)?;
+    let document = objects
+        .get(&manifest.document)
+        .ok_or_else(|| Error::InvalidPack("document object is absent".into()))?;
+    let document = serde_json::from_slice(document)?;
+    validate(&manifest, &document)?;
+    let missing = array_refs(&document)
+        .0
+        .iter()
+        .filter(|id| !objects.contains_key(id))
+        .count();
+    if missing > 0 {
+        return Err(Error::InvalidPack(format!(
+            "missing {missing} referenced object(s)"
+        )));
+    }
+    Ok(VerificationReport {
+        object_count: objects.len(),
+        byte_count: objects.values().map(|b| b.len() as u64).sum(),
+    })
+}
+
+/// Read only the manifest bytes of a packed file.
+pub fn read_packed_manifest(path: &Path) -> Result<Vec<u8>> {
     let mut file = fs::File::open(path).map_err(|e| io(path, e))?;
     let mut header = [0; 16];
-    file.read_exact(&mut header)
-        .map_err(|_| Error::InvalidPack("truncated data".into()))?;
+    file.read_exact(&mut header).map_err(|_| truncated())?;
     if &header[..8] != MAGIC {
         return Err(Error::InvalidPack("bad magic".into()));
     }
-    let manifest_len = u64::from_le_bytes(header[8..].try_into().expect("8-byte length"));
-    if manifest_len > limits.max_manifest_bytes {
-        return Err(Error::PackLimit("manifest bytes".into()));
-    }
-    let mut manifest = vec![0; usize_len(manifest_len)?];
-    file.read_exact(&mut manifest)
-        .map_err(|_| Error::InvalidPack("truncated data".into()))?;
+    let mut manifest = vec![0; length(&header[8..])?];
+    file.read_exact(&mut manifest).map_err(|_| truncated())?;
     Ok(manifest)
 }
 
-fn build_result(
-    staging: &Path,
-    manifest: &[u8],
-    objects: PackedObjects,
-) -> Result<VerificationReport> {
-    let store = ObjectStore::for_result_dir(staging);
-    fs::create_dir_all(store.root()).map_err(|e| io(store.root(), e))?;
-    for (id, bytes) in objects {
-        let written = store.put(&bytes)?;
-        if written != id {
-            return Err(Error::DigestMismatch {
-                expected: id.to_string(),
-                actual: written.digest(),
-            });
+fn parse_manifest(bytes: &[u8]) -> Result<Manifest> {
+    let text = std::str::from_utf8(bytes)
+        .map_err(|_| Error::InvalidPack("manifest is not UTF-8".into()))?;
+    Ok(toml::from_str(text)?)
+}
+
+fn read_pack(path: &Path) -> Result<(Vec<u8>, Objects)> {
+    let file = fs::read(path).map_err(|e| io(path, e))?;
+    let mut cursor = Cursor::new(file.as_slice());
+    if take(&mut cursor, 8)? != MAGIC {
+        return Err(Error::InvalidPack("bad magic".into()));
+    }
+    let size = length(take(&mut cursor, 8)?)?;
+    let manifest = take(&mut cursor, size)?.to_vec();
+    let count = length(take(&mut cursor, 8)?)?;
+    let mut objects = BTreeMap::new();
+    for _ in 0..count {
+        let id = ObjectId(take(&mut cursor, 32)?.try_into().expect("32 bytes"));
+        let size = length(take(&mut cursor, 8)?)?;
+        let bytes = take(&mut cursor, size)?.to_vec();
+        verify_bytes(&id, &bytes)?;
+        if objects.insert(id, bytes).is_some() {
+            return Err(Error::InvalidPack("duplicate object".into()));
         }
     }
-    let manifest_path = staging.join("manifest.toml");
-    fs::write(&manifest_path, manifest).map_err(|e| io(&manifest_path, e))?;
-    let gitignore = staging.join(".gitignore");
-    fs::write(&gitignore, GITIGNORE).map_err(|e| io(&gitignore, e))?;
-    verify_artifact(staging)
+    if cursor.position() != file.len() as u64 {
+        return Err(Error::InvalidPack("trailing data".into()));
+    }
+    Ok((manifest, objects))
+}
+
+/// The next `n` bytes, without allocating for lengths beyond the end of the input.
+fn take<'a>(cursor: &mut Cursor<&'a [u8]>, n: usize) -> Result<&'a [u8]> {
+    let data = *cursor.get_ref();
+    let start = cursor.position() as usize;
+    let end = start.checked_add(n).filter(|&end| end <= data.len());
+    let end = end.ok_or_else(truncated)?;
+    cursor.set_position(end as u64);
+    Ok(&data[start..end])
+}
+
+fn length(bytes: &[u8]) -> Result<usize> {
+    let value = u64::from_le_bytes(bytes.try_into().expect("8-byte length"));
+    usize::try_from(value).map_err(|_| Error::InvalidPack("length too large".into()))
+}
+
+fn truncated() -> Error {
+    Error::InvalidPack("truncated data".into())
+}
+
+fn write_directory(dir: &Path, manifest: &[u8], objects: Objects) -> Result<VerificationReport> {
+    let store = ObjectStore::for_result_dir(dir);
+    for bytes in objects.values() {
+        store.put(bytes)?;
+    }
+    for (name, bytes) in [("manifest.toml", manifest), (".gitignore", b"/objects/\n")] {
+        let path = dir.join(name);
+        fs::write(&path, bytes).map_err(|e| io(&path, e))?;
+    }
+    verify_artifact(dir)
 }
 
 fn install(staging: &Path, destination: &Path) -> Result<()> {
@@ -149,33 +185,29 @@ fn install(staging: &Path, destination: &Path) -> Result<()> {
     Ok(())
 }
 
+/// Only nothing, an empty directory or an existing MPlot result may be replaced.
 fn ensure_replaceable(destination: &Path) -> Result<()> {
-    match fs::symlink_metadata(destination) {
-        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(()),
-        Err(error) => Err(io(destination, error)),
-        Ok(_) if is_mplot_result(destination) => Ok(()),
-        Ok(_) => Err(io(
-            destination,
-            std::io::Error::new(
-                std::io::ErrorKind::AlreadyExists,
-                "destination exists and is not an MPlot result",
-            ),
-        )),
-    }
-}
-
-fn is_mplot_result(path: &Path) -> bool {
-    let Ok(metadata) = fs::symlink_metadata(path) else {
-        return false;
+    let metadata = match fs::symlink_metadata(destination) {
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(()),
+        Err(error) => return Err(io(destination, error)),
+        Ok(metadata) => metadata,
     };
-    if metadata.is_dir() {
-        let Ok(mut entries) = fs::read_dir(path) else {
-            return false;
-        };
-        entries.next().is_none() || starts_with(&path.join("manifest.toml"), MANIFEST_PREFIX)
+    let replaceable = if metadata.is_dir() {
+        fs::read_dir(destination).is_ok_and(|mut entries| entries.next().is_none())
+            || starts_with(&destination.join("manifest.toml"), MANIFEST_PREFIX)
     } else {
-        metadata.is_file() && (starts_with(path, MAGIC) || starts_with(path, MANIFEST_PREFIX))
+        metadata.is_file() && starts_with(destination, MAGIC)
+    };
+    if replaceable {
+        return Ok(());
     }
+    Err(io(
+        destination,
+        std::io::Error::new(
+            std::io::ErrorKind::AlreadyExists,
+            "destination exists and is not an MPlot result",
+        ),
+    ))
 }
 
 fn starts_with(path: &Path, prefix: &[u8]) -> bool {
@@ -194,11 +226,8 @@ fn sibling(path: &Path, suffix: &str) -> Result<PathBuf> {
         _ => Path::new("."),
     };
     fs::create_dir_all(parent).map_err(|e| io(parent, e))?;
-    Ok(parent.join(format!(
-        ".{}.{}.{suffix}",
-        name.to_string_lossy(),
-        std::process::id()
-    )))
+    let name = name.to_string_lossy();
+    Ok(parent.join(format!(".{name}.{}.{suffix}", std::process::id())))
 }
 
 fn remove_any(path: &Path) {
@@ -213,131 +242,16 @@ fn remove_any(path: &Path) {
     }
 }
 
-pub fn verify_packed(path: &Path, limits: PackLimits) -> Result<VerificationReport> {
-    let (manifest_bytes, objects) = read_pack(path, limits)?;
-    let manifest: Manifest = toml::from_str(
-        std::str::from_utf8(&manifest_bytes)
-            .map_err(|_| Error::InvalidPack("manifest is not UTF-8".into()))?,
-    )?;
-    let document_bytes = objects
-        .get(&manifest.document)
-        .ok_or_else(|| Error::InvalidPack("document object is absent".into()))?;
-    let document = serde_json::from_slice(document_bytes)?;
-    let manifest_issues = manifest.validate();
-    if !manifest_issues.is_empty() {
-        return Err(Error::Validation(
-            manifest_issues
-                .iter()
-                .map(ToString::to_string)
-                .collect::<Vec<_>>()
-                .join("; "),
-        ));
-    }
-    let mut required: BTreeSet<_> = std::iter::once(manifest.document)
-        .chain(referenced_objects(&document))
-        .collect();
-    for id in objects.keys() {
-        required.remove(id);
-    }
-    if !required.is_empty() {
-        return Err(Error::InvalidPack(format!(
-            "missing {} referenced object(s)",
-            required.len()
-        )));
-    }
-    let issues = crate::validate_document(&document);
-    if !issues.is_empty() {
-        return Err(Error::Validation(
-            issues
-                .iter()
-                .map(ToString::to_string)
-                .collect::<Vec<_>>()
-                .join("; "),
-        ));
-    }
-    Ok(VerificationReport {
-        object_count: objects.len(),
-        byte_count: objects.values().map(|b| b.len() as u64).sum(),
-    })
-}
-
-fn read_pack(path: &Path, limits: PackLimits) -> Result<(Vec<u8>, PackedObjects)> {
-    let file = fs::read(path).map_err(|e| io(path, e))?;
-    if file.len() as u64 > limits.max_total_bytes {
-        return Err(Error::PackLimit("total packed bytes".into()));
-    }
-    let mut cursor = Cursor::new(file.as_slice());
-    let mut magic = [0; 8];
-    read_exact(&mut cursor, &mut magic)?;
-    if &magic != MAGIC {
-        return Err(Error::InvalidPack("bad magic".into()));
-    }
-    let manifest_len = read_u64(&mut cursor)?;
-    if manifest_len > limits.max_manifest_bytes {
-        return Err(Error::PackLimit("manifest bytes".into()));
-    }
-    let mut manifest = vec![0; usize_len(manifest_len)?];
-    read_exact(&mut cursor, &mut manifest)?;
-    let count = read_u64(&mut cursor)?;
-    if count > limits.max_objects {
-        return Err(Error::PackLimit("object count".into()));
-    }
-    let mut objects = BTreeMap::new();
-    let mut total = manifest_len;
-    for _ in 0..count {
-        let mut digest = [0; 32];
-        read_exact(&mut cursor, &mut digest)?;
-        let id: ObjectId = format!("sha256:{}", hex::encode(digest)).parse()?;
-        let length = read_u64(&mut cursor)?;
-        if length > limits.max_object_bytes {
-            return Err(Error::PackLimit("object bytes".into()));
-        }
-        total = total
-            .checked_add(length)
-            .ok_or_else(|| Error::PackLimit("total object bytes".into()))?;
-        if total > limits.max_total_bytes {
-            return Err(Error::PackLimit("total object bytes".into()));
-        }
-        let mut bytes = vec![0; usize_len(length)?];
-        read_exact(&mut cursor, &mut bytes)?;
-        verify_bytes(&id, &bytes)?;
-        if objects.insert(id, bytes).is_some() {
-            return Err(Error::InvalidPack("duplicate object".into()));
-        }
-    }
-    if cursor.position() != file.len() as u64 {
-        return Err(Error::InvalidPack("trailing data".into()));
-    }
-    Ok((manifest, objects))
-}
-
-fn write_u64(output: &mut Vec<u8>, value: u64) {
-    output.extend_from_slice(&value.to_le_bytes());
-}
-fn read_u64(input: &mut Cursor<&[u8]>) -> Result<u64> {
-    let mut bytes = [0; 8];
-    read_exact(input, &mut bytes)?;
-    Ok(u64::from_le_bytes(bytes))
-}
-fn read_exact(input: &mut Cursor<&[u8]>, bytes: &mut [u8]) -> Result<()> {
-    input
-        .read_exact(bytes)
-        .map_err(|_| Error::InvalidPack("truncated data".into()))
-}
-fn usize_len(value: u64) -> Result<usize> {
-    usize::try_from(value).map_err(|_| Error::PackLimit("length does not fit this platform".into()))
-}
-
 #[cfg(test)]
 mod tests {
-    use super::{PackLimits, pack_artifact, read_packed_manifest, unpack_artifact};
-    use crate::{Document, Manifest, ObjectStore, verify_artifact};
-    use std::{fs, path::Path};
+    use super::*;
+    use crate::Document;
     use tempfile::tempdir;
 
     fn write_result(dir: &Path) -> Vec<u8> {
-        let store = ObjectStore::for_result_dir(dir);
-        let id = store.put_json(&Document::default()).unwrap();
+        let id = ObjectStore::for_result_dir(dir)
+            .put_json(&Document::default())
+            .unwrap();
         let manifest = toml::to_string(&Manifest::new(id)).unwrap();
         fs::write(dir.join("manifest.toml"), &manifest).unwrap();
         fs::write(dir.join(".gitignore"), "/objects/\n").unwrap();
@@ -345,50 +259,25 @@ mod tests {
     }
 
     #[test]
-    fn deterministic_pack_round_trip() {
-        let dir = tempdir().unwrap();
-        let source = dir.path().join("source.mplot.toml");
-        let store = ObjectStore::for_manifest(&source);
-        let document = Document::default();
-        let id = store.put_json(&document).unwrap();
-        fs::write(&source, toml::to_string(&Manifest::new(id)).unwrap()).unwrap();
-        let one = dir.path().join("one.mplot");
-        let two = dir.path().join("two.mplot");
-        pack_artifact(&source, &one).unwrap();
-        pack_artifact(&source, &two).unwrap();
-        assert_eq!(fs::read(&one).unwrap(), fs::read(&two).unwrap());
-        let destination = dir.path().join("out/result.mplot");
-        unpack_artifact(&one, &destination, PackLimits::default()).unwrap();
-        assert!(destination.is_dir());
-        assert_eq!(
-            fs::read_to_string(destination.join(".gitignore")).unwrap(),
-            "/objects/\n"
-        );
-        assert_eq!(
-            fs::read(destination.join("manifest.toml")).unwrap(),
-            fs::read(&source).unwrap()
-        );
-        assert_eq!(verify_artifact(&destination).unwrap().object_count, 1);
-        assert_eq!(
-            read_packed_manifest(&one, PackLimits::default()).unwrap(),
-            fs::read(&source).unwrap()
-        );
-    }
-
-    #[test]
-    fn directory_result_round_trip() {
+    fn pack_round_trip_is_deterministic() {
         let dir = tempdir().unwrap();
         let source = dir.path().join("fit.mplot");
-        fs::create_dir(&source).unwrap();
         let manifest = write_result(&source);
         let packed = dir.path().join("fit.packed");
         pack_artifact(&source, &packed).unwrap();
         let via_manifest = dir.path().join("via-manifest.packed");
         pack_artifact(&source.join("manifest.toml"), &via_manifest).unwrap();
         assert_eq!(fs::read(&packed).unwrap(), fs::read(&via_manifest).unwrap());
+        assert_eq!(read_packed_manifest(&packed).unwrap(), manifest);
+        assert_eq!(verify_packed(&packed).unwrap().object_count, 1);
+
         let restored = dir.path().join("restored/fit.mplot");
-        unpack_artifact(&packed, &restored, PackLimits::default()).unwrap();
+        unpack_artifact(&packed, &restored).unwrap();
         assert_eq!(fs::read(restored.join("manifest.toml")).unwrap(), manifest);
+        assert_eq!(
+            fs::read_to_string(restored.join(".gitignore")).unwrap(),
+            "/objects/\n"
+        );
         assert_eq!(verify_artifact(&restored).unwrap().object_count, 1);
         assert_eq!(
             fs::read_dir(dir.path().join("restored")).unwrap().count(),
@@ -398,10 +287,31 @@ mod tests {
     }
 
     #[test]
-    fn unpack_replaces_existing_result() {
+    fn rejects_corrupt_packs() {
         let dir = tempdir().unwrap();
         let source = dir.path().join("fit.mplot");
-        fs::create_dir(&source).unwrap();
+        write_result(&source);
+        let packed = dir.path().join("fit.packed");
+        pack_artifact(&source, &packed).unwrap();
+        let bytes = fs::read(&packed).unwrap();
+
+        let mut flipped = bytes.clone();
+        *flipped.last_mut().unwrap() ^= 1;
+        fs::write(&packed, &flipped).unwrap();
+        assert!(matches!(
+            verify_packed(&packed),
+            Err(Error::DigestMismatch { .. })
+        ));
+        fs::write(&packed, &bytes[..bytes.len() - 1]).unwrap();
+        assert!(verify_packed(&packed).is_err());
+        fs::write(&packed, [&bytes[..], b"x"].concat()).unwrap();
+        assert!(verify_packed(&packed).is_err());
+    }
+
+    #[test]
+    fn unpack_replaces_existing_results() {
+        let dir = tempdir().unwrap();
+        let source = dir.path().join("fit.mplot");
         write_result(&source);
         let packed = dir.path().join("fit.packed");
         pack_artifact(&source, &packed).unwrap();
@@ -413,41 +323,40 @@ mod tests {
         )
         .unwrap();
         fs::write(destination.join("stale.bin"), b"old").unwrap();
-        unpack_artifact(&packed, &destination, PackLimits::default()).unwrap();
+        unpack_artifact(&packed, &destination).unwrap();
         assert!(!destination.join("stale.bin").exists());
-        verify_artifact(&destination).unwrap();
-        unpack_artifact(&packed, &destination, PackLimits::default()).unwrap();
-        let packed_destination = dir.path().join("was-packed.mplot");
-        fs::copy(&packed, &packed_destination).unwrap();
-        unpack_artifact(&packed, &packed_destination, PackLimits::default()).unwrap();
-        assert!(packed_destination.is_dir());
+        unpack_artifact(&packed, &destination).unwrap();
+        let was_packed = dir.path().join("was-packed.mplot");
+        fs::copy(&packed, &was_packed).unwrap();
+        unpack_artifact(&packed, &was_packed).unwrap();
+        assert!(was_packed.is_dir());
         assert_eq!(fs::read_dir(dir.path()).unwrap().count(), 4);
     }
 
     #[test]
-    fn unpack_refuses_to_replace_other_directories() {
+    fn refuses_to_replace_other_files() {
         let dir = tempdir().unwrap();
         let source = dir.path().join("fit.mplot");
-        fs::create_dir(&source).unwrap();
         write_result(&source);
         let packed = dir.path().join("fit.packed");
         pack_artifact(&source, &packed).unwrap();
-        let destination = dir.path().join("notes");
-        fs::create_dir(&destination).unwrap();
-        fs::write(destination.join("notes.txt"), b"keep me").unwrap();
-        assert!(unpack_artifact(&packed, &destination, PackLimits::default()).is_err());
-        assert_eq!(fs::read(destination.join("notes.txt")).unwrap(), b"keep me");
-        assert_eq!(fs::read_dir(&destination).unwrap().count(), 1);
-        assert_eq!(fs::read_dir(dir.path()).unwrap().count(), 3);
+
+        let notes = dir.path().join("notes");
+        fs::create_dir(&notes).unwrap();
+        fs::write(notes.join("notes.txt"), b"keep me").unwrap();
+        assert!(unpack_artifact(&packed, &notes).is_err());
+        assert_eq!(fs::read(notes.join("notes.txt")).unwrap(), b"keep me");
+
         let file = dir.path().join("notes.txt");
         fs::write(&file, b"plain").unwrap();
-        assert!(unpack_artifact(&packed, &file, PackLimits::default()).is_err());
-        assert_eq!(fs::read(&file).unwrap(), b"plain");
+        assert!(unpack_artifact(&packed, &file).is_err());
         assert!(pack_artifact(&source, &file).is_err());
         assert_eq!(fs::read(&file).unwrap(), b"plain");
-        let repacked = dir.path().join("fit.mplot.packed");
-        fs::create_dir(&repacked).unwrap();
-        pack_artifact(&source, &repacked).unwrap();
-        assert!(repacked.is_file());
+        assert_eq!(fs::read_dir(dir.path()).unwrap().count(), 4);
+
+        let empty = dir.path().join("empty.mplot");
+        fs::create_dir(&empty).unwrap();
+        pack_artifact(&source, &empty).unwrap();
+        assert!(empty.is_file());
     }
 }

@@ -1,5 +1,5 @@
 import { isArrayReference, normalizeArtistData } from "./normalize.js";
-import type { ArrayResolver, Axis, AxisDimension, Artist, MPlotDocument, ResolvedData, Viewport } from "./types.js";
+import type { ArrayResolver, Axis, Artist, MPlotDocument, ResolvedData, Viewport } from "./types.js";
 const cloneViewport = (value: Viewport): Viewport => ({ x: [...value.x], y: [...value.y], ...(value.z ? { z: [...value.z] } : {}) } as Viewport);
 const numbers = (value: unknown): number[] => Array.isArray(value) || ArrayBuffer.isView(value) ? Array.from(value as ArrayLike<unknown>, Number).filter(Number.isFinite) : [];
 const pointValues = (value: unknown, dimension: 0 | 1 | 2): number[] => {
@@ -94,28 +94,7 @@ export class ViewerModel extends EventTarget {
 
   setViewport(axisId: string, viewport: Viewport, source = axisId): void {
     this.viewports.set(axisId, cloneViewport(viewport));
-    const affected = new Set([axisId]);
-    for (const link of this.document.links ?? []) {
-      const members = link.axes ?? link.axis_ids ?? [];
-      if (!members.includes(axisId)) continue;
-      const dimensions = link.dimensions ?? (Array.isArray(link.dimension) ? link.dimension : [link.dimension ?? "x"]);
-      for (const member of members) {
-        if (member === axisId) continue;
-        const current = this.viewports.get(member);
-        if (!current) continue;
-        const next = cloneViewport(current);
-        for (const dimension of dimensions) this.copyDimension(next, viewport, dimension);
-        this.viewports.set(member, next);
-        affected.add(member);
-      }
-    }
-    this.dispatchEvent(new CustomEvent("viewport", { detail: { axisId, source, affected: Array.from(affected) } }));
-  }
-
-  private copyDimension(target: Viewport, source: Viewport, dimension: AxisDimension): void {
-    if (dimension === "x") target.x = [...source.x];
-    else if (dimension === "y") target.y = [...source.y];
-    else if (source.z) target.z = [...source.z];
+    this.dispatchEvent(new CustomEvent("viewport", { detail: { axisId, source } }));
   }
 
   async resolveData(data: Record<string, unknown>, artist?: Artist): Promise<ResolvedData> {

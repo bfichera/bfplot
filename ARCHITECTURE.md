@@ -1,68 +1,69 @@
-# MPlot architecture contract
+# MPlot architecture
 
-MPlot 0.9.9 is a script-first, content-addressed interactive scientific plot system.
+MPlot turns plots into self-contained, content-addressed results that a browser viewer can open.
 
-## Production pipeline
-
-There is one production path:
+## Pipeline
 
 ```text
-Matplotlib -> MPlot Intermediate Representation (MIR) -> compiler -> artifact
+plotting library -> adapter -> MIR -> writer -> result -> Rust CLI -> viewer
 ```
 
-`mplot.savefig()` is the convenience composition of `mplot.translate()` and `mplot.compile()`.
+`mplot.savefig()` is `mplot.translate()` followed by `mplot.compile()`.
 
-### Source adapters
+| Part | Location | Responsibility |
+| --- | --- | --- |
+| Adapter | `src/mplot/adapters/matplotlib.py` | Matplotlib figures to MIR. Knows nothing about hashes, compression or files. |
+| MIR | `src/mplot/mir.py`, `src/mplot/mir.schema.json` | The language-neutral document model and its validator. |
+| Writer | `src/mplot/artifact.py` | Validates MIR, encodes buffers, writes and replaces results. Knows nothing about Matplotlib. |
+| Results | `src/mplot/result.py`, `src/mplot/temporal.py` | `mplot.result()` and animation recording. |
+| Core | `crates/mplot-core` | Reads, validates, verifies, packs and unpacks results. |
+| CLI | `crates/mplot-cli` | `verify`, `pack`, `unpack`, `manifest`, `serve`, `view`. |
+| Viewer | `viewer/` | Browser UI and renderers. The built copy in `viewer/dist` is committed. |
 
-Source adapters understand their plotting library and produce MIR. The Matplotlib adapter lives in `src/mplot/adapters/matplotlib.py`. An adapter may resolve source transforms, geometry, styles, and source-object relationships, but it must not import or understand content stores, hashes, compression, manifests, packing, or artifact array references.
+## MIR
 
-### MIR
-
-MIR is the language-neutral producer/compiler boundary. It has its own version (`mir_version = "1.0"`) independently of the artifact version. Its structural contract is published as JSON Schema 2020-12 in `src/mplot/mir-1.schema.json`; `src/mplot/mir.py` implements the in-process Python model and semantic validator.
-
-A MIR document contains semantic figure, axes, artist, layout, scale, guide, and relationship records. Large numerical values are local typed buffers referenced as:
+MIR is the boundary that other producers (Julia, C, ...) target. A MIR document has `metadata` (with a required `created_utc`), a `document` of figures, axes and artists, and typed numeric `buffers`. Arrays in the document are references to buffers:
 
 ```json
 {"$buffer": "buffer-0"}
 ```
 
-The in-process Python producer uses immutable contiguous NumPy buffers. Other language producers can implement the same typed-buffer contract with native arrays or a portable interchange such as Arrow IPC. MIR never contains artifact object IDs, codecs, paths, or packing details.
+Validation checks unique IDs, unique non-empty figure names, artist ownership, parent axes and colorbar references, timeline updates, and that every buffer reference resolves and every buffer is used. MIR never contains hashes, codecs or paths.
 
-MIR validation is mandatory. It checks its version, required processing metadata, unique IDs, axes/artist ownership, parent relationships, colorbar-to-mappable references, and local buffer references. Required processing metadata always includes `created_utc`. When the producer runs from a Git worktree, baseline processing metadata also records the producing `git_commit`; Git absence or lookup failure must not prevent artifact creation.
+An animation is one initial scene plus a timeline of frames. Each update names a `figure`, `axes` or `artist` target by ID and a path whose first element is in `mir.ANIMATABLE` (mirrored by `animatable()` in Rust). Structure cannot change during an animation.
 
-Temporal MIR uses one immutable initial scene plus a restricted timeline of stable-ID updates. Each timestamped update names a figure, axes, or artist target and an allow-listed semantic path such as `["data", "y"]`. Timeline values can reference the same local typed buffers as the initial scene. Arbitrary callbacks and unrestricted JSON Patch operations are not part of the format.
+## Results
 
-### Compiler
+One output path holds exactly one result. It is written exactly as given, and objects are never shared between results.
 
-`src/mplot/lower.py` is the MIR compiler boundary. It validates MIR, encodes each local typed buffer into a compressed content-addressed artifact array, and emits the canonical artifact document. It does not import or understand Matplotlib. No unresolved `$buffer` reference may enter an artifact.
+A directory result:
 
-`src/mplot/artifact.py` owns result materialization (directory and packed layouts, atomic replace, manifest TOML) and `src/mplot/store.py` owns content-addressed storage. `src/mplot/result.py` owns `mplot.result()`: composing named figures, at most one animation, and metadata into one MIR document.
+```text
+<path>/manifest.toml
+<path>/.gitignore                      /objects/
+<path>/objects/sha256/<2 hex>/<digest>
+```
 
-One output path holds exactly one result and is used exactly as given; no suffix is added or rewritten. An existing MPlot result (either layout, or an empty directory) at the path is replaced only after the new result is fully built in a hidden temporary sibling. Any other existing path is refused with `FileExistsError` before expensive work starts.
+A packed result (`layout="file"`) is one file: the magic `MPLOT\0\x09\x09`, a u64 manifest length, the manifest, a u64 object count, then for each object its 32-byte SHA-256 digest, a u64 length and its bytes. Integers are little-endian and objects are sorted by digest, so packing is deterministic and both layouts convert losslessly.
 
-## Stable artifact layout
+The manifest is TOML:
 
-The default result directory contains a UTF-8 TOML `manifest.toml`, a generated `.gitignore` containing `/objects/`, and immutable blobs in `objects/sha256/<first-two>/<digest>`. Objects are never shared between results. Every blob is addressed by SHA-256 of its exact stored bytes. A packed file (`layout="file"`) preserves the same manifest and blob identities in one deterministic container; the two layouts convert losslessly.
+```toml
+format = "mplot"
+document = "sha256:<hex>"
 
-Manifest and document `schema_version` is 2, which adds an optional unique, non-empty `name` on each figure record. Readers accept versions 1 and 2. Legacy split artifacts (`*.mplot.toml` plus a shared `.mplot/objects/` store) remain readable, verifiable, and packable but are no longer written.
+[provenance]
+created_utc = "2026-01-01T00:00:00Z"
+```
 
-The manifest owns provenance and references one document blob. The document is JSON and contains figures, axes, artists, links, selections, and references to typed array blobs. JSON is used in 0.9.9 to keep the pre-1.0 format inspectable. Canonical JSON (recursive key sorting, compact separators, finite numbers) is required for hashes.
+Every object is named by the SHA-256 of its exact bytes. The document object is canonical JSON (sorted keys, compact separators, finite numbers). Arrays are little-endian, C-ordered and zstd-compressed, referenced as `{"object": "sha256:<hex>", "dtype": "f8", "shape": [N], "codec": "zstd"}`.
 
-## Artist protocol
+Writing builds the new result in a hidden sibling and swaps it in only when complete. An existing MPlot result (either layout) or an empty directory at the path is replaced; anything else raises `FileExistsError` before any expensive work starts.
 
-Every compiled artist has `type`, `schema_version`, `id`, `axes_id`, `props`, and `data`. Supported types use the `mplot.*` namespace and must be implemented in-tree. Compiled data values can contain inline JSON or array references of the form `{ "object": "sha256:<hex>", "dtype": "f8", "shape": [N], "codec": "zstd" }`.
+## Artists
 
-Required built-ins: line, scatter, image, errorbar, fill_between, histogram, contour, contourf, text, patch, line3d, scatter3d, surface3d and mesh3d. The viewer must visibly degrade for unknown artists.
+Every artist has `type`, `id`, `axes_id`, `props` and `data`. Types use the `mplot.*` namespace and are implemented in-tree: line, scatter, image, errorbar, fill_between, histogram, contour, contourf, text, patch, line3d, scatter3d, surface3d and mesh3d. The viewer shows a visible placeholder for anything it cannot draw.
 
 ## Safety
 
-Artifacts and MIR never embed executable Python/native code and cannot install or load artist implementations. Remote serving binds to loopback unless explicitly overridden. Paths are normalized and object digests are verified before decode.
-
-## Ownership
-
-- Producer adapters: source plotting library to MIR only.
-- MIR: language-neutral semantic records, local typed buffers, schema, and validation.
-- Compiler: MIR lowering, typed-array encoding, and artifact materialization.
-- Rust: artifact format/store, validation, pack/unpack, verify, serve, stream primitives, and CLI.
-- Viewer: dependency-light browser UI and renderers.
-- Integration: fixtures, tests, docs, packaging, and visual regression coverage.
+Results contain data, never code, and cannot load renderers. Object digests are verified before decoding. The server binds to loopback unless told otherwise.

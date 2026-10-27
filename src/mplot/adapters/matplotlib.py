@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import math
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any
 
 import matplotlib.dates as mdates
@@ -16,7 +16,7 @@ from matplotlib.patches import Patch, Polygon
 from matplotlib.spines import Spine
 from matplotlib.text import Text
 
-from ..mir import DOCUMENT_SCHEMA_VERSION, MirBuilder, MirDocument
+from ..mir import MirBuilder, MirDocument
 
 
 def _finite(value: Any) -> Any:
@@ -41,36 +41,33 @@ def _color(value: Any) -> list[float] | None:
 
 
 def _common(artist: Artist) -> dict[str, Any]:
-    result: dict[str, Any] = {
+    label = artist.get_label() if hasattr(artist, "get_label") else None
+    return {
         "visible": bool(artist.get_visible()),
         "alpha": _finite(artist.get_alpha()),
         "zorder": _finite(artist.get_zorder()),
-        "label": (
-            lambda label: label if isinstance(label, str) and not label.startswith("_") else None
-        )(artist.get_label())
-        if hasattr(artist, "get_label")
-        else None,
+        "label": label if isinstance(label, str) and not label.startswith("_") else None,
     }
-    return result
 
 
 @dataclass
 class ExtractionContext:
     builder: MirBuilder
-    _next_artist: int = 0
-    _artist_ids: dict[int, str] | None = None
+    next_artist: int = 0
+    artist_ids: dict[int, str] = field(default_factory=dict)
 
     def array(self, value: Any) -> dict[str, str]:
         return self.builder.buffer(value)
 
-    def artist_id(self, source: Any) -> str:
-        if self._artist_ids is None:
-            self._artist_ids = {}
-        source_id = id(source)
-        if source_id not in self._artist_ids:
-            self._artist_ids[source_id] = f"artist-{self._next_artist}"
-            self._next_artist += 1
-        return self._artist_ids[source_id]
+    def artist_id(self, source: Any = None) -> str:
+        """A fresh artist ID, or the one already given to ``source`` (e.g. a colorbar mappable)."""
+        if source is not None and id(source) in self.artist_ids:
+            return self.artist_ids[id(source)]
+        artist_id = f"artist-{self.next_artist}"
+        self.next_artist += 1
+        if source is not None:
+            self.artist_ids[id(source)] = artist_id
+        return artist_id
 
     def artist(
         self,
@@ -80,15 +77,9 @@ class ExtractionContext:
         data: dict[str, Any],
         source: Any | None = None,
     ) -> dict[str, Any]:
-        if source is None:
-            artist_id = f"artist-{self._next_artist}"
-            self._next_artist += 1
-        else:
-            artist_id = self.artist_id(source)
         return {
             "type": type_name,
-            "schema_version": 1,
-            "id": artist_id,
+            "id": self.artist_id(source),
             "axes_id": axes_id,
             "props": _finite(props),
             "data": data,
@@ -102,45 +93,22 @@ def translate_figures(
     names: list[str | None] | None = None,
     first_figure: int = 0,
     first_artist: int = 0,
-) -> MirDocument:
-    """Translate Matplotlib figures into storage-independent MIR."""
-    return translate_group(
-        figures, metadata, names=names, first_figure=first_figure, first_artist=first_artist
-    )[0]
-
-
-def translate_group(
-    figures: list[Any],
-    metadata: dict[str, Any],
-    *,
-    names: list[str | None] | None = None,
-    first_figure: int = 0,
-    first_artist: int = 0,
 ) -> tuple[MirDocument, int]:
-    """Translate figures and return the next unused artist number.
+    """Translate Matplotlib figures into MIR and return the next unused artist number.
 
     ``first_figure`` and ``first_artist`` offset generated IDs so separately translated
     groups can be combined into one document without collisions.
     """
-    if names is not None and len(names) != len(figures):
-        raise ValueError("names must match the number of figures")
+    names = names or [None] * len(figures)
     builder = MirBuilder(metadata=metadata)
-    context = ExtractionContext(builder, _next_artist=first_artist)
-    extracted = []
-    for index, figure in enumerate(figures):
+    context = ExtractionContext(builder, next_artist=first_artist)
+    records = []
+    for index, (figure, name) in enumerate(zip(figures, names, strict=True)):
         record = _extract_figure(figure, f"figure-{first_figure + index}", context)
-        if names is not None and names[index] is not None:
-            record["name"] = names[index]
-        extracted.append(record)
-    document = builder.build(
-        {
-            "schema_version": DOCUMENT_SCHEMA_VERSION,
-            "figures": extracted,
-            "links": [],
-            "selections": [],
-        }
-    )
-    return document, context._next_artist
+        if name is not None:
+            record["name"] = name
+        records.append(record)
+    return builder.build({"figures": records}), context.next_artist
 
 
 def _extract_figure(figure: Any, figure_id: str, context: ExtractionContext) -> dict[str, Any]:

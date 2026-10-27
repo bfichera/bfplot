@@ -1,52 +1,27 @@
 # Command-line interface
 
-The `mplot` command verifies, converts, serves, and views results.
+Every command that reads a result accepts a result directory or a packed file. Run `mplot COMMAND --help` for details.
 
-Every command that reads a result accepts a result directory, a packed file, or an older `*.mplot.toml` manifest.
+| Command | What it does |
+| --- | --- |
+| `mplot view RESULT` | Serve a result and open it in the browser. |
+| `mplot serve RESULT` | Serve a result without opening a browser. |
+| `mplot verify RESULT` | Check the manifest, document and every object hash. |
+| `mplot manifest RESULT` | Print the manifest exactly as stored. |
+| `mplot pack SOURCE OUTPUT` | Turn a result directory into one packed file. |
+| `mplot unpack PACKED DESTINATION` | Turn a packed file into a result directory. |
 
-## View a plot
+`pack` and `unpack` replace an existing result at the destination and refuse to replace anything else.
 
-```console
-$ mplot view ARTIFACT
-```
-
-Serve a result and open it in the default browser.
-
-```console
-$ mplot view result.mplot --port 9000
-```
-
-## Serve a plot
-
-```console
-$ mplot serve ARTIFACT
-```
-
-Serve without launching a browser. The default address is `127.0.0.1:8080`.
-
-Options shared by `view` and `serve`:
+## `view` and `serve` options
 
 | Option | Meaning |
 | --- | --- |
-| `--bind ADDRESS` | Listening address. Defaults to loopback. |
+| `--bind ADDRESS` | Listening address. Defaults to `127.0.0.1`. |
 | `--port PORT` | Listening port. Defaults to `8080`. |
-| `--viewer-dir PATH` | Directory containing built viewer assets. |
+| `--viewer-dir PATH` | Directory with the built viewer. Defaults to `MPLOT_VIEWER_DIR` or `./viewer/dist`. |
 
-## Verify a result
-
-```console
-$ mplot verify ARTIFACT
-```
-
-Verify a result’s hashes, schema, and references.
-
-## Print the manifest
-
-```console
-$ mplot manifest ARTIFACT
-```
-
-Print the stored manifest TOML exactly as it is. This is handy for readable Git diffs of packed files:
+## Diffing packed files in Git
 
 ```text title=".gitattributes"
 *.mplot diff=mplot
@@ -56,45 +31,4 @@ Print the stored manifest TOML exactly as it is. This is handy for readable Git 
 $ git config diff.mplot.textconv "mplot manifest"
 ```
 
-Result directories do not need this; Git already diffs their `manifest.toml` as text.
-
-## Pack a result
-
-```console
-$ mplot pack SOURCE OUTPUT
-```
-
-Convert a result directory (or an older manifest) into one packed file.
-
-```console
-$ mplot pack results/fit.mplot shared/fit.mplot
-$ mplot pack old.mplot.toml new.mplot
-```
-
-## Unpack a result
-
-```console
-$ mplot unpack ARTIFACT DESTINATION
-```
-
-Turn a packed file into a result directory. An existing MPlot result at the destination is replaced; anything else is refused.
-
-```console
-$ mplot unpack shared/fit.mplot restored/fit.mplot
-```
-
-## Stream framing utilities
-
-Convert newline-delimited JSON stream frames to MPlot’s binary framing:
-
-```console
-$ mplot stream encode < frames.jsonl > frames.bin
-```
-
-Decode them again:
-
-```console
-$ mplot stream decode < frames.bin > frames.jsonl
-```
-
-Run `mplot --help` or `mplot COMMAND --help` for the exact options supported by your installed build.
+Result directories do not need this; Git diffs their `manifest.toml` directly.

@@ -65,7 +65,6 @@ nav:
       - Using MPlot with Git: guides/version-control.md
       - Provenance and metadata: guides/provenance.md
       - Using MPlot with Snakemake: guides/snakemake.md
-      - Live plots: guides/streaming.md
       - Serving plots: guides/serving.md
   - Reference:
       - Python API: reference/python-api.md

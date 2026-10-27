@@ -97,34 +97,7 @@ export class ViewerModel extends EventTarget {
     }
     setViewport(axisId, viewport, source = axisId) {
         this.viewports.set(axisId, cloneViewport(viewport));
-        const affected = new Set([axisId]);
-        for (const link of this.document.links ?? []) {
-            const members = link.axes ?? link.axis_ids ?? [];
-            if (!members.includes(axisId))
-                continue;
-            const dimensions = link.dimensions ?? (Array.isArray(link.dimension) ? link.dimension : [link.dimension ?? "x"]);
-            for (const member of members) {
-                if (member === axisId)
-                    continue;
-                const current = this.viewports.get(member);
-                if (!current)
-                    continue;
-                const next = cloneViewport(current);
-                for (const dimension of dimensions)
-                    this.copyDimension(next, viewport, dimension);
-                this.viewports.set(member, next);
-                affected.add(member);
-            }
-        }
-        this.dispatchEvent(new CustomEvent("viewport", { detail: { axisId, source, affected: Array.from(affected) } }));
-    }
-    copyDimension(target, source, dimension) {
-        if (dimension === "x")
-            target.x = [...source.x];
-        else if (dimension === "y")
-            target.y = [...source.y];
-        else if (source.z)
-            target.z = [...source.z];
+        this.dispatchEvent(new CustomEvent("viewport", { detail: { axisId, source } }));
     }
     async resolveData(data, artist) {
         const entries = await Promise.all(Object.entries(data).map(async ([key, value]) => [key, await this.resolveValue(value)]));

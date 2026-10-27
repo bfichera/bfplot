@@ -11,7 +11,6 @@ export type DataValue = unknown | ArrayReference;
 
 export interface Artist {
   type: string;
-  schema_version: number;
   id: string;
   axes_id: string;
   props: Record<string, unknown>;
@@ -62,14 +61,6 @@ export interface Figure {
   props?: Record<string, unknown>;
 }
 
-export interface AxisLink {
-  id?: string;
-  axes?: string[];
-  axis_ids?: string[];
-  dimension?: AxisDimension | AxisDimension[];
-  dimensions?: AxisDimension[];
-}
-
 export interface TimelineUpdate {
   target_kind: "artist" | "axes" | "figure";
   target: string;
@@ -80,7 +71,6 @@ export interface TimelineUpdate {
 export interface TimelineFrame { time: number; updates: TimelineUpdate[]; }
 
 export interface Timeline {
-  version: 1;
   fps: number;
   duration: number;
   loop?: boolean;
@@ -88,12 +78,10 @@ export interface Timeline {
 }
 
 export interface MPlotDocument {
-  version?: string;
   title?: string;
   figures: Figure[];
   axes: Axis[];
   artists: Artist[];
-  links?: AxisLink[];
   timeline?: Timeline;
   metadata?: Record<string, unknown>;
 }

@@ -64,7 +64,7 @@ function normalizeAxis(rawValue, figureId) {
 function normalizeArtist(rawValue, axesId) {
     const raw = record(rawValue);
     return {
-        type: text(raw.type, "mplot.unknown"), schema_version: Number(raw.schema_version ?? 1), id: text(raw.id),
+        type: text(raw.type, "mplot.unknown"), id: text(raw.id),
         axes_id: text(raw.axes_id, axesId), props: normalizeProps(raw.props), data: { ...record(raw.data) },
     };
 }
@@ -101,28 +101,11 @@ export function normalizeDocument(value) {
         if (!artists.some((item) => item.id === artist.id))
             artists.push(artist);
     }
-    const metadata = { ...record(raw.metadata) };
-    delete metadata.plugin_requirements;
-    delete metadata.plugins;
-    const hasMetadata = Object.keys(metadata).length > 0;
-    const baseline = hasMetadata ? metadata : {
-        artifact: {
-            schema_version: Number(raw.schema_version ?? 1),
-            status: "No embedded metadata was found in this legacy or raw document.",
-        },
-        document: {
-            figures: figures.length,
-            plots: axes.filter((axis) => axis.role !== "colorbar" && axis.role !== "inset").length,
-            artists: artists.length,
-        },
-    };
-    const timelineRaw = record(raw.timeline);
-    const timeline = timelineRaw.version === 1 && Array.isArray(timelineRaw.frames) ? timelineRaw : undefined;
+    const timeline = Array.isArray(record(raw.timeline).frames) ? raw.timeline : undefined;
     return {
         figures, axes, artists,
-        links: list(raw.links),
         ...(timeline ? { timeline } : {}),
-        ...(text(raw.title) ? { title: text(raw.title) } : {}), metadata: baseline,
+        ...(text(raw.title) ? { title: text(raw.title) } : {}), metadata: { ...record(raw.metadata) },
     };
 }
 const arrayShape = (value) => {

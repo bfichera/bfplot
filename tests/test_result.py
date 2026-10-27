@@ -1,36 +1,15 @@
 from __future__ import annotations
 
-import json
 import os
 import shutil
-import struct
 import warnings
 
-import matplotlib
-import tomllib
-
-matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
 import pytest
 
 import mplot
-
-
-def _read(path):
-    if path.is_dir():
-        manifest = tomllib.loads((path / "manifest.toml").read_text())
-        digest = manifest["document"].split(":", 1)[1]
-        document = (path / "objects" / "sha256" / digest[:2] / digest).read_text()
-        return manifest, json.loads(document)
-    with path.open("rb") as handle:
-        assert handle.read(8) == b"MPLOT\0\x09\x09"
-        manifest = tomllib.loads(handle.read(struct.unpack("<Q", handle.read(8))[0]).decode())
-        objects = {}
-        for _ in range(struct.unpack("<Q", handle.read(8))[0]):
-            digest = handle.read(32).hex()
-            objects[digest] = handle.read(struct.unpack("<Q", handle.read(8))[0])
-    return manifest, json.loads(objects[manifest["document"].split(":", 1)[1]])
+from helpers import read_result
 
 
 def _objects(path):
@@ -55,9 +34,9 @@ def test_directory_result_is_self_contained_and_ignores_its_objects(tmp_path):
     assert (output / ".gitignore").read_text() == "/objects/\n"
     assert not (tmp_path / ".mplot").exists()
     assert [item.name for item in tmp_path.iterdir()] == ["fit.mplot"]
-    manifest, document = _read(output)
-    assert manifest["schema_version"] == 2
-    assert document["schema_version"] == 2
+    manifest, document = read_result(output)
+    assert set(manifest) == {"format", "document", "provenance"}
+    assert document["figures"]
 
 
 def test_results_in_one_directory_do_not_share_objects(tmp_path):
@@ -67,7 +46,7 @@ def test_results_in_one_directory_do_not_share_objects(tmp_path):
 
     shutil.rmtree(first)
 
-    _, document = _read(second)
+    _, document = read_result(second)
     assert document["figures"]
     assert _objects(second)
 
@@ -93,7 +72,7 @@ def test_mplot_suffix_does_not_warn(tmp_path):
 def test_file_layout_writes_one_packed_file(tmp_path):
     output = mplot.savefig(tmp_path / "fit.mplot", _line(), layout="file", provenance=False)
     assert output.is_file()
-    manifest, document = _read(output)
+    manifest, document = read_result(output)
     assert manifest["format"] == "mplot"
     assert document["figures"][0]["axes"]
 
@@ -123,7 +102,7 @@ def test_existing_results_are_replaced_in_either_layout(tmp_path, first, second)
     output = mplot.savefig(path, new, layout=second, provenance=False)
 
     assert output.is_dir() == (second == "directory")
-    _, document = _read(output)
+    _, document = read_result(output)
     assert document["figures"][0]["axes"][0]["title"] == "new"
     assert [item.name for item in tmp_path.iterdir()] == ["fit.mplot"]
 
@@ -138,7 +117,7 @@ def test_replacing_a_directory_result_drops_stale_objects(tmp_path):
     mplot.savefig(path, _line(), provenance=False)
     after = {item.name for item in _objects(path)}
 
-    manifest, document = _read(path)
+    manifest, document = read_result(path)
     referenced = {manifest["document"].split(":", 1)[1]} | {
         value["object"].split(":", 1)[1]
         for axes in document["figures"][0]["axes"]
@@ -184,7 +163,7 @@ def test_result_collects_named_figures_and_metadata(tmp_path):
         result.metadata["chi2"] = np.float64(1.25)
         result.metadata["fit"] = {"model": "gaussian", "parameters": np.array([1.0, 2.0])}
 
-    manifest, document = _read(tmp_path / "fit.mplot")
+    manifest, document = read_result(tmp_path / "fit.mplot")
     assert [figure["name"] for figure in document["figures"]] == ["spectrum", "residuals"]
     assert [figure["id"] for figure in document["figures"]] == ["figure-0", "figure-1"]
     artist_ids = [
@@ -208,7 +187,7 @@ def test_result_captures_figures_when_added(tmp_path):
         result.add(figure, name="before")
         line.set_ydata([5, 5])
 
-    _, document = _read(tmp_path / "fit.mplot")
+    _, document = read_result(tmp_path / "fit.mplot")
     assert len(document["figures"]) == 1
 
 
@@ -222,7 +201,7 @@ def test_matplotlib_labels_become_names_when_unique(tmp_path):
 
     output = mplot.savefig(tmp_path / "labels.mplot", [first, second, unnamed], provenance=False)
 
-    _, document = _read(output)
+    _, document = read_result(output)
     assert [figure.get("name") for figure in document["figures"]] == [
         "spectrum",
         "spectrum-copy",
@@ -234,7 +213,7 @@ def test_savefig_accepts_names_for_several_figures(tmp_path):
     output = mplot.savefig(
         tmp_path / "pair.mplot", [_line(), _line()], name=["left", "right"], provenance=False
     )
-    _, document = _read(output)
+    _, document = read_result(output)
     assert [figure["name"] for figure in document["figures"]] == ["left", "right"]
 
 
@@ -252,7 +231,7 @@ def test_invalid_names_fail_when_added_not_when_written(tmp_path):
     with pytest.raises(TypeError, match="cannot represent"):
         result.metadata["bad"] = object()
     result.close()
-    _, document = _read(tmp_path / "fit.mplot")
+    _, document = read_result(tmp_path / "fit.mplot")
     assert [figure.get("name") for figure in document["figures"]] == ["spectrum"]
 
 
@@ -293,7 +272,7 @@ def test_result_mixes_static_figures_with_one_animation(tmp_path):
         with pytest.raises(RuntimeError, match="only one animation"):
             result.animation(_line())
 
-    manifest, document = _read(tmp_path / "mixed.mplot")
+    manifest, document = read_result(tmp_path / "mixed.mplot")
     assert [figure["name"] for figure in document["figures"]] == [
         "overview",
         "evolution",
@@ -316,7 +295,7 @@ def test_result_closes_an_unclosed_animation(tmp_path):
         recording = result.animation(figure, fps=2)
         line.set_ydata([1, 0])
         recording.capture()
-    _, document = _read(tmp_path / "auto.mplot")
+    _, document = read_result(tmp_path / "auto.mplot")
     assert len(document["timeline"]["frames"]) == 1
 
 
@@ -344,7 +323,7 @@ def test_nested_metadata_round_trips_through_toml(tmp_path):
         result.metadata["fit"] = {"model": {"kind": "gaussian", "order": 2}, "odd key": [1, 2]}
         result.metadata["path"] = tmp_path / "input.npz"
 
-    manifest, _ = _read(tmp_path / "nested.mplot")
+    manifest, _ = read_result(tmp_path / "nested.mplot")
     extra = manifest["provenance"]["extra"]
     assert extra["run"] == {"seed": 4}
     assert extra["fit"] == {"model": {"kind": "gaussian", "order": 2}, "odd key": [1, 2]}

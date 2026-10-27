@@ -1,144 +1,88 @@
-# How MPlot files work
+# File format
 
-You do **not** need to understand the file format to use MPlot. If this is your first visit, go back to the [front page](index.md), call `mplot.savefig()`, and make yourself an interactive plot!
+You do not need this page to use MPlot. It explains what MPlot writes to disk. The [architecture page](project/architecture.md) is the precise reference.
 
-Still here? Great. This page explains what MPlot puts on disk and why it looks a little different from a PDF.
-
-> This is the friendly format guide. The [architecture contract](project/architecture.md) is the precise internal reference if you are implementing a reader or writer.
-
-## The short version
-
-When you run:
+## A result
 
 ```python
 mplot.savefig("experiment.mplot", fig)
 ```
 
-MPlot creates one result directory:
+creates one result directory:
 
 ```text
 experiment.mplot/
 ├── manifest.toml
-├── .gitignore                    ← contains "/objects/"
-└── objects/sha256/ab/abcdef...
+├── .gitignore                ← "/objects/"
+└── objects/sha256/ab/abcdef…
 ```
 
-The TOML file is a small, readable manifest. The `objects/` folder contains the plot document and compressed numerical arrays for this result only. Every object is stored at `objects/sha256/<first two hex digits>/<digest>`, named using its SHA-256 hash.
-
-Why keep them apart? Scientific arrays can be enormous, while manifests are small and useful to inspect in Git. The generated `.gitignore` keeps the objects out of Git, so committing the directory commits only the manifest.
+Every object is named by the SHA-256 hash of its bytes. Objects belong to this result only.
 
 ## The manifest
 
-`manifest.toml` is the front door to a result. It tells MPlot:
-
-- which format and MPlot version created the output;
-- which content-addressed object contains the plot document;
-- what provenance was recorded when the figure was saved.
-
-A manifest looks roughly like this:
-
 ```toml
 format = "mplot"
-version = "0.9.9"
-schema_version = 2
-document = "sha256:0123456789abcdef..."
+document = "sha256:0123456789abcdef…"
 
 [provenance]
+created_utc = "2026-01-01T00:00:00Z"
+git_commit = "98b821a316dd0a54f3e9d7bdd72c6e6007c1bbbf"
 python = "3.14.6"
-script = "/path/to/analysis.py"
 ```
 
-The manifest is intended to be small enough to read, diff, and commit.
+The manifest names the document object and records [provenance](guides/provenance.md). It is small and meant to be read, diffed and committed.
 
-## The plot document
+## The document
 
-The document is canonical JSON describing the figures, axes, artists, links, selections, and references to numerical arrays. Each figure record may carry an optional `name`: a non-empty string that is unique within the result.
+The document is canonical JSON (sorted keys, no extra whitespace, finite numbers) describing figures, axes and artists. A figure may have a `name` that is unique within the result. An animated result also has a `timeline`.
 
-“Canonical” sounds fancy, but it just means MPlot writes equivalent JSON in one predictable way:
+Every artist has:
 
-- object keys are sorted;
-- unnecessary whitespace is removed;
-- text is encoded as UTF-8;
-- numbers must be finite.
-
-Predictable bytes give predictable hashes. That makes verification and deduplication possible.
-
-## Artists
-
-In Matplotlib, a line, scatter plot, image, and piece of text are all “artists.” MPlot uses the same general idea.
-
-Every saved artist includes:
-
-| Field | What it means |
+| Field | Meaning |
 | --- | --- |
-| `type` | What kind of artist this is, such as `mplot.line`. |
-| `schema_version` | Which version of that artist’s data layout is being used. |
-| `id` | The artist’s identifier inside this document. |
-| `axes_id` | The axes that owns the artist. |
-| `props` | Colors, line widths, labels, and other display properties. |
-| `data` | Inline values or references to larger arrays. |
+| `type` | The kind of artist, such as `mplot.line`. |
+| `id` | Its identifier in the document. |
+| `axes_id` | The axes it belongs to. |
+| `props` | Colors, line widths, labels and other styling. |
+| `data` | Inline values or references to arrays. |
 
-MPlot 0.9.9 includes artists for lines, scatter plots, images, error bars, filled regions, histograms, contours, text, patches, and common 3D plots.
+## Arrays
 
-A viewer should never silently hide an artist it does not understand. It should show a useful placeholder instead. A missing curve can change the scientific meaning of a figure, and “I quietly ignored it” is not an acceptable rendering strategy.
-
-## Numerical arrays
-
-Large arrays are stored separately and referenced like this:
+Arrays are separate objects, referenced like this:
 
 ```json
-{
-  "object": "sha256:<64 hexadecimal digits>",
-  "dtype": "f8",
-  "shape": [1024],
-  "codec": "zstd"
-}
+{"object": "sha256:<64 hex digits>", "dtype": "f8", "shape": [1024], "codec": "zstd"}
 ```
 
-This says, “fetch this object, verify its hash, decompress it with Zstandard, and interpret it as 1,024 double-precision values.”
+That means: fetch the object, check its hash, decompress it with Zstandard and read 1,024 little-endian doubles.
 
-MPlot verifies the stored bytes *before* decoding them. Readers also check the dtype, shape, decoded length, and allocation limits. That may sound fussy, but scientific software should be fussy about corrupted data.
+## Hashes
 
-## What does the hash do?
-
-An object’s filename is the lowercase SHA-256 digest of its exact stored bytes. If even one byte changes, verification fails:
+`mplot verify` checks the manifest, the document and the hash of every object:
 
 ```console
 $ mplot verify experiment.mplot
 verified 12 objects (22907 bytes)
 ```
 
-The hash provides integrity. It tells you whether the bytes still match their recorded identity. It does **not** tell you who created them; use an external signature if authorship matters.
+A hash proves the bytes have not changed. It does not prove who made them; use an external signature for that.
 
 ## Packed files
-
-Sometimes you do not want a directory. You want one file that you can attach to an email or copy onto a drive:
 
 ```python
 mplot.savefig("experiment.mplot", fig, layout="file")
 ```
 
-A packed file contains the same manifest and objects in a deterministic binary container. Packing does not change object contents or hashes. With `SOURCE_DATE_EPOCH` set, which fixes `created_utc`, packed files are byte-for-byte reproducible.
+writes the same manifest and objects into one file. Packing does not change any object or hash, and with `SOURCE_DATE_EPOCH` set the file is byte-for-byte reproducible.
 
 ```console
 $ mplot pack experiment.mplot shared/experiment.mplot
 $ mplot unpack shared/experiment.mplot restored/experiment.mplot
 ```
 
-A directory → packed → directory trip preserves the scientific result. No numerical luggage should go missing along the way.
+## Safety
 
-## Older artifacts
+Results contain data, never code, and cannot load extra renderers. Treat files from strangers as untrusted input anyway; see the [security policy](project/security.md).
 
-Earlier versions wrote a `*.mplot.toml` manifest next to a shared hidden `.mplot/objects/` store. MPlot no longer writes this form, but it can still view, verify, and pack it (`mplot pack old.mplot.toml new.mplot`).
-
-## Are MPlot files safe to open?
-
-MPlot artifacts contain data, not executable Python or native code. They cannot request or load third-party artist implementations; supported exporters and renderers ship with MPlot.
-
-Files are still untrusted input, so readers must validate hashes, paths, array sizes, and schemas. See the [security policy](project/security.md) if you are writing a server or opening artifacts from strangers on the internet.
-
-## Compatibility
-
-MPlot 0.9.9 is pre-1.0. Producers record their version, and readers reject unsupported schemas instead of making a heroic—and potentially incorrect—guess. New output uses manifest and document `schema_version = 2`, which adds figure names; readers accept versions 1 and 2.
-
-The goal for 1.0 is a format that can be opened for a long time. The point of saving a scientific result is, after all, to be able to look at it later.
+MPlot is pre-1.0, so the format may still change before 1.0.

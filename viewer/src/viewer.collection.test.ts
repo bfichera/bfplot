@@ -15,7 +15,7 @@ const manyPlots = (): MPlotDocument => ({
     { id: "a3", figure_id: "f2", title: "Independent", position: [.1, .1, .8, .8], xlim: [0, 2], ylim: [0, 4] },
   ],
   artists: ["a1", "a2", "a3"].map((axes_id, index) => ({
-    type: "mplot.line", schema_version: 1, id: `line-${index}`, axes_id, props: {}, data: { x: [0, 1, 2], y: [index, index + 1, index + 2] },
+    type: "mplot.line", id: `line-${index}`, axes_id, props: {}, data: { x: [0, 1, 2], y: [index, index + 1, index + 2] },
   })),
 });
 

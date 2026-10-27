@@ -1,8 +1,5 @@
 from __future__ import annotations
 
-import matplotlib
-
-matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
 import pytest
@@ -16,7 +13,6 @@ def test_mir_buffers_are_owned_immutable_copies() -> None:
     builder = MirBuilder(metadata={"created_utc": "2026-01-01T00:00:00Z"})
     reference = builder.buffer(source)
     document = {
-        "schema_version": 1,
         "figures": [
             {
                 "id": "figure-0",
@@ -36,8 +32,6 @@ def test_mir_buffers_are_owned_immutable_copies() -> None:
                 ],
             }
         ],
-        "links": [],
-        "selections": [],
     }
     mir = builder.build(document)
     source[:] = -1
@@ -54,7 +48,6 @@ def test_matplotlib_translation_produces_local_typed_buffers() -> None:
 
     mir = mplot.translate(figure, metadata={"created_utc": "2026-01-01T00:00:00Z"})
 
-    assert mir.mir_version == "1.0"
     assert mir.metadata["created_utc"] == "2026-01-01T00:00:00Z"
     assert mir.buffers
     assert all(
@@ -90,7 +83,6 @@ def test_3d_scatter_translation_has_no_orphaned_buffers() -> None:
 def test_mir_validation_rejects_dangling_buffers_and_references() -> None:
     builder = MirBuilder(metadata={"created_utc": "2026-01-01T00:00:00Z"})
     document = {
-        "schema_version": 1,
         "figures": [
             {
                 "id": "figure-0",
@@ -111,8 +103,6 @@ def test_mir_validation_rejects_dangling_buffers_and_references() -> None:
                 ],
             }
         ],
-        "links": [],
-        "selections": [],
     }
 
     with pytest.raises(MirValidationError, match="dangling buffer reference") as error:
@@ -124,20 +114,17 @@ def test_mir_validation_rejects_dangling_buffers_and_references() -> None:
 def test_mir_validation_requires_processing_metadata() -> None:
     builder = MirBuilder(metadata={})
     with pytest.raises(MirValidationError, match="metadata.created_utc is required"):
-        builder.build({"schema_version": 1, "figures": [], "links": [], "selections": []})
+        builder.build({"figures": []})
 
 
 def test_mir_validation_rejects_bad_and_duplicate_figure_names() -> None:
     builder = MirBuilder(metadata={"created_utc": "2026-01-01T00:00:00Z"})
     document = {
-        "schema_version": 2,
         "figures": [
             {"id": "figure-0", "name": "spectrum", "axes": []},
             {"id": "figure-1", "name": "spectrum", "axes": []},
             {"id": "figure-2", "name": "", "axes": []},
         ],
-        "links": [],
-        "selections": [],
     }
     with pytest.raises(MirValidationError, match="duplicate figure name") as error:
         builder.build(document)

@@ -7,22 +7,21 @@ use std::{
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use serde_json::Value;
 
-use crate::{Error, ObjectStore, Result};
+use crate::{Error, Result};
 
+/// SHA-256 identity of an object, written as `sha256:<hex>`.
 #[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
-pub struct ObjectId([u8; 32]);
+pub struct ObjectId(pub(crate) [u8; 32]);
 
 impl ObjectId {
-    pub fn from_bytes(bytes: &[u8]) -> Self {
+    /// The identity of `bytes`.
+    pub fn of(bytes: &[u8]) -> Self {
         use sha2::{Digest, Sha256};
         Self(Sha256::digest(bytes).into())
     }
 
     pub fn digest(&self) -> String {
         hex::encode(self.0)
-    }
-    pub fn as_bytes(&self) -> &[u8; 32] {
-        &self.0
     }
 }
 
@@ -36,15 +35,12 @@ impl FromStr for ObjectId {
     type Err = Error;
 
     fn from_str(value: &str) -> Result<Self> {
-        let hex_value = value
-            .strip_prefix("sha256:")
-            .ok_or_else(|| Error::InvalidObjectId(value.into()))?;
-        if hex_value.len() != 64 || !hex_value.bytes().all(|c| c.is_ascii_hexdigit()) {
-            return Err(Error::InvalidObjectId(value.into()));
-        }
         let mut digest = [0; 32];
-        hex::decode_to_slice(hex_value, &mut digest)
-            .map_err(|_| Error::InvalidObjectId(value.into()))?;
+        value
+            .strip_prefix("sha256:")
+            .filter(|hex| hex.len() == 64)
+            .and_then(|hex| hex::decode_to_slice(hex, &mut digest).ok())
+            .ok_or_else(|| Error::InvalidObjectId(value.into()))?;
         Ok(Self(digest))
     }
 }
@@ -54,6 +50,7 @@ impl Serialize for ObjectId {
         serializer.serialize_str(&self.to_string())
     }
 }
+
 impl<'de> Deserialize<'de> for ObjectId {
     fn deserialize<D: Deserializer<'de>>(deserializer: D) -> std::result::Result<Self, D::Error> {
         String::deserialize(deserializer)?
@@ -62,13 +59,11 @@ impl<'de> Deserialize<'de> for ObjectId {
     }
 }
 
+/// `manifest.toml`: the only part of a result that is meant to be committed.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Manifest {
     pub format: String,
-    pub version: String,
-    #[serde(default = "default_schema_version")]
-    pub schema_version: u32,
     pub document: ObjectId,
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub provenance: BTreeMap<String, Value>,
@@ -78,72 +73,26 @@ impl Manifest {
     pub fn new(document: ObjectId) -> Self {
         Self {
             format: "mplot".into(),
-            version: "0.9.9".into(),
-            schema_version: SCHEMA_VERSION,
             document,
             provenance: BTreeMap::new(),
         }
     }
-
-    pub fn validate(&self) -> Vec<ValidationIssue> {
-        let mut issues = Vec::new();
-        if self.format != "mplot" {
-            issues.push(ValidationIssue::new("manifest.format", "must be 'mplot'"));
-        }
-        if self.version != "0.9.9" {
-            issues.push(ValidationIssue::new(
-                "manifest.version",
-                "unsupported version",
-            ));
-        }
-        if !SUPPORTED_SCHEMA_VERSIONS.contains(&self.schema_version) {
-            issues.push(ValidationIssue::new(
-                "manifest.schema_version",
-                "unsupported schema version",
-            ));
-        }
-        issues
-    }
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
 pub struct Document {
-    #[serde(default = "default_schema_version")]
-    pub schema_version: u32,
-    #[serde(default)]
     pub figures: Vec<Figure>,
-    #[serde(default)]
-    pub links: Vec<Value>,
-    #[serde(default)]
-    pub selections: Vec<Selection>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub timeline: Option<Timeline>,
-    #[serde(default, flatten)]
-    pub metadata: BTreeMap<String, Value>,
-}
-
-impl Default for Document {
-    fn default() -> Self {
-        Self {
-            schema_version: SCHEMA_VERSION,
-            figures: Vec::new(),
-            links: Vec::new(),
-            selections: Vec::new(),
-            timeline: None,
-            metadata: BTreeMap::new(),
-        }
-    }
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Figure {
     pub id: String,
     #[serde(default)]
-    pub props: BTreeMap<String, Value>,
-    #[serde(default)]
     pub axes: Vec<Axes>,
-    /// Direct figure metadata emitted by Python, such as size_inches and dpi.
-    #[serde(default, flatten)]
+    /// Remaining fields such as `name`, `size_inches` and `dpi`.
+    #[serde(flatten)]
     pub metadata: BTreeMap<String, Value>,
 }
 
@@ -151,11 +100,9 @@ pub struct Figure {
 pub struct Axes {
     pub id: String,
     #[serde(default)]
-    pub props: BTreeMap<String, Value>,
-    #[serde(default)]
     pub artists: Vec<Artist>,
-    /// Direct axes metadata emitted by Python, such as projection, bounds, x, y and z.
-    #[serde(default, flatten)]
+    /// Remaining fields such as `projection`, `bounds`, `x`, `y` and `z`.
+    #[serde(flatten)]
     pub metadata: BTreeMap<String, Value>,
 }
 
@@ -164,7 +111,6 @@ pub struct Axes {
 pub struct Artist {
     #[serde(rename = "type")]
     pub artist_type: String,
-    pub schema_version: u32,
     pub id: String,
     pub axes_id: String,
     #[serde(default)]
@@ -173,6 +119,7 @@ pub struct Artist {
     pub data: BTreeMap<String, Value>,
 }
 
+/// A numerical array stored as a separate object.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct ArrayRef {
@@ -184,16 +131,7 @@ pub struct ArrayRef {
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
-pub struct Selection {
-    pub id: String,
-    #[serde(flatten)]
-    pub value: BTreeMap<String, Value>,
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
 pub struct Timeline {
-    pub version: u32,
     pub fps: f64,
     pub duration: f64,
     #[serde(default = "default_true")]
@@ -223,550 +161,247 @@ const fn default_true() -> bool {
     true
 }
 
-#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
-pub struct ValidationIssue {
-    pub path: String,
-    pub message: String,
-}
-impl ValidationIssue {
-    pub fn new(path: impl Into<String>, message: impl Into<String>) -> Self {
-        Self {
-            path: path.into(),
-            message: message.into(),
-        }
-    }
-}
-impl fmt::Display for ValidationIssue {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}: {}", self.path, self.message)
-    }
-}
-
-/// Schema version written by current producers.
-pub const SCHEMA_VERSION: u32 = 2;
-const SUPPORTED_SCHEMA_VERSIONS: &[u32] = &[1, 2];
-
-/// Schema version assumed when the field is absent (legacy artifacts).
-const fn default_schema_version() -> u32 {
-    1
-}
-
-const BUILT_INS: &[&str] = &[
-    "line",
-    "scatter",
-    "image",
-    "errorbar",
-    "fill_between",
-    "histogram",
-    "contour",
-    "contourf",
-    "text",
-    "patch",
-    "line3d",
-    "scatter3d",
-    "surface3d",
-    "mesh3d",
+const ARTIST_TYPES: &[&str] = &[
+    "mplot.line",
+    "mplot.scatter",
+    "mplot.image",
+    "mplot.errorbar",
+    "mplot.fill_between",
+    "mplot.histogram",
+    "mplot.contour",
+    "mplot.contourf",
+    "mplot.text",
+    "mplot.patch",
+    "mplot.line3d",
+    "mplot.scatter3d",
+    "mplot.surface3d",
+    "mplot.mesh3d",
 ];
 
-pub fn validate_document(document: &Document) -> Vec<ValidationIssue> {
+/// Fields a timeline update may replace, by target kind (mirrors `mplot.mir.ANIMATABLE`).
+fn animatable(kind: &str) -> Option<&'static [&'static str]> {
+    match kind {
+        "figure" => Some(&["title", "size_inches", "dpi", "facecolor"]),
+        "axes" => Some(&["title", "x", "y", "z", "view", "bounds", "facecolor"]),
+        "artist" => Some(&["data", "props"]),
+        _ => None,
+    }
+}
+
+/// Check IDs, names, artist types, timeline updates and array references.
+pub fn validate_document(document: &Document) -> Vec<String> {
     let mut issues = Vec::new();
-    if !SUPPORTED_SCHEMA_VERSIONS.contains(&document.schema_version) {
-        issues.push(ValidationIssue::new(
-            "schema_version",
-            "unsupported schema version",
-        ));
-    }
-    for key in ["plugin_requirements", "plugins"] {
-        let unsupported = match document.metadata.get(key) {
-            Some(Value::Null) | None => false,
-            Some(Value::Array(values)) => !values.is_empty(),
-            Some(Value::Object(values)) => !values.is_empty(),
-            Some(_) => true,
-        };
-        if unsupported {
-            issues.push(ValidationIssue::new(
-                key,
-                "third-party artist plugins are not supported",
-            ));
-        }
-    }
     let mut ids = HashSet::new();
-    let mut figure_ids = HashSet::new();
-    let mut axes_ids = HashSet::new();
-    let mut artist_ids = HashSet::new();
-    let mut figure_names = HashSet::new();
+    let mut targets: [(&str, HashSet<&str>); 3] = [
+        ("figure", HashSet::new()),
+        ("axes", HashSet::new()),
+        ("artist", HashSet::new()),
+    ];
+    let mut names = HashSet::new();
+    let mut unique = |id: &str, path: String, issues: &mut Vec<String>| {
+        if id.is_empty() {
+            issues.push(format!("{path}.id: must not be empty"));
+        } else if !ids.insert(id.to_owned()) {
+            issues.push(format!("{path}.id: duplicate id"));
+        }
+    };
+
     for (fi, figure) in document.figures.iter().enumerate() {
-        unique_id(
-            &mut ids,
-            &figure.id,
-            format!("figures[{fi}].id"),
-            &mut issues,
-        );
+        let path = format!("figures[{fi}]");
+        unique(&figure.id, path.clone(), &mut issues);
+        targets[0].1.insert(&figure.id);
         match figure.metadata.get("name") {
             None => {}
-            Some(Value::String(name)) if name.is_empty() => issues.push(ValidationIssue::new(
-                format!("figures[{fi}].name"),
-                "must not be empty",
-            )),
-            Some(Value::String(name)) => {
-                if !figure_names.insert(name.as_str()) {
-                    issues.push(ValidationIssue::new(
-                        format!("figures[{fi}].name"),
-                        "duplicate figure name",
-                    ));
-                }
+            Some(Value::String(name)) if name.is_empty() => {
+                issues.push(format!("{path}.name: must not be empty"));
             }
-            Some(_) => issues.push(ValidationIssue::new(
-                format!("figures[{fi}].name"),
-                "must be a string",
-            )),
+            Some(Value::String(name)) if !names.insert(name) => {
+                issues.push(format!("{path}.name: duplicate figure name"));
+            }
+            Some(Value::String(_)) => {}
+            Some(_) => issues.push(format!("{path}.name: must be a string")),
         }
-        figure_ids.insert(figure.id.as_str());
         for (ai, axes) in figure.axes.iter().enumerate() {
-            unique_id(
-                &mut ids,
-                &axes.id,
-                format!("figures[{fi}].axes[{ai}].id"),
-                &mut issues,
-            );
-            axes_ids.insert(axes.id.as_str());
+            let path = format!("{path}.axes[{ai}]");
+            unique(&axes.id, path.clone(), &mut issues);
+            targets[1].1.insert(&axes.id);
             for (ri, artist) in axes.artists.iter().enumerate() {
-                let path = format!("figures[{fi}].axes[{ai}].artists[{ri}]");
-                unique_id(&mut ids, &artist.id, format!("{path}.id"), &mut issues);
-                artist_ids.insert(artist.id.as_str());
+                let path = format!("{path}.artists[{ri}]");
+                unique(&artist.id, path.clone(), &mut issues);
+                targets[2].1.insert(&artist.id);
                 if artist.axes_id != axes.id {
-                    issues.push(ValidationIssue::new(
-                        format!("{path}.axes_id"),
-                        "does not match containing axes",
-                    ));
+                    issues.push(format!("{path}.axes_id: does not match containing axes"));
                 }
-                if artist.schema_version == 0 {
-                    issues.push(ValidationIssue::new(
-                        format!("{path}.schema_version"),
-                        "must be positive",
+                if !ARTIST_TYPES.contains(&artist.artist_type.as_str()) {
+                    issues.push(format!(
+                        "{path}.type: unknown artist type {:?}",
+                        artist.artist_type
                     ));
-                }
-                validate_artist_type(&artist.artist_type, &path, &mut issues);
-                for (name, value) in &artist.data {
-                    validate_refs(value, &format!("{path}.data.{name}"), &mut issues);
                 }
             }
         }
     }
-    for (i, selection) in document.selections.iter().enumerate() {
-        unique_id(
-            &mut ids,
-            &selection.id,
-            format!("selections[{i}].id"),
-            &mut issues,
-        );
-    }
+
     if let Some(timeline) = &document.timeline {
-        if timeline.version != 1 {
-            issues.push(ValidationIssue::new("timeline.version", "must be 1"));
-        }
         if !timeline.fps.is_finite() || timeline.fps <= 0.0 {
-            issues.push(ValidationIssue::new(
-                "timeline.fps",
-                "must be positive and finite",
-            ));
+            issues.push("timeline.fps: must be positive and finite".into());
         }
-        if !timeline.duration.is_finite() || timeline.duration < 0.0 {
-            issues.push(ValidationIssue::new(
-                "timeline.duration",
-                "must be non-negative and finite",
-            ));
-        }
-        let mut previous = 0.0;
-        for (frame_index, frame) in timeline.frames.iter().enumerate() {
-            let path = format!("timeline.frames[{frame_index}]");
-            if !frame.time.is_finite() || frame.time <= previous {
-                issues.push(ValidationIssue::new(
-                    format!("{path}.time"),
-                    "must be finite and strictly increasing",
+        let mut last = 0.0;
+        for (i, frame) in timeline.frames.iter().enumerate() {
+            let path = format!("timeline.frames[{i}]");
+            if !frame.time.is_finite() || frame.time <= last {
+                issues.push(format!(
+                    "{path}.time: must be finite and strictly increasing"
                 ));
             }
-            previous = frame.time;
-            for (update_index, update) in frame.updates.iter().enumerate() {
-                let update_path = format!("{path}.updates[{update_index}]");
-                if !matches!(update.target_kind.as_str(), "artist" | "axes" | "figure") {
-                    issues.push(ValidationIssue::new(
-                        format!("{update_path}.target_kind"),
-                        "unsupported target kind",
-                    ));
-                }
-                let target_exists = match update.target_kind.as_str() {
-                    "artist" => artist_ids.contains(update.target.as_str()),
-                    "axes" => axes_ids.contains(update.target.as_str()),
-                    "figure" => figure_ids.contains(update.target.as_str()),
-                    _ => false,
+            last = frame.time;
+            for (u, update) in frame.updates.iter().enumerate() {
+                let path = format!("{path}.updates[{u}]");
+                let kind = update.target_kind.as_str();
+                let Some(fields) = animatable(kind) else {
+                    issues.push(format!("{path}.target_kind: unsupported {kind:?}"));
+                    continue;
                 };
-                if !target_exists {
-                    issues.push(ValidationIssue::new(
-                        format!("{update_path}.target"),
-                        "dangling target for target kind",
-                    ));
+                let known = targets.iter().find(|(name, _)| *name == kind);
+                if !known.is_some_and(|(_, ids)| ids.contains(update.target.as_str())) {
+                    issues.push(format!("{path}.target: no {kind} {:?}", update.target));
                 }
-                let allowed = match update.target_kind.as_str() {
-                    "artist" => matches!(
-                        update.path.first().map(String::as_str),
-                        Some("data" | "props")
-                    ),
-                    "axes" => matches!(
-                        update.path.first().map(String::as_str),
-                        Some("title" | "x" | "y" | "z" | "view" | "bounds" | "facecolor")
-                    ),
-                    "figure" => matches!(
-                        update.path.first().map(String::as_str),
-                        Some("title" | "size_inches" | "dpi" | "facecolor")
-                    ),
-                    _ => false,
-                };
-                if update.path.is_empty() || update.path.iter().any(String::is_empty) || !allowed {
-                    issues.push(ValidationIssue::new(
-                        format!("{update_path}.path"),
-                        "unsupported update path",
-                    ));
+                let field = update.path.first().map(String::as_str).unwrap_or_default();
+                if !fields.contains(&field) || update.path.iter().any(String::is_empty) {
+                    issues.push(format!("{path}.path: cannot update {:?}", update.path));
                 }
-                validate_refs(&update.value, &format!("{update_path}.value"), &mut issues);
             }
         }
-        if timeline
-            .frames
-            .last()
-            .is_some_and(|frame| frame.time != timeline.duration)
-        {
-            issues.push(ValidationIssue::new(
-                "timeline.duration",
-                "must equal the final frame time",
-            ));
-        }
-        if timeline.frames.is_empty() && timeline.duration != 0.0 {
-            issues.push(ValidationIssue::new(
-                "timeline.duration",
-                "must be zero when there are no frames",
-            ));
+        if timeline.duration != last {
+            issues.push("timeline.duration: must equal the final frame time (or 0)".into());
         }
     }
+
+    issues.extend(array_refs(document).1);
     issues
 }
 
-pub fn validate_artifact(
-    manifest: &Manifest,
-    document: &Document,
-    store: &ObjectStore,
-) -> Vec<ValidationIssue> {
-    let mut issues = manifest.validate();
-    issues.extend(validate_document(document));
-    walk_document_refs(document, |object, path| match store.get(object) {
-        Ok(_) => {}
-        Err(error) => issues.push(ValidationIssue::new(path, error.to_string())),
-    });
-    issues
-}
+/// Every array object a document references, and any malformed references.
+pub(crate) fn array_refs(document: &Document) -> (Vec<ObjectId>, Vec<String>) {
+    fn walk(value: &Value, path: String, ids: &mut Vec<ObjectId>, issues: &mut Vec<String>) {
+        match value {
+            Value::Object(map) if map.contains_key("object") => {
+                match serde_json::from_value::<ArrayRef>(value.clone()) {
+                    Ok(reference) => ids.push(reference.object),
+                    Err(error) => issues.push(format!("{path}: invalid array reference: {error}")),
+                }
+            }
+            Value::Object(map) => {
+                for (key, child) in map {
+                    walk(child, format!("{path}.{key}"), ids, issues);
+                }
+            }
+            Value::Array(values) => {
+                for (i, child) in values.iter().enumerate() {
+                    walk(child, format!("{path}[{i}]"), ids, issues);
+                }
+            }
+            _ => {}
+        }
+    }
 
-pub(crate) fn referenced_objects(document: &Document) -> Vec<ObjectId> {
-    let mut result = Vec::new();
-    walk_document_refs(document, |object, _| result.push(object.clone()));
-    result.sort();
-    result.dedup();
-    result
-}
-
-fn walk_document_refs(document: &Document, mut f: impl FnMut(&ObjectId, String)) {
+    let (mut ids, mut issues) = (Vec::new(), Vec::new());
     for (fi, figure) in document.figures.iter().enumerate() {
         for (ai, axes) in figure.axes.iter().enumerate() {
             for (ri, artist) in axes.artists.iter().enumerate() {
                 for (name, value) in &artist.data {
-                    walk_refs(
-                        value,
-                        &format!("figures[{fi}].axes[{ai}].artists[{ri}].data.{name}"),
-                        &mut f,
-                    );
+                    let path = format!("figures[{fi}].axes[{ai}].artists[{ri}].data.{name}");
+                    walk(value, path, &mut ids, &mut issues);
                 }
             }
         }
     }
-    if let Some(timeline) = &document.timeline {
-        for (frame_index, frame) in timeline.frames.iter().enumerate() {
-            for (update_index, update) in frame.updates.iter().enumerate() {
-                walk_refs(
-                    &update.value,
-                    &format!("timeline.frames[{frame_index}].updates[{update_index}].value"),
-                    &mut f,
-                );
-            }
+    for (i, frame) in document
+        .timeline
+        .iter()
+        .flat_map(|t| t.frames.iter())
+        .enumerate()
+    {
+        for (u, update) in frame.updates.iter().enumerate() {
+            let path = format!("timeline.frames[{i}].updates[{u}].value");
+            walk(&update.value, path, &mut ids, &mut issues);
         }
     }
-}
-
-fn walk_refs(value: &Value, path: &str, f: &mut impl FnMut(&ObjectId, String)) {
-    match value {
-        Value::Object(map) => {
-            if let Some(Value::String(id)) = map.get("object")
-                && let Ok(id) = id.parse()
-            {
-                f(&id, path.into());
-            }
-            for (key, child) in map {
-                walk_refs(child, &format!("{path}.{key}"), f);
-            }
-        }
-        Value::Array(values) => {
-            for (i, child) in values.iter().enumerate() {
-                walk_refs(child, &format!("{path}[{i}]"), f);
-            }
-        }
-        _ => {}
-    }
-}
-
-fn validate_refs(value: &Value, path: &str, issues: &mut Vec<ValidationIssue>) {
-    match value {
-        Value::Object(map) if map.contains_key("object") => {
-            if let Err(error) = serde_json::from_value::<ArrayRef>(value.clone()) {
-                issues.push(ValidationIssue::new(
-                    path,
-                    format!("invalid array reference: {error}"),
-                ));
-            }
-        }
-        Value::Object(map) => {
-            for (key, child) in map {
-                validate_refs(child, &format!("{path}.{key}"), issues);
-            }
-        }
-        Value::Array(values) => {
-            for (i, child) in values.iter().enumerate() {
-                validate_refs(child, &format!("{path}[{i}]"), issues);
-            }
-        }
-        _ => {}
-    }
-}
-
-fn unique_id(ids: &mut HashSet<String>, id: &str, path: String, issues: &mut Vec<ValidationIssue>) {
-    if id.is_empty() {
-        issues.push(ValidationIssue::new(path, "must not be empty"));
-    } else if !ids.insert(id.into()) {
-        issues.push(ValidationIssue::new(path, "duplicate id"));
-    }
-}
-
-fn validate_artist_type(value: &str, path: &str, issues: &mut Vec<ValidationIssue>) {
-    let Some(name) = value.strip_prefix("mplot.") else {
-        issues.push(ValidationIssue::new(
-            format!("{path}.type"),
-            "custom artist types are not supported",
-        ));
-        return;
-    };
-    if !BUILT_INS.contains(&name) {
-        issues.push(ValidationIssue::new(
-            format!("{path}.type"),
-            "unknown mplot built-in",
-        ));
-    }
+    (ids, issues)
 }
 
 #[cfg(test)]
 mod tests {
-    use std::collections::BTreeMap;
-
     use serde_json::json;
 
     use super::*;
 
-    #[test]
-    fn validates_artist_protocol_and_references() {
-        let document = Document {
-            figures: vec![Figure {
-                id: "figure".into(),
-                props: BTreeMap::new(),
-                metadata: BTreeMap::new(),
-                axes: vec![Axes {
-                    id: "axes".into(),
-                    props: BTreeMap::new(),
-                    metadata: BTreeMap::new(),
-                    artists: vec![Artist {
-                        artist_type: "mplot.line".into(),
-                        schema_version: 1,
-                        id: "line".into(),
-                        axes_id: "wrong".into(),
-                        props: BTreeMap::new(),
-                        data: BTreeMap::from([(
-                            "x".into(),
-                            json!({"object": "not-a-digest", "dtype": "f8", "shape": [2], "codec": "zstd"}),
-                        )]),
-                    }],
-                }],
-            }],
-            ..Document::default()
-        };
-
-        let issues = validate_document(&document);
-        assert!(issues.iter().any(|issue| issue.path.ends_with("axes_id")));
-        assert!(
-            issues
-                .iter()
-                .any(|issue| issue.message.contains("array reference"))
-        );
+    fn document(name: Value, artist_axes: &str, x: Value) -> Document {
+        serde_json::from_value(json!({
+            "figures": [{"id": "figure", "name": name, "axes": [{"id": "axes", "artists": [
+                {"type": "mplot.line", "id": "line", "axes_id": artist_axes, "data": {"x": x}}
+            ]}]}]
+        }))
+        .unwrap()
     }
 
     #[test]
-    fn validates_temporal_updates() {
-        let document = Document {
-            figures: vec![Figure {
-                id: "figure".into(),
-                props: BTreeMap::new(),
-                metadata: BTreeMap::new(),
-                axes: vec![Axes {
-                    id: "axes".into(),
-                    props: BTreeMap::new(),
-                    metadata: BTreeMap::new(),
-                    artists: vec![Artist {
-                        artist_type: "mplot.line".into(),
-                        schema_version: 1,
-                        id: "line".into(),
-                        axes_id: "axes".into(),
-                        props: BTreeMap::new(),
-                        data: BTreeMap::new(),
-                    }],
-                }],
-            }],
-            timeline: Some(Timeline {
-                version: 1,
-                fps: 30.0,
-                duration: 0.5,
-                r#loop: true,
-                frames: vec![TimelineFrame {
-                    time: 0.5,
-                    updates: vec![TimelineUpdate {
-                        target_kind: "artist".into(),
-                        target: "line".into(),
-                        path: vec!["data".into(), "y".into()],
-                        value: json!({"object": "not-a-digest", "dtype": "f8", "shape": [2], "codec": "zstd"}),
-                    }],
-                }],
-            }),
-            ..Document::default()
-        };
-        let issues = validate_document(&document);
-        assert!(
-            issues
-                .iter()
-                .any(|issue| issue.path.contains("timeline.frames[0].updates[0].value"))
-        );
-
-        let mut wrong_kind = document;
-        wrong_kind.timeline.as_mut().unwrap().frames[0].updates[0].target_kind = "axes".into();
-        let issues = validate_document(&wrong_kind);
-        assert!(
-            issues
-                .iter()
-                .any(|issue| issue.path.ends_with(".target")
-                    && issue.message.contains("target kind"))
-        );
-    }
-
-    #[test]
-    fn rejects_custom_artist_types_and_plugin_requirements() {
-        let mut issues = Vec::new();
-        validate_artist_type("org.example.line", "artist", &mut issues);
-        assert_eq!(issues.len(), 1);
-        assert_eq!(issues[0].message, "custom artist types are not supported");
-
-        let document = Document {
-            metadata: BTreeMap::from([("plugin_requirements".into(), json!(["org.example"]))]),
-            ..Document::default()
-        };
-        let issues = validate_document(&document);
-        assert!(
-            issues
-                .iter()
-                .any(|issue| issue.message.contains("plugins are not supported"))
-        );
-    }
-
-    fn named_figure(id: &str, name: Value) -> Figure {
-        Figure {
-            id: id.into(),
-            props: BTreeMap::new(),
-            axes: Vec::new(),
-            metadata: BTreeMap::from([("name".into(), name)]),
-        }
-    }
-
-    #[test]
-    fn validates_figure_names() {
-        let valid = Document {
-            figures: vec![
-                named_figure("a", json!("spectrum")),
-                named_figure("b", json!("residuals")),
-            ],
-            ..Document::default()
-        };
+    fn validates_ids_types_and_array_references() {
+        let reference = json!({"object": format!("{}", ObjectId::of(b"x")), "dtype": "f8", "shape": [2], "codec": "zstd"});
+        let valid = document(json!("spectrum"), "axes", reference.clone());
         assert!(validate_document(&valid).is_empty());
+        assert_eq!(array_refs(&valid).0, vec![ObjectId::of(b"x")]);
 
-        for (name, message) in [
-            (json!(""), "must not be empty"),
-            (json!(3), "must be a string"),
-            (Value::Null, "must be a string"),
-        ] {
-            let document = Document {
-                figures: vec![named_figure("a", name)],
-                ..Document::default()
-            };
-            assert_eq!(
-                validate_document(&document),
-                vec![ValidationIssue::new("figures[0].name", message)]
-            );
-        }
+        let invalid = document(json!(""), "wrong", json!({"object": "nope"}));
+        let issues = validate_document(&invalid).join("\n");
+        assert!(issues.contains("figures[0].name: must not be empty"));
+        assert!(issues.contains("axes_id: does not match containing axes"));
+        assert!(issues.contains("data.x: invalid array reference"));
 
-        let duplicate = Document {
-            figures: vec![
-                named_figure("a", json!("spectrum")),
-                named_figure("b", json!("spectrum")),
-            ],
-            ..Document::default()
-        };
-        assert_eq!(
-            validate_document(&duplicate),
-            vec![ValidationIssue::new(
-                "figures[1].name",
-                "duplicate figure name"
-            )]
-        );
+        let mut custom = valid.clone();
+        custom.figures[0].axes[0].artists[0].artist_type = "org.example.line".into();
+        assert!(validate_document(&custom)[0].contains("unknown artist type"));
+
+        let mut duplicate = valid.clone();
+        duplicate.figures.push(duplicate.figures[0].clone());
+        duplicate.figures[1].id = "other".into();
+        let issues = validate_document(&duplicate).join("\n");
+        assert!(issues.contains("figures[1].name: duplicate figure name"));
+        assert!(issues.contains("figures[1].axes[0].id: duplicate id"));
     }
 
     #[test]
-    fn accepts_schema_one_and_two_and_rejects_three() {
-        assert_eq!(Document::default().schema_version, SCHEMA_VERSION);
-        let legacy: Document = serde_json::from_str("{}").unwrap();
-        assert_eq!(legacy.schema_version, 1);
-        for version in [1, 2] {
-            let document = Document {
-                schema_version: version,
-                ..Document::default()
-            };
-            assert!(validate_document(&document).is_empty());
-            let mut manifest = Manifest::new(ObjectId::from_bytes(b"document"));
-            manifest.schema_version = version;
-            assert!(manifest.validate().is_empty());
-        }
-        let document = Document {
-            schema_version: 3,
-            ..Document::default()
+    fn validates_timeline_updates() {
+        let mut document = document(json!("wave"), "axes", json!([]));
+        let update = |kind: &str, target: &str, path: &str| TimelineUpdate {
+            target_kind: kind.into(),
+            target: target.into(),
+            path: vec![path.into()],
+            value: json!(null),
         };
-        assert_eq!(validate_document(&document)[0].path, "schema_version");
-        let mut manifest = Manifest::new(ObjectId::from_bytes(b"document"));
-        manifest.schema_version = 3;
-        assert_eq!(manifest.validate()[0].path, "manifest.schema_version");
-        let missing: Manifest = toml::from_str(&format!(
-            "format = \"mplot\"\nversion = \"0.9.9\"\ndocument = \"{}\"\n",
-            ObjectId::from_bytes(b"document")
-        ))
-        .unwrap();
-        assert_eq!(missing.schema_version, 1);
+        document.timeline = Some(Timeline {
+            fps: 30.0,
+            duration: 0.5,
+            r#loop: true,
+            frames: vec![TimelineFrame {
+                time: 0.5,
+                updates: vec![
+                    update("artist", "line", "data"),
+                    update("axes", "axes", "x"),
+                ],
+            }],
+        });
+        assert!(validate_document(&document).is_empty());
+
+        let frame = &mut document.timeline.as_mut().unwrap().frames[0];
+        frame.updates = vec![
+            update("axes", "line", "x"),
+            update("figure", "figure", "axes"),
+            update("selection", "x", "x"),
+        ];
+        let issues = validate_document(&document).join("\n");
+        assert!(issues.contains("updates[0].target: no axes \"line\""));
+        assert!(issues.contains("updates[1].path: cannot update"));
+        assert!(issues.contains("updates[2].target_kind: unsupported"));
     }
 }

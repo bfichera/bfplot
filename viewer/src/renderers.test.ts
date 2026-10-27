@@ -5,7 +5,7 @@ import { createScale } from "./scales.js";
 import { svg } from "./svg.js";
 import { themes } from "./theme.js";
 
-const artist = { type: "mplot.line", schema_version: 1, id: "line", axes_id: "axis", props: {}, data: {} };
+const artist = { type: "mplot.line", id: "line", axes_id: "axis", props: {}, data: {} };
 const context = (group: SVGGElement, type: string, data: Record<string, unknown>, props: Record<string, unknown> = {}) => ({
   group, artist: { ...artist, type, props }, data,
   x: createScale("linear", [-3, 3], [0, 600]), y: createScale("linear", [-3, 3], [600, 0]),

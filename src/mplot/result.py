@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import copy
-import tempfile
 from collections.abc import Iterable
 from pathlib import Path
 from typing import Any
@@ -9,15 +8,11 @@ from typing import Any
 import matplotlib.pyplot as plt
 from matplotlib.figure import Figure
 
-from .adapters.matplotlib import translate_group
+from .adapters.matplotlib import translate_figures
 from .artifact import Layout, metadata_value, prepare_destination, write_result
-from .lower import lower_mir
-from .mir import DOCUMENT_SCHEMA_VERSION, MirDocument
+from .mir import MirDocument
 from .provenance import collect_provenance, processing_metadata
-from .store import ContentStore
-from .temporal import Animation
-
-FigureSource = Figure | Iterable[Figure] | None
+from .temporal import Animation, FigureSource
 
 
 def figures_from(figure: FigureSource) -> list[Figure]:
@@ -39,15 +34,6 @@ def provenance_metadata(provenance: bool | dict[str, Any]) -> dict[str, Any]:
     if isinstance(provenance, dict):
         return collect_provenance(extra=metadata_value(provenance))
     raise TypeError("provenance must be bool or a dictionary")
-
-
-def compile_document(document: MirDocument, path: Path, layout: Layout) -> Path:
-    with tempfile.TemporaryDirectory(prefix="mplot-") as temporary:
-        store = ContentStore(Path(temporary) / "objects")
-        artifact_document = lower_mir(document, store)
-        provenance = processing_metadata()
-        provenance.update(document.metadata)
-        return write_result(path, artifact_document, provenance, store, layout=layout)
 
 
 class Metadata(dict[str, Any]):
@@ -121,7 +107,7 @@ class Result:
         self._check_open()
         figures = figures_from(figure)
         names = self._claim_names(figures, name)
-        document, self._next_artist = translate_group(
+        document, self._next_artist = translate_figures(
             figures,
             self._base_metadata,
             names=names,
@@ -154,7 +140,7 @@ class Result:
 
         def translator(source: FigureSource, metadata: dict[str, Any]) -> MirDocument:
             nonlocal next_artist
-            document, next_artist = translate_group(
+            document, next_artist = translate_figures(
                 figures_from(source),
                 metadata,
                 names=names,
@@ -168,7 +154,6 @@ class Result:
             fps=fps,
             loop=loop,
             translator=translator,
-            finisher=lambda _: None,
             metadata=self._base_metadata,
         )
         self._next_figure += len(figures)
@@ -187,7 +172,7 @@ class Result:
         self._closed = True
         if not self._groups:
             raise ValueError("a result needs at least one figure")
-        self._written = compile_document(self._document(), self.path, self.layout)
+        self._written = write_result(self.path, self._document(), self.layout)
         return self._written
 
     def abort(self) -> None:
@@ -261,17 +246,10 @@ class Result:
             extra = dict(metadata.get("extra", {}))
             extra.update(self.metadata)
             metadata["extra"] = extra
-        content = {
-            "schema_version": DOCUMENT_SCHEMA_VERSION,
-            "figures": figures,
-            "links": [],
-            "selections": [],
-        }
+        content: dict[str, Any] = {"figures": figures}
         if timeline is not None:
             content["timeline"] = timeline
-        result = MirDocument(document=content, buffers=buffers, metadata=metadata)
-        result.validate()
-        return result
+        return MirDocument(content, buffers, metadata)
 
 
 def _rename_buffers(value: Any, renamed: dict[str, str]) -> Any:

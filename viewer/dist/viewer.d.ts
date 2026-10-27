@@ -5,7 +5,6 @@ export interface ViewerOptions {
     arrayResolver?: ArrayResolver;
     interactive?: boolean;
     toolbar?: boolean;
-    liveUrl?: string;
 }
 export type ExportScope = "axis" | "figure" | "artifact";
 export declare class MPlotViewer extends EventTarget {
@@ -21,7 +20,6 @@ export declare class MPlotViewer extends EventTarget {
     private exportScope;
     private activeAxisId;
     private activeFigureIdValue;
-    private source?;
     private resize?;
     private intersection?;
     private documentToken;
@@ -99,7 +97,6 @@ export declare class MPlotViewer extends EventTarget {
     private mountFigure;
     private activeFigureId;
     private download;
-    connectLive(url: string): void;
     private figureAxisIds;
     private applyTheme;
 }

@@ -9,7 +9,7 @@ const animatedDocument = (): MPlotDocument => ({
   artists: [
     {
       type: "mplot.line",
-      schema_version: 1,
+     
       id: "line",
       axes_id: "axes",
       props: {},
@@ -17,7 +17,6 @@ const animatedDocument = (): MPlotDocument => ({
     },
   ],
   timeline: {
-    version: 1,
     fps: 2,
     duration: 0.5,
     loop: false,

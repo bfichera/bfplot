@@ -1,49 +1,26 @@
 # Security policy
 
-Most people can simply use MPlot normally. This page is for reporting a security problem or operating MPlot around untrusted files and public networks.
+## Reporting a vulnerability
 
-## Found a vulnerability?
+Please **do not** open a public issue. Use GitHub's private vulnerability reporting for `mplot-dev/mplot` (**Security → Report a vulnerability**). Include the version or commit, the component (Rust core/CLI, Python package, viewer), reproduction steps or a minimal result if safe to share, and the likely impact.
 
-Please **do not** open a public issue yet. Use GitHub’s private vulnerability reporting for `mplot-dev/mplot` under **Security → Report a vulnerability**.
+If private reporting is unavailable, contact a maintainer privately through a verified GitHub profile and ask for a secure channel.
 
-A helpful report includes:
+MPlot is pre-1.0; fixes go into the latest release only.
 
-- the affected MPlot version or commit;
-- the affected component (Rust core/CLI, Python exporter, viewer, or packaging);
-- reproduction steps or a minimal artifact, if it is safe to share;
-- the likely impact and any known workaround.
+## Untrusted results
 
-If private GitHub reporting is unavailable, contact a maintainer privately through a verified GitHub profile and ask for a secure reporting channel. Please do not email a live exploit or sensitive scientific artifact over an unencrypted public channel.
+A result is data, never code, but parsers and renderers must still treat it as untrusted input. MPlot:
 
-We will acknowledge reports as soon as practical, investigate them, and coordinate a fix and disclosure. Please give us time to prepare a release before publishing details.
+- verifies every object's SHA-256 before decoding it;
+- keeps paths inside the result directory;
+- rejects malformed manifests, documents, array metadata and non-finite JSON;
+- shows unsupported artists visibly instead of hiding them;
+- does not load third-party exporters or renderers;
+- binds the server to loopback unless told otherwise.
 
-## Which versions receive fixes?
+Hashes provide integrity, not authenticity. Use an external signature when authorship matters.
 
-MPlot is currently pre-1.0. Security fixes are provided for the latest released version. Please upgrade promptly; older development snapshots may not receive patches.
+## Serving remotely
 
-## What MPlot trusts—and what it does not
-
-An MPlot artifact is data, not code. Opening one never authorizes executable Python or native code.
-
-That does not make every file harmless. Parsers and renderers still need to treat artifacts as untrusted input. MPlot implementations should:
-
-- verify every object’s SHA-256 hash before decoding it;
-- keep paths confined to the intended artifact or object-store directory;
-- reject malformed manifests, schemas, array metadata, and non-finite JSON;
-- limit file sizes, allocations, decompression, nesting, and rendering work;
-- show unsupported artists visibly rather than hiding them;
-- bind servers to loopback unless the operator explicitly chooses another interface.
-
-Hashes provide integrity: they tell you whether bytes still match their recorded identity. They do not prove who created the artifact. Use a trusted external signature when authenticity matters.
-
-MPlot does not load third-party artist exporters or viewer renderers. Supported artist implementations ship with MPlot and are reviewed as part of the project.
-
-## Serving plots remotely
-
-The safe default is local:
-
-```console
-$ mplot serve result.mplot
-```
-
-Binding to a public interface exposes the artifact data and parser surface to the network. If you choose to do that, use authentication, TLS, isolation, access controls, and resource limits appropriate for your environment. “It was only supposed to be up for five minutes” is, unfortunately, not a security mechanism.
+`mplot serve --bind` on a public interface exposes the result and the parsers to the network, without authentication or TLS. Put it behind an authenticated reverse proxy with access controls.

@@ -17,7 +17,6 @@ export declare class ViewerModel extends EventTarget {
     private resolvedViewport;
     private paddedBounds;
     setViewport(axisId: string, viewport: Viewport, source?: string): void;
-    private copyDimension;
     resolveData(data: Record<string, unknown>, artist?: Artist): Promise<ResolvedData>;
     private resolveValue;
     private withResolutionSlot;

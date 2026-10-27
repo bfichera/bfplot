@@ -1,63 +1,41 @@
 # Choosing a file type
 
-Every MPlot output holds one result: all the figures you saved together, an optional animation, and metadata. A result can live on disk in two forms. They contain the same scientific information; they are simply convenient for different jobs.
+A result can be saved as a directory or as one file. Both hold the same data.
 
-MPlot uses your path exactly as given. If the name does not end in `.mplot`, it warns you but still writes exactly that path.
-
-## Result directories: pleasant for projects and Git
+## Directories (default)
 
 ```python
 mplot.savefig("results/experiment.mplot", fig)
 ```
 
-This is the default. It creates:
-
 ```text
 results/experiment.mplot/
-├── manifest.toml      ← small, readable; commit this
-├── .gitignore         ← written by MPlot, contains "/objects/"
-└── objects/sha256/…   ← this result's numerical data only
+├── manifest.toml      ← small and readable; commit this
+├── .gitignore         ← "/objects/"
+└── objects/sha256/…   ← this result's data
 ```
 
-The TOML manifest is small and readable. Numerical arrays live in the `objects/` folder, and nothing is shared with other results. Copying, zipping, or deleting the folder copies, zips, or deletes the whole result.
+Use directories while you work and when you keep results in [Git](version-control.md). Copying or deleting the folder copies or deletes the whole result.
 
-Use this form when you are actively working on an analysis, comparing outputs, or keeping manifests in version control. See [Using MPlot with Git](version-control.md).
-
-## Single files: pleasant for people and archives
+## Single files
 
 ```python
 mplot.savefig("experiment.mplot", fig, layout="file")
 ```
 
-This creates one self-contained packed file with the same manifest and object hashes. Use it when you want to:
+Use one file to email, archive or copy a result to another machine.
 
-- email a result;
-- attach it to a release;
-- copy it to another machine;
-- archive a final output.
-
-## Convert whenever you like
+## Converting
 
 ```console
 $ mplot pack results/experiment.mplot shared/experiment.mplot
 $ mplot unpack shared/experiment.mplot restored/experiment.mplot
 ```
 
-Packing and unpacking preserve the object hashes. The numerical data does not change just because its luggage did. `mplot view`, `mplot serve`, and `mplot verify` accept both forms.
+Hashes do not change. `mplot view`, `serve` and `verify` accept both forms.
 
-!!! tip "A useful rule of thumb"
-    **Directories while you work, single files when you share.**
+## Paths and overwriting
 
-## Saving over an old result
+MPlot writes exactly the path you give it and warns if the name does not end in `.mplot`.
 
-Saving to a path that already holds an MPlot result (in either form, or an empty directory) replaces it. The new result is fully built first and only then swapped in, so a crash halfway through leaves the old one alone. Replacing a directory also drops the data of the old version.
-
-If the path holds something that is *not* an MPlot result—a folder with your own files, a plain text file—MPlot refuses to touch it and raises `FileExistsError`. It checks this when the save starts, before any expensive work.
-
-## Older artifacts
-
-Earlier versions of MPlot wrote a `*.mplot.toml` manifest next to a shared hidden `.mplot/objects/` folder. MPlot no longer writes this form, but it can still view, verify, and pack it:
-
-```console
-$ mplot pack old.mplot.toml new.mplot
-```
+Saving over an existing result, in either form, replaces it. The new result is built first and swapped in only when complete, so a crash leaves the old one intact. If the path holds anything else, such as a folder of your own files, MPlot raises `FileExistsError` before doing any work.

@@ -5,11 +5,10 @@ const ref=(shape:number[])=>({object:`sha256:${"a".repeat(64)}`,dtype:"f8",shape
 
 describe("document normalization",()=>{
   it("flattens Python figures, axes, and artists",()=>{
-    const result=normalizeDocument({schema_version:1,figures:[{id:"f",size_inches:[6,4],dpi:100,axes:[{id:"a",title:"Signal",bounds:[.1,.2,.8,.7],x:{label:"time",scale:"log",limits:[1,10]},y:{label:"value",scale:"linear",limits:[-2,2]},artists:[{type:"mplot.scatter",schema_version:1,id:"s",axes_id:"a",props:{color:[1,0,.5,.5]},data:{xy:ref([2,2])}}]}]}]});
+    const result=normalizeDocument({figures:[{id:"f",size_inches:[6,4],dpi:100,axes:[{id:"a",title:"Signal",bounds:[.1,.2,.8,.7],x:{label:"time",scale:"log",limits:[1,10]},y:{label:"value",scale:"linear",limits:[-2,2]},artists:[{type:"mplot.scatter",id:"s",axes_id:"a",props:{color:[1,0,.5,.5]},data:{xy:ref([2,2])}}]}]}]});
     expect(result.figures[0]).toMatchObject({id:"f",axes:["a"],size:[600,400]});
     expect(result.axes[0]).toMatchObject({id:"a",figure_id:"f",xlabel:"time",xscale:"log",xlim:[1,10],position:[.1,.2,.8,.7]});
     expect(result.artists[0]?.props.color).toBe("rgba(255, 0, 128, 0.5)");
-    expect(result.metadata).toMatchObject({artifact:{schema_version:1,status:"No embedded metadata was found in this legacy or raw document."},document:{figures:1,plots:1,artists:1}});
   });
 
   it("preserves flat axis limits, scales, dates, positions, and auxiliary colorbars from served artifacts",()=>{
@@ -18,10 +17,14 @@ describe("document normalization",()=>{
     expect(result.axes[1]).toMatchObject({id:"c",role:"colorbar",position:[.82,.2,.03,.7],colorbar:{orientation:"vertical",label:"intensity",limits:[-1,1],ticks:[-1,0,1]}});
   });
 
-  it("keeps named figures from schema 2 results",()=>{
-    const result=normalizeDocument({schema_version:2,figures:[{id:"f",name:"spectrum",axes:[]},{id:"g",axes:[]}]});
+  it("keeps figure names, metadata and timelines",()=>{
+    const result=normalizeDocument({figures:[{id:"f",name:"spectrum",axes:[]},{id:"g",axes:[]}]});
     expect(result.figures[0]).toMatchObject({id:"f",name:"spectrum"});
     expect(result.figures[1]?.name).toBeUndefined();
+    const timeline={fps:2,duration:0.5,frames:[{time:0.5,updates:[]}]};
+    const animated=normalizeDocument({figures:[],timeline,metadata:{provenance:{git_commit:"abc"}}});
+    expect(animated.timeline).toEqual(timeline);
+    expect(animated.metadata).toEqual({provenance:{git_commit:"abc"}});
   });
 
   it("adapts matrix and segmented path arrays",()=>{

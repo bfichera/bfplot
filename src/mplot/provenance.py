@@ -40,7 +40,7 @@ def _git_commit() -> str | None:
 
 
 def processing_metadata() -> dict[str, str]:
-    """Return baseline metadata that is present in every newly written artifact."""
+    """Return the creation time and Git commit recorded in every result."""
     source_epoch = os.environ.get("SOURCE_DATE_EPOCH")
     if source_epoch is not None:
         timestamp = dt.datetime.fromtimestamp(int(source_epoch), dt.timezone.utc)

@@ -1,12 +1,11 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://mplot.dev/schema/mir-1.schema.json",
-  "title": "MPlot Intermediate Representation 1.0",
+  "$id": "https://mplot.dev/schema/mir.schema.json",
+  "title": "MPlot Intermediate Representation",
   "type": "object",
-  "required": ["mir_version", "metadata", "document", "buffers"],
+  "required": ["metadata", "document", "buffers"],
   "additionalProperties": false,
   "properties": {
-    "mir_version": {"const": "1.0"},
     "metadata": {
       "type": "object",
       "required": ["created_utc"],
@@ -22,12 +21,9 @@
   "$defs": {
     "document": {
       "type": "object",
-      "required": ["schema_version", "figures", "links", "selections"],
+      "required": ["figures"],
       "properties": {
-        "schema_version": {"type": "integer", "minimum": 1},
         "figures": {"type": "array", "items": {"$ref": "#/$defs/figure"}},
-        "links": {"type": "array"},
-        "selections": {"type": "array"},
         "timeline": {"$ref": "#/$defs/timeline"}
       },
       "additionalProperties": true
@@ -71,10 +67,9 @@
     },
     "timeline": {
       "type": "object",
-      "required": ["version", "fps", "duration", "frames"],
+      "required": ["fps", "duration", "frames"],
       "additionalProperties": false,
       "properties": {
-        "version": {"const": 1},
         "fps": {"type": "number", "exclusiveMinimum": 0},
         "duration": {"type": "number", "minimum": 0},
         "loop": {"type": "boolean"},

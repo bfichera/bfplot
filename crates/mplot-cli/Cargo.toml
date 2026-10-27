@@ -18,7 +18,6 @@ mplot-core = { version = "0.9.9", path = "../mplot-core" }
 serde_json.workspace = true
 tempfile.workspace = true
 tokio.workspace = true
+
+[dev-dependencies]
 toml.workspace = true
-tower-http.workspace = true
-tracing.workspace = true
-tracing-subscriber.workspace = true

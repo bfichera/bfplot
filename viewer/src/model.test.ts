@@ -6,21 +6,16 @@ const document: MPlotDocument = {
   figures: [{ id: "figure", axes: ["a", "b"] }],
   axes: [{ id: "a", xlim: [0, 10], ylim: [0, 5] }, { id: "b", xlim: [0, 20], ylim: [-1, 1] }],
   artists: [],
-  links: [{ axes: ["a", "b"], dimensions: ["x"] }],
 };
 
 describe("ViewerModel", () => {
-  it("propagates linked dimensions without replacing unlinked ranges", () => {
-    const model = new ViewerModel(document);
-    model.setViewport("a", { x: [2, 4], y: [1, 2] });
-    expect(model.viewports.get("b")).toEqual({ x: [2, 4], y: [-1, 1] });
-  });
-
-  it("reports every linked axis affected by a viewport change", () => {
+  it("changes only the requested viewport and reports it", () => {
     const model = new ViewerModel(document), listener = vi.fn();
     model.addEventListener("viewport", listener);
     model.setViewport("a", { x: [2, 4], y: [1, 2] });
-    expect((listener.mock.calls[0]?.[0] as CustomEvent).detail.affected).toEqual(["a", "b"]);
+    expect(model.viewports.get("a")).toEqual({ x: [2, 4], y: [1, 2] });
+    expect(model.viewports.get("b")).toEqual({ x: [0, 20], y: [-1, 1] });
+    expect((listener.mock.calls[0]?.[0] as CustomEvent).detail.axisId).toBe("a");
   });
 
   it("fits and resets object-backed data when explicit limits are absent", async () => {
@@ -29,7 +24,7 @@ describe("ViewerModel", () => {
     const resolver = vi.fn(async (reference: typeof xref) => reference.object === xref.object ? new Float64Array([10, 20, 30]) : new Float64Array([-5, 0, 5]));
     const autoscaleDocument: MPlotDocument = {
       figures: [{ id: "figure", axes: ["a"] }], axes: [{ id: "a" }],
-      artists: [{ type: "mplot.line", schema_version: 1, id: "line", axes_id: "a", props: {}, data: { x: xref, y: yref } }],
+      artists: [{ type: "mplot.line", id: "line", axes_id: "a", props: {}, data: { x: xref, y: yref } }],
     };
     const model = new ViewerModel(autoscaleDocument, resolver);
     await model.fitViewports();

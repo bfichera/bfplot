@@ -1,32 +1,11 @@
 from __future__ import annotations
 
-import json
-import struct
-
-import matplotlib
-import tomllib
-
-matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
 import pytest
 
 import mplot
-
-
-def _packed_document(path):
-    with path.open("rb") as handle:
-        assert handle.read(8) == b"MPLOT\0\x09\x09"
-        manifest_size = struct.unpack("<Q", handle.read(8))[0]
-        manifest = tomllib.loads(handle.read(manifest_size).decode())
-        object_count = struct.unpack("<Q", handle.read(8))[0]
-        objects = {}
-        for _ in range(object_count):
-            digest = handle.read(32).hex()
-            size = struct.unpack("<Q", handle.read(8))[0]
-            objects[digest] = handle.read(size)
-    digest = manifest["document"].split(":", 1)[1]
-    return manifest, json.loads(objects[digest])
+from helpers import read_result
 
 
 def test_animation_exposes_defensive_initial_mir(tmp_path):
@@ -55,14 +34,13 @@ def test_animation_records_semantic_buffer_updates(tmp_path):
         recording.capture(time=0.25)
 
     assert recording.result is not None
-    manifest, document = _packed_document(recording.result)
+    manifest, document = read_result(recording.result)
     timeline = document["timeline"]
     assert timeline == {
         "duration": 0.25,
         "fps": 10.0,
         "frames": timeline["frames"],
         "loop": False,
-        "version": 1,
     }
     assert [frame["time"] for frame in timeline["frames"]] == [0.1, 0.25]
     assert all(frame["updates"] for frame in timeline["frames"])
@@ -78,7 +56,7 @@ def test_empty_animation_is_valid_and_has_zero_duration(tmp_path):
     axes.plot([0, 1], [0, 1])
     recording = mplot.animation(tmp_path / "still.mplot", figure, layout="file", provenance=False)
     output = recording.close()
-    _, document = _packed_document(output)
+    _, document = read_result(output)
     assert document["timeline"]["duration"] == 0
     assert document["timeline"]["frames"] == []
 
@@ -107,7 +85,7 @@ def test_animation_records_property_and_axes_updates(tmp_path):
     recording.capture()
     output = recording.close()
 
-    _, document = _packed_document(output)
+    _, document = read_result(output)
     updates = document["timeline"]["frames"][0]["updates"]
     assert any(
         update["target_kind"] == "artist" and update["path"] == ["props", "color"]
@@ -136,5 +114,5 @@ def test_save_animation_convenience_api(tmp_path):
         provenance=False,
     )
 
-    _, document = _packed_document(output)
+    _, document = read_result(output)
     assert [frame["time"] for frame in document["timeline"]["frames"]] == [0.2, 0.4]

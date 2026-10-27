@@ -1,6 +1,6 @@
 # Python API
 
-The Python API is intentionally small. Most scripts only need `mplot.savefig()` or `mplot.result()`.
+Most scripts only need `mplot.savefig()` or `mplot.result()`.
 
 ## Paths, layouts, and overwriting
 
@@ -130,13 +130,14 @@ mplot.save_animation(
 
 Call `update(frame)` for each item in `frames` and capture the resulting figure state. Returns the output path.
 
-## `mplot.compile`
+## `mplot.translate` and `mplot.compile`
 
 ```python
+mplot.translate(figure=None, *, metadata=None)
 mplot.compile(mir, path, *, layout="directory")
 ```
 
-Compile a validated MIR document, such as the output of `mplot.translate(fig)`, into one result at exactly `path`.
+`translate` turns Matplotlib figures into a validated `mplot.MirDocument`, MPlot's intermediate representation. `compile` writes a MIR document as one result at exactly `path`. `savefig` is the two combined. Producers in other languages can write MIR directly; its schema is `src/mplot/mir.schema.json`.
 
 ## `mplot.show`
 
@@ -158,21 +159,6 @@ mplot.show(fig)
 
 Set `open_browser=False` to create the output without launching the CLI.
 
-## `mplot.stream`
-
-```python
-mplot.stream(path, *, provenance=True)
-```
-
-Create an append-only sequence of figure frames. Each frame is a packed file inside `<path>.mplot-stream/`.
-
-```python
-with mplot.stream("runs/detector") as stream:
-    stream.append(fig)
-```
-
-`Stream.append()` and `Stream.send()` are aliases. Both accept an optional `timestamp` keyword.
-
 ## Additional artist types
 
-MPlot does not load third-party artist exporters or viewer renderers. To add support for another Matplotlib artist, please submit a pull request that implements and tests both sides in MPlot itself.
+MPlot does not load third-party exporters or renderers. To support another Matplotlib artist, send a pull request that implements and tests both sides in MPlot.

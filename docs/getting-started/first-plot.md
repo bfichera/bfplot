@@ -1,8 +1,6 @@
 # Your first MPlot
 
-Let’s make a slightly more realistic figure: a sine wave with an uncertainty band. Very scientific.
-
-## 1. Make the Matplotlib figure
+## Save a figure
 
 ```python title="analysis.py"
 import matplotlib.pyplot as plt
@@ -14,83 +12,55 @@ y = np.sin(x)
 
 fig, ax = plt.subplots()
 ax.plot(x, y, label="signal")
-ax.fill_between(
-    x,
-    y - 0.1,
-    y + 0.1,
-    alpha=0.2,
-    label="uncertainty",
-)
-ax.set(
-    xlabel="time (s)",
-    ylabel="voltage (V)",
-    title="A very scientific sine wave",
-)
+ax.fill_between(x, y - 0.1, y + 0.1, alpha=0.2, label="uncertainty")
+ax.set(xlabel="time (s)", ylabel="voltage (V)", title="Sine wave")
 ax.legend()
 
 output = mplot.savefig("results/sine_wave.mplot", fig)
 print(f"Saved {output}")
 ```
 
-Run it like any ordinary Python script:
-
 ```console
 $ python analysis.py
 Saved results/sine_wave.mplot
 ```
 
-## 2. Open the saved plot
+## Open it
 
 ```console
 $ mplot view results/sine_wave.mplot
 ```
 
-MPlot starts a small local server and opens the viewer in your browser. The server binds to your own machine by default; it does not publish the plot to the internet.
+This starts a local server, bound to your own machine, and opens the viewer in your browser.
 
-## 3. Add useful scientific context
+## Add context
 
-MPlot records basic provenance automatically. Add the experimental details that only you know:
+MPlot records [provenance](../guides/provenance.md) automatically. Add the details only you know:
 
 ```python
 mplot.savefig(
     "results/sine_wave.mplot",
     fig,
-    provenance={
-        "sample": "crystal-17",
-        "temperature_kelvin": 83.5,
-        "note": "background-subtracted calibration run",
-    },
+    provenance={"sample": "crystal-17", "temperature_kelvin": 83.5},
 )
 ```
 
-If you do not want provenance for a particular output:
+`provenance=False` keeps only the creation time and Git commit.
 
-```python
-mplot.savefig("anonymous_plot.mplot", fig, provenance=False)
-```
+## Which figures are saved?
 
-## Which figure gets saved?
-
-Passing the figure explicitly is clearest:
-
-```python
-mplot.savefig("result.mplot", fig)
-```
-
-If you leave it out, MPlot saves all currently open Matplotlib figures:
+Pass the figure explicitly. Without one, MPlot saves every open figure as one result:
 
 ```python
 mplot.savefig("all_my_figures.mplot")
 ```
 
-That can be convenient, but explicit figure arguments usually make analysis scripts easier to understand later.
+To save several figures with names, use [`mplot.result()`](../reference/python-api.md#mplotresult).
 
-## One file or a Git-friendly output?
-
-The example above creates a result directory, `results/sine_wave.mplot/`. To save one portable file instead, pass `layout="file"`:
+## One file instead of a directory
 
 ```python
 mplot.savefig("sine_wave.mplot", fig, layout="file")
 ```
 
-Read [Choosing a file type](../guides/file-types.md) for the tradeoff. The short answer is: directories while you work, single files when you share.
+See [Choosing a file type](../guides/file-types.md).

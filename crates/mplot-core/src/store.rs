@@ -7,83 +7,65 @@ use std::{
 use serde::Serialize;
 
 use crate::{
-    Document, Error, Manifest, ObjectId, Result, canonical_json_bytes, error::io,
-    format::referenced_objects, validate_artifact,
+    Document, Error, Manifest, ObjectId, Result, error::io, format::array_refs, validate_document,
 };
 
+/// Content-addressed objects at `<root>/<2 hex>/<digest>`.
 #[derive(Clone, Debug)]
 pub struct ObjectStore {
     root: PathBuf,
 }
 
 impl ObjectStore {
-    /// Create a store whose objects live at `<root>/<2 hex>/<digest>`.
     pub fn new(root: impl Into<PathBuf>) -> Self {
         Self { root: root.into() }
     }
-    /// Store of a directory result: `<dir>/objects/sha256`.
+
+    /// The store of a result directory: `<dir>/objects/sha256`.
     pub fn for_result_dir(dir: &Path) -> Self {
         Self::new(dir.join("objects/sha256"))
     }
-    /// Shared legacy store beside a split manifest: `<parent>/.mplot/objects/sha256`.
-    pub fn for_manifest(path: &Path) -> Self {
-        Self::new(
-            path.parent()
-                .unwrap_or_else(|| Path::new("."))
-                .join(".mplot/objects/sha256"),
-        )
-    }
+
     pub fn root(&self) -> &Path {
         &self.root
     }
+
     pub fn path(&self, id: &ObjectId) -> PathBuf {
         let digest = id.digest();
         self.root.join(&digest[..2]).join(digest)
     }
+
     pub fn put(&self, bytes: &[u8]) -> Result<ObjectId> {
-        let id = ObjectId::from_bytes(bytes);
+        let id = ObjectId::of(bytes);
         let path = self.path(&id);
         if path.exists() {
-            self.verify(&id)?;
+            self.get(&id)?;
             return Ok(id);
         }
         let parent = path.parent().expect("object path has parent");
         fs::create_dir_all(parent).map_err(|e| io(parent, e))?;
-        let temporary = parent.join(format!(".{}.tmp-{}", id.digest(), std::process::id()));
-        fs::write(&temporary, bytes).map_err(|e| io(&temporary, e))?;
-        match fs::rename(&temporary, &path) {
-            Ok(()) => Ok(id),
-            Err(_) if path.exists() => {
-                let _ = fs::remove_file(&temporary);
-                self.verify(&id)?;
-                Ok(id)
-            }
-            Err(error) => {
-                let _ = fs::remove_file(&temporary);
-                Err(io(path, error))
-            }
-        }
+        fs::write(&path, bytes).map_err(|e| io(&path, e))?;
+        Ok(id)
     }
+
+    /// Store `value` as canonical JSON: compact, with sorted keys.
     pub fn put_json<T: Serialize>(&self, value: &T) -> Result<ObjectId> {
-        self.put(&canonical_json_bytes(value)?)
+        // `serde_json::Map` is a `BTreeMap` (no `preserve_order`), so keys come out sorted.
+        self.put(&serde_json::to_vec(&serde_json::to_value(value)?)?)
     }
+
     pub fn get(&self, id: &ObjectId) -> Result<Vec<u8>> {
         let path = self.path(id);
-        let bytes = fs::read(&path).map_err(|e| {
-            if e.kind() == std::io::ErrorKind::NotFound {
-                Error::ObjectNotFound(id.to_string())
-            } else {
-                io(path, e)
-            }
+        let bytes = fs::read(&path).map_err(|e| match e.kind() {
+            std::io::ErrorKind::NotFound => Error::ObjectNotFound(id.to_string()),
+            _ => io(path, e),
         })?;
         verify_bytes(id, &bytes)?;
         Ok(bytes)
     }
-    pub fn verify(&self, id: &ObjectId) -> Result<()> {
-        self.get(id).map(|_| ())
-    }
 }
 
+/// A loaded result directory.
 #[derive(Clone, Debug)]
 pub struct Artifact {
     pub manifest: Manifest,
@@ -91,26 +73,17 @@ pub struct Artifact {
     pub store: ObjectStore,
 }
 
-/// Resolve a user path to its manifest file and object store.
-///
-/// A directory is a result (`dir/manifest.toml`, `dir/objects/sha256`); a file named
-/// `manifest.toml` is opened as the manifest of its parent result; anything else is a
-/// legacy split manifest with a shared sibling `.mplot` store.
+/// Resolve a result directory, or its `manifest.toml`, to the manifest path and store.
 pub fn locate_artifact(path: &Path) -> (PathBuf, ObjectStore) {
-    if path.is_dir() {
-        return (
-            path.join("manifest.toml"),
-            ObjectStore::for_result_dir(path),
-        );
-    }
-    if path.file_name().is_some_and(|name| name == "manifest.toml") {
-        let parent = match path.parent() {
+    let dir = if path.file_name().is_some_and(|name| name == "manifest.toml") {
+        match path.parent() {
             Some(parent) if !parent.as_os_str().is_empty() => parent,
             _ => Path::new("."),
-        };
-        return (path.to_path_buf(), ObjectStore::for_result_dir(parent));
-    }
-    (path.to_path_buf(), ObjectStore::for_manifest(path))
+        }
+    } else {
+        path
+    };
+    (dir.join("manifest.toml"), ObjectStore::for_result_dir(dir))
 }
 
 pub fn load_artifact(path: &Path) -> Result<Artifact> {
@@ -131,20 +104,12 @@ pub struct VerificationReport {
     pub byte_count: u64,
 }
 
+/// Validate a result directory and check the digest of every object it references.
 pub fn verify_artifact(path: &Path) -> Result<VerificationReport> {
     let artifact = load_artifact(path)?;
-    let issues = validate_artifact(&artifact.manifest, &artifact.document, &artifact.store);
-    if !issues.is_empty() {
-        return Err(Error::Validation(
-            issues
-                .iter()
-                .map(ToString::to_string)
-                .collect::<Vec<_>>()
-                .join("; "),
-        ));
-    }
+    validate(&artifact.manifest, &artifact.document)?;
     let ids: BTreeSet<_> = std::iter::once(artifact.manifest.document.clone())
-        .chain(referenced_objects(&artifact.document))
+        .chain(array_refs(&artifact.document).0)
         .collect();
     let mut report = VerificationReport::default();
     for id in ids {
@@ -154,8 +119,23 @@ pub fn verify_artifact(path: &Path) -> Result<VerificationReport> {
     Ok(report)
 }
 
+pub(crate) fn validate(manifest: &Manifest, document: &Document) -> Result<()> {
+    let mut issues = validate_document(document);
+    if manifest.format != "mplot" {
+        issues.insert(
+            0,
+            format!("format: expected \"mplot\", got {:?}", manifest.format),
+        );
+    }
+    if issues.is_empty() {
+        Ok(())
+    } else {
+        Err(Error::Validation(issues.join("; ")))
+    }
+}
+
 pub(crate) fn verify_bytes(expected: &ObjectId, bytes: &[u8]) -> Result<()> {
-    let actual = ObjectId::from_bytes(bytes);
+    let actual = ObjectId::of(bytes);
     if &actual != expected {
         return Err(Error::DigestMismatch {
             expected: expected.to_string(),
@@ -168,6 +148,7 @@ pub(crate) fn verify_bytes(expected: &ObjectId, bytes: &[u8]) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use serde_json::json;
     use tempfile::tempdir;
 
     #[test]
@@ -181,19 +162,22 @@ mod tests {
     }
 
     #[test]
-    fn locates_directory_manifest_and_legacy_layouts() {
+    fn json_objects_are_canonical() {
         let dir = tempdir().unwrap();
-        let result = dir.path().join("fit.mplot");
-        fs::create_dir(&result).unwrap();
-        let (manifest, store) = locate_artifact(&result);
-        assert_eq!(manifest, result.join("manifest.toml"));
-        assert_eq!(store.root(), result.join("objects/sha256"));
-        let (manifest, store) = locate_artifact(&result.join("manifest.toml"));
-        assert_eq!(manifest, result.join("manifest.toml"));
-        assert_eq!(store.root(), result.join("objects/sha256"));
-        let legacy = dir.path().join("fit.mplot.toml");
-        let (manifest, store) = locate_artifact(&legacy);
-        assert_eq!(manifest, legacy);
-        assert_eq!(store.root(), dir.path().join(".mplot/objects/sha256"));
+        let store = ObjectStore::new(dir.path());
+        let id = store
+            .put_json(&json!({"z": {"b": 1, "a": 2}, "a": 3}))
+            .unwrap();
+        assert_eq!(store.get(&id).unwrap(), br#"{"a":3,"z":{"a":2,"b":1}}"#);
+    }
+
+    #[test]
+    fn locates_directory_and_manifest_paths() {
+        let result = Path::new("out/fit.mplot");
+        for path in [result.to_path_buf(), result.join("manifest.toml")] {
+            let (manifest, store) = locate_artifact(&path);
+            assert_eq!(manifest, result.join("manifest.toml"));
+            assert_eq!(store.root(), result.join("objects/sha256"));
+        }
     }
 }

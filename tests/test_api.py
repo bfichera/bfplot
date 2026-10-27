@@ -1,13 +1,5 @@
 from __future__ import annotations
 
-import json
-import struct
-
-import matplotlib
-import tomllib
-import zstandard as zstd
-
-matplotlib.use("Agg")
 from datetime import datetime, timedelta
 
 import matplotlib.dates as mdates
@@ -15,22 +7,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 import mplot
-
-
-def _document_from_result(path):
-    manifest = tomllib.loads((path / "manifest.toml").read_text())
-    digest = manifest["document"].split(":", 1)[1]
-    document_path = path / "objects" / "sha256" / digest[:2] / digest
-    return manifest, json.loads(document_path.read_text())
-
-
-def _decode_array(path, reference):
-    digest = reference["object"].split(":", 1)[1]
-    object_path = path / "objects" / "sha256" / digest[:2] / digest
-    raw = zstd.ZstdDecompressor().decompress(object_path.read_bytes())
-    return np.frombuffer(raw, dtype=np.dtype(reference["dtype"]).newbyteorder("<")).reshape(
-        reference["shape"]
-    )
+from helpers import read_array, read_objects, read_result
 
 
 def test_savefig_extracts_broad_artist_set(tmp_path):
@@ -50,8 +27,7 @@ def test_savefig_extracts_broad_artist_set(tmp_path):
     output = mplot.savefig(tmp_path / "all.mplot", figure, provenance=False)
     assert output == tmp_path / "all.mplot"
     assert output.is_dir()
-    manifest, document = _document_from_result(output)
-    assert manifest["version"] == "0.9.9"
+    _, document = read_result(output)
     types = {
         artist["type"] for axis in document["figures"][0]["axes"] for artist in axis["artists"]
     }
@@ -71,12 +47,12 @@ def test_savefig_extracts_broad_artist_set(tmp_path):
     )
     for axis in document["figures"][0]["axes"]:
         for artist in axis["artists"]:
-            assert {"type", "schema_version", "id", "axes_id", "props", "data"} == artist.keys()
+            assert {"type", "id", "axes_id", "props", "data"} == artist.keys()
     final_axis = document["figures"][0]["axes"][5]
     contour = next(artist for artist in final_axis["artists"] if artist["type"] == "mplot.contourf")
     text = [artist for artist in final_axis["artists"] if artist["type"] == "mplot.text"]
     assert "facecolors" in contour["props"]
-    assert _decode_array(output, contour["data"]["path_codes"]).size > 0
+    assert read_array(output, contour["data"]["path_codes"]).size > 0
     assert final_axis["title"] == "Contours"
     assert final_axis["x"]["label"] == "x"
     assert len(text) == 1
@@ -88,7 +64,7 @@ def test_savefig_always_records_processing_time(tmp_path):
     axes.plot([0, 1], [0, 1])
 
     output = mplot.savefig(tmp_path / "minimal-metadata.mplot", figure, provenance=False)
-    manifest = tomllib.loads((output / "manifest.toml").read_text())
+    manifest, _ = read_result(output)
 
     assert set(manifest["provenance"]) == {"created_utc", "git_commit"}
     assert manifest["provenance"]["created_utc"].endswith("Z")
@@ -103,7 +79,7 @@ def test_savefig_marks_colorbars_as_auxiliary_axes(tmp_path):
     figure.colorbar(scatter, ax=scatter_axes, label="points")
 
     output = mplot.savefig(tmp_path / "colorbar.mplot", figure, provenance=False)
-    _, document = _document_from_result(output)
+    _, document = read_result(output)
     plots = [axis for axis in document["figures"][0]["axes"] if axis.get("role") != "colorbar"]
     colorbars = [axis for axis in document["figures"][0]["axes"] if axis.get("role") == "colorbar"]
     assert all(colorbar["artists"] == [] for colorbar in colorbars)
@@ -124,7 +100,7 @@ def test_savefig_links_filled_contour_colorbar_to_mappable(tmp_path):
     figure.colorbar(contour, ax=axes, label="level")
 
     output = mplot.savefig(tmp_path / "contour-colorbar.mplot", figure, provenance=False)
-    _, document = _document_from_result(output)
+    _, document = read_result(output)
     plot = next(axis for axis in document["figures"][0]["axes"] if axis.get("role") != "colorbar")
     colorbar = next(
         axis for axis in document["figures"][0]["axes"] if axis.get("role") == "colorbar"
@@ -132,8 +108,8 @@ def test_savefig_links_filled_contour_colorbar_to_mappable(tmp_path):
     extracted = next(artist for artist in plot["artists"] if artist["type"] == "mplot.contourf")
 
     assert colorbar["colorbar"]["mappable"] == extracted["id"]
-    path_values = _decode_array(output, extracted["data"]["path_values"])
-    path_lengths = _decode_array(output, extracted["data"]["path_lengths"])
+    path_values = read_array(output, extracted["data"]["path_values"])
+    path_lengths = read_array(output, extracted["data"]["path_lengths"])
     assert len(path_values) == len(path_lengths) > 0
 
 
@@ -146,7 +122,7 @@ def test_savefig_preserves_dates_insets_and_public_labels(tmp_path):
     inset.plot([0, 1], [0, 1], label="_child0")
 
     output = mplot.savefig(tmp_path / "semantic-axes.mplot", figure, provenance=False)
-    _, document = _document_from_result(output)
+    _, document = read_result(output)
     primary, extracted_inset = document["figures"][0]["axes"]
     assert primary["x"]["scale"] == "date"
     assert primary["x"]["date_format"] == "%b %d"
@@ -167,7 +143,7 @@ def test_savefig_preserves_true_3d_surface_and_wire_geometry(tmp_path):
     wire_axes.plot_wireframe(x, y, z)
 
     output = mplot.savefig(tmp_path / "three-dimensional.mplot", figure, provenance=False)
-    _, document = _document_from_result(output)
+    _, document = read_result(output)
     surface = next(
         artist
         for artist in document["figures"][0]["axes"][0]["artists"]
@@ -178,13 +154,13 @@ def test_savefig_preserves_true_3d_surface_and_wire_geometry(tmp_path):
         for artist in document["figures"][0]["axes"][1]["artists"]
         if artist["type"] == "mplot.mesh3d"
     )
-    surface_vertices = _decode_array(output, surface["data"]["vertices"])
-    wire_vertices = _decode_array(output, wire["data"]["vertices"])
+    surface_vertices = read_array(output, surface["data"]["vertices"])
+    wire_vertices = read_array(output, wire["data"]["vertices"])
     assert surface_vertices.shape[1] == wire_vertices.shape[1] == 3
     assert np.ptp(surface_vertices[:, 0]) > 1
     assert np.ptp(wire_vertices[:, 1]) > 1
-    assert len(_decode_array(output, surface["data"]["path_lengths"])) > 1
-    assert len(_decode_array(output, wire["data"]["path_lengths"])) > 1
+    assert len(read_array(output, surface["data"]["path_lengths"])) > 1
+    assert len(read_array(output, wire["data"]["path_lengths"])) > 1
 
 
 def test_savefig_preserves_large_multi_figure_collections(tmp_path):
@@ -197,7 +173,7 @@ def test_savefig_preserves_large_multi_figure_collections(tmp_path):
         figures.append(figure)
 
     output = mplot.savefig(tmp_path / "many.mplot", figures, provenance=False)
-    _, document = _document_from_result(output)
+    _, document = read_result(output)
     assert len(document["figures"]) == 10
     assert sum(len(figure["axes"]) for figure in document["figures"]) == 40
     positions = [axis["bounds"] for figure in document["figures"] for axis in figure["axes"]]
@@ -210,18 +186,8 @@ def test_packed_artifact_contains_manifest_and_all_objects(tmp_path):
     figure, axes = plt.subplots()
     axes.plot([1, 2], [3, 4])
     output = mplot.savefig(tmp_path / "figure.mplot", figure, layout="file", provenance=False)
-    with output.open("rb") as handle:
-        assert handle.read(8) == b"MPLOT\0\x09\x09"
-        manifest_size = struct.unpack("<Q", handle.read(8))[0]
-        manifest = tomllib.loads(handle.read(manifest_size).decode())
-        object_count = struct.unpack("<Q", handle.read(8))[0]
-        objects = {}
-        for _ in range(object_count):
-            digest = handle.read(32).hex()
-            size = struct.unpack("<Q", handle.read(8))[0]
-            objects[digest] = handle.read(size)
-        assert handle.read() == b""
-    assert manifest["document"].split(":", 1)[1] in objects
+    manifest, objects = read_objects(output)
+    assert manifest["document"].removeprefix("sha256:") in objects
     assert len(objects) >= 3
 
 
@@ -229,14 +195,3 @@ def test_show_can_avoid_viewer_side_effect(tmp_path):
     figure, axes = plt.subplots()
     axes.plot([0, 1])
     assert mplot.show(figure, path=tmp_path / "shown.mplot", open_browser=False).exists()
-
-
-def test_stream_commits_frames_and_closes(tmp_path):
-    figure, axes = plt.subplots()
-    axes.plot([0, 1])
-    with mplot.stream(tmp_path / "live", provenance=False) as session:
-        frame = session.send(figure, timestamp=10)
-        assert frame.exists()
-    index = json.loads((tmp_path / "live.mplot-stream" / "index.json").read_text())
-    assert index["closed"] is True
-    assert index["frames"] == [{"sequence": 0, "timestamp": 10.0, "artifact": "00000000.mplot"}]

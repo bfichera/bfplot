@@ -6,7 +6,4 @@ node_modules/
 dist/
 release-dist/
 /site/
-.mplot/objects/
-.mplot/cache/
-*.mplot-stream/chunks/
 .DS_Store

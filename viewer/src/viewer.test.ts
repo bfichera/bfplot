@@ -15,8 +15,8 @@ const document: MPlotDocument = {
   figures: [{ id: "f", title: "Results", axes: ["a"] }],
   axes: [{ id: "a", title: "Signal", xlabel: "time", ylabel: "value", xlim: [0, 2], ylim: [0, 4] }],
   artists: [
-    { type: "mplot.line", schema_version: 1, id: "line", axes_id: "a", props: { color: "red" }, data: { x: [0, 1, 2], y: [0, 2, 4] } },
-    { type: "org.example.missing", schema_version: 1, id: "unknown", axes_id: "a", props: {}, data: {} },
+    { type: "mplot.line", id: "line", axes_id: "a", props: { color: "red" }, data: { x: [0, 1, 2], y: [0, 2, 4] } },
+    { type: "org.example.missing", id: "unknown", axes_id: "a", props: {}, data: {} },
   ],
 };
 
@@ -76,7 +76,7 @@ describe("MPlotViewer", () => {
       ...document,
       figures: [{ id: "f", title: "Results", axes: ["a", "c"] }],
       axes: [...document.axes, { id: "c", figure_id: "f", role: "colorbar", position: [.82, .1, .03, .8], colorbar: { orientation: "vertical", label: "intensity", limits: [0, 1], ticks: [0, .5, 1], colors: ["#000000", "#ffffff"], mappable: "image" } }],
-      artists: [{ type: "mplot.image", schema_version: 1, id: "image", axes_id: "a", props: { clim: [0, 1] }, data: { values: [[0, 1], [1, 0]], extent: [0, 2, 0, 4] } }],
+      artists: [{ type: "mplot.image", id: "image", axes_id: "a", props: { clim: [0, 1] }, data: { values: [[0, 1], [1, 0]], extent: [0, 2, 0, 4] } }],
     };
     const viewer = new MPlotViewer(host, withColorbar);
     await viewer.render();
@@ -111,7 +111,7 @@ describe("MPlotViewer", () => {
       ...document,
       figures: [{ id: "f", title: "Results", axes: ["a", "c"] }],
       axes: [...document.axes, { id: "c", figure_id: "f", role: "colorbar", position: [.82, .1, .03, .8], colorbar: { orientation: "vertical", limits: [0, 1], ticks: [0, .5, 1], colors: ["#440154", "#fde725"], mappable: "contour" } }],
-      artists: [{ type: "mplot.contourf", schema_version: 1, id: "contour", axes_id: "a", props: { clim: [0, 1], cmap: "viridis", facecolors: ["#abcdef"] }, data: { paths: [[[0, 0], [2, 0], [1, 4]]], path_values: [.25], levels: [0, 1] } }],
+      artists: [{ type: "mplot.contourf", id: "contour", axes_id: "a", props: { clim: [0, 1], cmap: "viridis", facecolors: ["#abcdef"] }, data: { paths: [[[0, 0], [2, 0], [1, 4]]], path_values: [.25], levels: [0, 1] } }],
     };
     const viewer = new MPlotViewer(host, withContour);
     await viewer.render();
@@ -165,17 +165,16 @@ describe("MPlotViewer", () => {
     viewer.destroy();
   });
 
-  it("shows baseline metadata for documents without an embedded metadata envelope", async () => {
+  it("shows the document metadata on its own page", async () => {
     const host = window.document.createElement("div");
     window.document.body.append(host);
-    const viewer = new MPlotViewer(host, document);
+    const viewer = new MPlotViewer(host, { ...document, metadata: { provenance: { git_commit: "abc123", figures: 2 } } });
     await viewer.render();
     host.querySelector<HTMLButtonElement>('[data-page-id="__metadata__"]')!.click();
     await new Promise((resolve) => setTimeout(resolve, 0));
     const page = host.querySelector<HTMLElement>(".mplot-metadata-page")!;
-    expect(page.textContent).toContain("No embedded metadata was found in this legacy or raw document.");
-    expect(page.textContent).toContain("figures");
-    expect(page.textContent).toContain("artists");
+    expect(page.textContent).toContain("git_commit");
+    expect(page.textContent).toContain("abc123");
     viewer.destroy();
   });
 
@@ -206,7 +205,7 @@ describe("MPlotViewer", () => {
     const animated: MPlotDocument = {
       ...document,
       timeline: {
-        version: 1, fps: 2, duration: 1, loop: false,
+        fps: 2, duration: 1, loop: false,
         frames: [
           { time: .5, updates: [{ target_kind: "artist", target: "line", path: ["data", "y"], value: [4, 2, 0] }] },
           { time: 1, updates: [{ target_kind: "artist", target: "line", path: ["data", "y"], value: [1, 1, 1] }] },
@@ -249,7 +248,7 @@ describe("MPlotViewer", () => {
   it("rotates 3D plots by dragging", async () => {
     const host = window.document.createElement("div");
     window.document.body.append(host);
-    const threeDimensional: MPlotDocument = { ...document, axes: [{ ...document.axes[0]!, projection: "3d", zlim: [0, 2], props: { view: { elev: 30, azim: -60 } } }], artists: [{ type: "mplot.line3d", schema_version: 1, id: "line3d", axes_id: "a", props: {}, data: { x: [0, 1], y: [0, 1], z: [0, 2] } }] };
+    const threeDimensional: MPlotDocument = { ...document, axes: [{ ...document.axes[0]!, projection: "3d", zlim: [0, 2], props: { view: { elev: 30, azim: -60 } } }], artists: [{ type: "mplot.line3d", id: "line3d", axes_id: "a", props: {}, data: { x: [0, 1], y: [0, 1], z: [0, 2] } }] };
     const viewer = new MPlotViewer(host, threeDimensional);
     await viewer.render();
     const chart = host.querySelector<SVGSVGElement>(".mplot-axis svg")!, before = host.querySelector('[data-artist-id="line3d"] path')?.getAttribute("d");

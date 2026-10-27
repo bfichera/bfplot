@@ -19,7 +19,6 @@ export class MPlotViewer extends EventTarget {
     exportScope = "figure";
     activeAxisId;
     activeFigureIdValue;
-    source;
     resize;
     intersection;
     documentToken = 0;
@@ -48,9 +47,7 @@ export class MPlotViewer extends EventTarget {
         this.element.setAttribute("aria-label", document.title ?? "Interactive scientific plot collection");
         this.applyTheme();
         this.model.addEventListener("viewport", (event) => {
-            const detail = event.detail;
-            for (const axisId of detail.affected ?? [detail.axisId])
-                void this.renderAxis(axisId);
+            void this.renderAxis(event.detail.axisId);
         });
         this.model.addEventListener("change", () => { void this.render(); });
         if (typeof ResizeObserver !== "undefined") {
@@ -74,8 +71,6 @@ export class MPlotViewer extends EventTarget {
                     }
             }, { rootMargin: "600px 0px" });
         }
-        if (options.liveUrl)
-            this.connectLive(options.liveUrl);
         void this.render();
     }
     update(document) {
@@ -118,7 +113,6 @@ export class MPlotViewer extends EventTarget {
     }
     destroy() {
         this.timeline.pause();
-        this.source?.close();
         this.resize?.disconnect();
         this.intersection?.disconnect();
         this.element.replaceChildren();
@@ -599,16 +593,7 @@ export class MPlotViewer extends EventTarget {
         heading.append(title, subtitle);
         const body = document.createElement("div");
         body.className = "mplot-metadata-body";
-        const embedded = this.model.document.metadata ?? {};
-        const metadata = Object.keys(embedded).length ? embedded : {
-            artifact: { status: "No embedded metadata was found in this legacy or raw document." },
-            document: {
-                figures: this.model.document.figures.length,
-                plots: this.model.document.axes.filter((axis) => axis.role !== "colorbar" && axis.role !== "inset").length,
-                artists: this.model.document.artists.length,
-            },
-        };
-        body.append(this.metadataTree(metadata, "Metadata"));
+        body.append(this.metadataTree(this.model.document.metadata ?? {}, "Metadata"));
         page.append(heading, body);
         return page;
     }
@@ -1105,14 +1090,6 @@ export class MPlotViewer extends EventTarget {
     async mountFigure(figureId, force = false) { await Promise.all((this.figures.get(figureId)?.axisIds ?? []).map((axisId) => this.mountAxis(axisId, force))); }
     activeFigureId() { return this.activeFigureIdValue ?? (this.activeAxisId ? this.views.get(this.activeAxisId)?.figureId : this.model.document.figures[0]?.id); }
     download(blob, filename) { const link = document.createElement("a"), url = URL.createObjectURL(blob); link.href = url; link.download = filename; link.click(); setTimeout(() => URL.revokeObjectURL(url), 0); }
-    connectLive(url) { this.source?.close(); if (typeof EventSource === "undefined")
-        return; this.source = new EventSource(url); const update = (event) => { try {
-        const payload = JSON.parse(String(event.data));
-        this.update("document" in payload ? payload.document : payload);
-    }
-    catch (error) {
-        this.dispatchEvent(new CustomEvent("mplot:error", { detail: error }));
-    } }; this.source.addEventListener("document", update); this.source.onmessage = update; this.source.onerror = () => this.dispatchEvent(new Event("mplot:disconnect")); }
     figureAxisIds(figure) { return (figure.axes ?? this.model.document.axes.filter((axis) => !axis.figure_id || axis.figure_id === figure.id)).map((axis) => typeof axis === "string" ? axis : axis.id); }
     applyTheme() { const values = { "--mplot-bg": this.theme.background, "--mplot-panel": this.theme.panel, "--mplot-fg": this.theme.foreground, "--mplot-muted": this.theme.muted, "--mplot-grid": this.theme.grid, "--mplot-accent": this.theme.accent, "font-family": this.theme.fontFamily }; for (const [key, value] of Object.entries(values))
         this.element.style.setProperty(key, value); }

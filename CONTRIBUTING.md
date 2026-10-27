@@ -1,121 +1,61 @@
-# How to contribute to MPlot
+# How to contribute
 
-First: thank you! Scientific software gets better when the people who actually use it report confusing behavior, improve an example, add a test, or fix the thing that has been annoying them all week.
+Thank you! Bug reports, documentation fixes and small tests are just as welcome as features.
 
-You do not need to arrive with a giant Rust feature. Documentation fixes and small reproducible bug reports are extremely useful.
+For a small fix, go ahead. For a new public API, artist type or format change, please open an issue first. Report security problems privately as described in `SECURITY.md`, not in the public tracker.
 
-## Before you start
-
-For a small bug fix, test, or documentation improvement, feel free to get started.
-
-For a new public API, artist schema, or file-format change, please open an issue first. These choices affect compatibility, and a short discussion can save everybody from implementing the same idea twice.
-
-Security vulnerabilities should follow [`SECURITY.md`](SECURITY.md) instead of the public issue tracker.
-
-If your change affects artifact behavior, read [`ARCHITECTURE.md`](ARCHITECTURE.md). It is less cheerful than this page because it defines the precise hashing, storage, artist, and safety contracts.
-
-## Finding your way around
+## Repository layout
 
 ```text
-crates/          Rust format, verification, packing, server, streams, and CLI
-src/mplot/       Python API, Matplotlib extraction, and provenance
-viewer/          Browser interface and artist renderers
-docs/            Friendly explanations of formats and workflows
-tests/           Python and integration tests
-scripts/         Smoke checks and release helpers
+src/mplot/       Python API, Matplotlib adapter, MIR and result writer
+crates/          Rust core library and the mplot CLI
+viewer/          Browser viewer (TypeScript); viewer/dist is the committed build
+docs/            Documentation site (MkDocs)
+tests/           Python tests
+scripts/         Smoke checks
 ```
 
-Try to keep changes focused. A patch that fixes contour rendering is much easier to review when it does not also reformat half the repository.
+`ARCHITECTURE.md` describes the format and how the parts fit together.
 
-## Setting up a development checkout
+## Development setup
 
-You will need Python 3.10 or newer, Rust, and Node.js for viewer development.
+You need Python 3.10+, Rust and Node.js.
 
 ```console
 $ python -m venv .venv
 $ . .venv/bin/activate
-$ python -m pip install -e '.[test]'
+$ python -m pip install -e '.[test,docs]'
 $ npm install --prefix viewer
-```
-
-Then run everything:
-
-```console
 $ ./scripts/smoke.sh
 ```
 
-The smoke script checks Rust formatting, tests, and lints; formats, lints, compiles, and tests the Python package; and type-checks, tests, and builds the viewer. It is the same quality gate used by CI.
-
-If you only changed one component, focused tests are faster while you work:
+The smoke script runs every formatter, linter and test suite and rebuilds the viewer. While working, the focused commands are faster:
 
 ```console
 $ cargo test --workspace
-$ python -m ruff check src tests
 $ python -m pytest
 $ npm --prefix viewer test
+$ mkdocs build --strict
 ```
 
-Run the complete smoke script before submitting the change.
+Format with `cargo fmt --all` and `python -m ruff format src tests`. Edit `viewer/src`, not `viewer/dist`; rebuild with `npm --prefix viewer run build`.
 
-## Code style
+## Tests
 
-Prefer small modules with one clear owner over large files organized only by comments. Public APIs should use precise types and docstrings; implementation details should stay private. Keep format validation at trust boundaries, and express invariants in tests rather than relying on reader intuition.
+A good test fails for the bug you fixed.
 
-Formatting is mechanical:
+- Format changes need a directory → packed → directory round trip and malformed-input cases.
+- New artist types need adapter and viewer tests.
+- Renderer changes should cover the visible fallback for bad data.
 
-```console
-$ python -m ruff format src tests
-$ cargo fmt --all
-```
+## Rules
 
-Viewer TypeScript follows the existing expanded style: one statement per line, trailing commas in multiline literals, and named helpers for non-trivial DOM behavior. The strict TypeScript compiler is the source of truth for correctness; avoid compressed one-line DOM construction even when it type-checks.
-
-Do not mix broad formatting with an unrelated behavior change. Generated viewer files in `viewer/dist` are rebuilt with `npm --prefix viewer run build`; edit the corresponding source file instead.
-
-## What makes a good test?
-
-A good test explains the behavior you care about and fails for the bug you fixed.
-
-- Parser and storage changes should include malformed and truncated inputs.
-- Numerical changes should test dtype, shape, non-finite values, and empty arrays.
-- Renderer changes should test ordinary output and the visible fallback for bad data.
-- New artist types should include Python extraction and viewer rendering tests.
-- Format changes need a directory/packed round trip and compatibility fixture.
-
-Please do not rely only on a screenshot. A screenshot can tell us that pixels moved; a semantic test can tell us whether the data remained correct.
-
-## A few rules that are not negotiable
-
-MPlot handles scientific artifacts, sometimes from untrusted sources. Please preserve these boundaries:
-
-- Verify the SHA-256 hash before decoding an object.
-- Keep canonical JSON deterministic.
-- Never let an artifact trigger code execution or load third-party renderers.
-- Keep network serving on loopback unless the user explicitly chooses otherwise.
-- Normalize paths and enforce file, allocation, and decompression limits.
-- Show unsupported artists visibly instead of quietly dropping them.
-
-If a change needs to alter one of these rules, it needs a format/security discussion and an explicit versioning decision.
-
-## Documentation
-
-Documentation should be friendly, accurate, and easy to copy from. Lead with the task the user came to accomplish. Explain jargon when it is unavoidable. A person should not need to understand content-addressed storage before seeing:
-
-```python
-mplot.savefig("my_plot.mplot", fig)
-```
-
-Also, please do not document planned functionality as if it already works. Honest limitations are much more useful than impressive fiction.
+- Verify an object's SHA-256 before decoding it.
+- Keep JSON canonical and packing deterministic.
+- Never let a result execute code or load third-party renderers.
+- Serve on loopback unless the user explicitly asks otherwise.
+- Show unsupported artists instead of dropping them.
 
 ## Pull requests
 
-Tell us:
-
-- what problem you are solving;
-- what approach you took;
-- whether compatibility or security behavior changes;
-- which tests you ran.
-
-Add release notes for user-visible changes. By submitting a contribution, you agree that it may be licensed under either Apache-2.0 or MIT, at the user’s option, as described in the repository license files.
-
-Thanks again for helping. We hope working on MPlot is fun—or at least more fun than debugging a mysteriously empty Matplotlib axes!
+Say what problem you solved, how, and which tests you ran. Contributions are licensed under Apache-2.0 or MIT, at the user's option.

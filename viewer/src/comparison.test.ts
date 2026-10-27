@@ -10,10 +10,10 @@ const document: MPlotDocument = {
     { id: "a3", xscale: "linear", yscale: "log" },
   ],
   artists: [
-    { type: "mplot.line", schema_version: 1, id: "one", axes_id: "a1", props: {}, data: {} },
-    { type: "mplot.line", schema_version: 1, id: "two", axes_id: "a2", props: {}, data: {} },
-    { type: "mplot.line", schema_version: 1, id: "log", axes_id: "a3", props: {}, data: {} },
-    { type: "mplot.scatter", schema_version: 1, id: "dots", axes_id: "a1", props: {}, data: {} },
+    { type: "mplot.line", id: "one", axes_id: "a1", props: {}, data: {} },
+    { type: "mplot.line", id: "two", axes_id: "a2", props: {}, data: {} },
+    { type: "mplot.line", id: "log", axes_id: "a3", props: {}, data: {} },
+    { type: "mplot.scatter", id: "dots", axes_id: "a1", props: {}, data: {} },
   ],
 };
 
