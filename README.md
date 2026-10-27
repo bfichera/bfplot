@@ -28,7 +28,13 @@ You need Python 3.10+.
 $ python -m pip install bfplot
 ```
 
-This installs the Python library and the `bfplot` app that opens results, with the viewer built in. To install only the app, use `uv tool install bfplot-cli`, `brew install bfplot-dev/tap/bfplot` or `cargo install bfplot-cli`; see [Installation](https://bfplot-dev.github.io/bfplot/getting-started/installation/).
+This installs the Python library and the `bfplot` app that opens results, with the viewer built in. To install only the app on macOS or Linux:
+
+```console
+$ curl -LsSf https://github.com/bfplot-dev/bfplot/releases/latest/download/install.sh | sh
+```
+
+See [Installation](https://bfplot-dev.github.io/bfplot/getting-started/installation/) for uninstalling and other options.
 
 ## Results
 

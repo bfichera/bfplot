@@ -75,8 +75,8 @@ The result format is the contract between writers and the app. Writers are nativ
 | --- | --- |
 | `bfplot` (PyPI) | The pure-Python writer. Depends on `bfplot-cli` at exactly the same version. |
 | `bfplot-cli` (PyPI) | Only the `bfplot` binary, as platform wheels built by maturin (`bindings = "bin"`). |
-| `bfplot-cli`, `bfplot-core` (crates.io) | The app and the core library, for `cargo install bfplot-cli`. |
-| GitHub release | Archives, shell and PowerShell installers, and the Homebrew formula in `bfplot-dev/homebrew-tap`, built by cargo-dist. |
+| GitHub release | macOS and Linux archives of the same binaries, with `install.sh` and `uninstall.sh` for installing them with curl. |
+| `bfplot-cli`, `bfplot-core` (crates.io) | The source of the app and the core library, for Rust developers (`cargo install bfplot-cli`, or depending on `bfplot-core`). |
 
 Other languages follow the same pattern (Julia, for example, through a `bfplot_jll` package built from the same release). `bfplot.show()` looks for the app in its Python environment's scripts directory before `PATH`.
 

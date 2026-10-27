@@ -3,8 +3,8 @@
 #
 #   scripts/release.sh 1.0.0
 #
-# CI builds the full set (all platforms) in .github/workflows/python-release.yml and
-# release.yml; this is the local dry run. See RELEASING.md.
+# CI builds the full set (all platforms) in .github/workflows/release.yml; this is the
+# local dry run. See RELEASING.md.
 set -euo pipefail
 
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -41,7 +41,7 @@ bash scripts/stage-crates.sh
 
 out="$root/release-dist"
 rm -rf "$out"
-mkdir -p "$out/python" "$out/crates" "$out/npm"
+mkdir -p "$out/python" "$out/github" "$out/crates" "$out/npm"
 
 printf '\n==> bfplot-cli wheel and sdist\n'
 "$python_bin" -m maturin build --release -m crates/bfplot-cli/Cargo.toml --out "$out/python"
@@ -53,11 +53,33 @@ printf '\n==> bfplot wheel and sdist\n'
 "$python_bin" -m twine check --strict "$out"/python/*
 
 printf '\n==> Test install\n'
-venv="$(mktemp -d)"
-trap 'rm -rf "$venv"' EXIT
-"$python_bin" -m venv "$venv"
-"$venv/bin/python" -m pip install -q --only-binary bfplot-cli --find-links "$out/python" "bfplot==$version"
-"$venv/bin/bfplot" --version
+work="$(mktemp -d)"
+trap 'rm -rf "$work"' EXIT
+"$python_bin" -m venv "$work/venv"
+"$work/venv/bin/python" -m pip install -q --only-binary bfplot-cli --find-links "$out/python" "bfplot==$version"
+"$work/venv/bin/bfplot" --version
+
+printf '\n==> App archive, install.sh and uninstall.sh\n'
+# The binary from the wheel, packaged the way CI does for this machine's platform.
+case "$(uname -s)-$(uname -m)" in
+  Darwin-arm64) target=aarch64-apple-darwin ;;
+  Darwin-x86_64) target=x86_64-apple-darwin ;;
+  Linux-x86_64) target=x86_64-unknown-linux-musl ;;
+  Linux-aarch64) target=aarch64-unknown-linux-musl ;;
+  *) target="" ;;
+esac
+if [[ -n "$target" ]]; then
+  # CI builds Linux archives for musl; a local glibc build is only a stand-in.
+  mkdir -p "$work/app"
+  cp "$work/venv/bin/bfplot" LICENSE-APACHE LICENSE-MIT "$work/app/"
+  archive="bfplot-$target.tar.gz"
+  tar -czf "$out/github/$archive" -C "$work/app" bfplot LICENSE-APACHE LICENSE-MIT
+  (cd "$out/github" && shasum -a 256 "$archive" >"$archive.sha256")
+  cp scripts/install.sh scripts/uninstall.sh "$out/github/"
+  BFPLOT_DOWNLOAD_URL="file://$out/github" BFPLOT_INSTALL_DIR="$work/bin" sh scripts/install.sh
+  BFPLOT_INSTALL_DIR="$work/bin" sh scripts/uninstall.sh
+  [[ ! -e "$work/bin/bfplot" ]]
+fi
 
 printf '\n==> Crates\n'
 # --allow-dirty: the staged license texts and viewer are ignored by Git.

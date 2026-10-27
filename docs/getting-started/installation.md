@@ -21,40 +21,21 @@ If your shell can't find `bfplot`, the environment you installed into is probabl
 
 ## Just the app
 
-To open results that someone else made, or that were written from another language, you only need the app:
+To open results that someone else made, or that were written from another language, you only need the app. On macOS and Linux:
 
-=== "pip / uv"
+```console
+$ curl -LsSf https://github.com/bfplot-dev/bfplot/releases/latest/download/install.sh | sh
+```
 
-    ```console
-    $ uv tool install bfplot-cli
-    $ pipx install bfplot-cli
-    ```
+This puts `bfplot` in `~/.local/bin`, after checking the download's SHA-256. Set `BFPLOT_INSTALL_DIR` to put it elsewhere, or `BFPLOT_VERSION` (such as `1.0.0`) for a particular version. Run the same command again to update.
 
-=== "Homebrew"
+To remove it:
 
-    ```console
-    $ brew install bfplot-dev/tap/bfplot
-    ```
+```console
+$ curl -LsSf https://github.com/bfplot-dev/bfplot/releases/latest/download/uninstall.sh | sh
+```
 
-=== "Installer script"
-
-    ```console
-    $ curl --proto '=https' --tlsv1.2 -LsSf https://github.com/bfplot-dev/bfplot/releases/latest/download/bfplot-cli-installer.sh | sh
-    ```
-
-    On Windows, in PowerShell:
-
-    ```powershell
-    PS> powershell -ExecutionPolicy Bypass -c "irm https://github.com/bfplot-dev/bfplot/releases/latest/download/bfplot-cli-installer.ps1 | iex"
-    ```
-
-=== "Cargo"
-
-    ```console
-    $ cargo install bfplot-cli
-    ```
-
-Every release also attaches ready-made archives for Linux, macOS and Windows to its [GitHub release](https://github.com/bfplot-dev/bfplot/releases).
+On Windows, or if you prefer Python tools, install only the app with `uv tool install bfplot-cli` or `pipx install bfplot-cli`. Rust developers can also use `cargo install bfplot-cli`.
 
 ## Versions
 

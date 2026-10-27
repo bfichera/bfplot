@@ -1,3 +1,0 @@
-- name: Stage crate files
-  shell: bash
-  run: bash scripts/stage-crates.sh
