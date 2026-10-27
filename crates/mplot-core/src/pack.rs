@@ -2,15 +2,18 @@ use std::{
     collections::{BTreeMap, BTreeSet},
     fs,
     io::{Cursor, Read},
-    path::Path,
+    path::{Path, PathBuf},
 };
 
 use crate::{
     Error, Manifest, ObjectId, ObjectStore, Result, VerificationReport, error::io,
-    format::referenced_objects, load_artifact, store::verify_bytes, verify_artifact,
+    format::referenced_objects, load_artifact, locate_artifact, store::verify_bytes,
+    verify_artifact,
 };
 
 const MAGIC: &[u8; 8] = b"MPLOT\0\x09\x09";
+const MANIFEST_PREFIX: &[u8] = b"format = \"mplot\"";
+const GITIGNORE: &str = "/objects/\n";
 type PackedObjects = BTreeMap<ObjectId, Vec<u8>>;
 
 #[derive(Clone, Copy, Debug)]
@@ -31,10 +34,11 @@ impl Default for PackLimits {
     }
 }
 
-pub fn pack_artifact(manifest_path: &Path, output: &Path) -> Result<VerificationReport> {
-    let verified = verify_artifact(manifest_path)?;
-    let artifact = load_artifact(manifest_path)?;
-    let manifest = fs::read(manifest_path).map_err(|error| io(manifest_path, error))?;
+pub fn pack_artifact(source: &Path, output: &Path) -> Result<VerificationReport> {
+    let verified = verify_artifact(source)?;
+    let artifact = load_artifact(source)?;
+    let (manifest_path, _) = locate_artifact(source);
+    let manifest = fs::read(&manifest_path).map_err(|error| io(&manifest_path, error))?;
     let ids: BTreeSet<_> = std::iter::once(artifact.manifest.document.clone())
         .chain(referenced_objects(&artifact.document))
         .collect();
@@ -49,13 +53,23 @@ pub fn pack_artifact(manifest_path: &Path, output: &Path) -> Result<Verification
         write_u64(&mut packed, bytes.len() as u64);
         packed.extend_from_slice(&bytes);
     }
-    fs::write(output, packed).map_err(|e| io(output, e))?;
-    Ok(verified)
+    ensure_replaceable(output)?;
+    let temporary = sibling(output, "tmp")?;
+    let result = fs::write(&temporary, packed)
+        .map_err(|e| io(&temporary, e))
+        .and_then(|()| install(&temporary, output));
+    if result.is_err() {
+        remove_any(&temporary);
+    }
+    result.map(|()| verified)
 }
 
+/// Unpack a packed file into a result directory at `destination`.
+///
+/// An existing MPlot result at `destination` is replaced; anything else is left untouched.
 pub fn unpack_artifact(
     packed_path: &Path,
-    manifest_path: &Path,
+    destination: &Path,
     limits: PackLimits,
 ) -> Result<VerificationReport> {
     let (manifest_bytes, objects) = read_pack(packed_path, limits)?;
@@ -63,7 +77,46 @@ pub fn unpack_artifact(
         std::str::from_utf8(&manifest_bytes)
             .map_err(|_| Error::InvalidPack("manifest is not UTF-8".into()))?,
     )?;
-    let store = ObjectStore::for_manifest(manifest_path);
+    if !objects.contains_key(&manifest.document) {
+        return Err(Error::InvalidPack("document object is absent".into()));
+    }
+    ensure_replaceable(destination)?;
+    let staging = sibling(destination, "partial")?;
+    remove_any(&staging);
+    let result = build_result(&staging, &manifest_bytes, objects)
+        .and_then(|report| install(&staging, destination).map(|()| report));
+    if result.is_err() {
+        remove_any(&staging);
+    }
+    result
+}
+
+/// Read only the header and manifest bytes of a packed file.
+pub fn read_packed_manifest(path: &Path, limits: PackLimits) -> Result<Vec<u8>> {
+    let mut file = fs::File::open(path).map_err(|e| io(path, e))?;
+    let mut header = [0; 16];
+    file.read_exact(&mut header)
+        .map_err(|_| Error::InvalidPack("truncated data".into()))?;
+    if &header[..8] != MAGIC {
+        return Err(Error::InvalidPack("bad magic".into()));
+    }
+    let manifest_len = u64::from_le_bytes(header[8..].try_into().expect("8-byte length"));
+    if manifest_len > limits.max_manifest_bytes {
+        return Err(Error::PackLimit("manifest bytes".into()));
+    }
+    let mut manifest = vec![0; usize_len(manifest_len)?];
+    file.read_exact(&mut manifest)
+        .map_err(|_| Error::InvalidPack("truncated data".into()))?;
+    Ok(manifest)
+}
+
+fn build_result(
+    staging: &Path,
+    manifest: &[u8],
+    objects: PackedObjects,
+) -> Result<VerificationReport> {
+    let store = ObjectStore::for_result_dir(staging);
+    fs::create_dir_all(store.root()).map_err(|e| io(store.root(), e))?;
     for (id, bytes) in objects {
         let written = store.put(&bytes)?;
         if written != id {
@@ -73,19 +126,90 @@ pub fn unpack_artifact(
             });
         }
     }
-    if !store.path(&manifest.document).exists() {
-        return Err(Error::InvalidPack("document object is absent".into()));
+    let manifest_path = staging.join("manifest.toml");
+    fs::write(&manifest_path, manifest).map_err(|e| io(&manifest_path, e))?;
+    let gitignore = staging.join(".gitignore");
+    fs::write(&gitignore, GITIGNORE).map_err(|e| io(&gitignore, e))?;
+    verify_artifact(staging)
+}
+
+fn install(staging: &Path, destination: &Path) -> Result<()> {
+    if fs::symlink_metadata(destination).is_err() {
+        return fs::rename(staging, destination).map_err(|e| io(destination, e));
     }
-    if let Some(parent) = manifest_path.parent() {
-        fs::create_dir_all(parent).map_err(|e| io(parent, e))?;
+    ensure_replaceable(destination)?;
+    let old = sibling(destination, "old")?;
+    remove_any(&old);
+    fs::rename(destination, &old).map_err(|e| io(destination, e))?;
+    if let Err(error) = fs::rename(staging, destination) {
+        let _ = fs::rename(&old, destination);
+        return Err(io(destination, error));
     }
-    fs::write(manifest_path, manifest_bytes).map_err(|e| io(manifest_path, e))?;
-    match verify_artifact(manifest_path) {
-        Ok(report) => Ok(report),
-        Err(error) => {
-            let _ = fs::remove_file(manifest_path);
-            Err(error)
+    remove_any(&old);
+    Ok(())
+}
+
+fn ensure_replaceable(destination: &Path) -> Result<()> {
+    match fs::symlink_metadata(destination) {
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(()),
+        Err(error) => Err(io(destination, error)),
+        Ok(_) if is_mplot_result(destination) => Ok(()),
+        Ok(_) => Err(io(
+            destination,
+            std::io::Error::new(
+                std::io::ErrorKind::AlreadyExists,
+                "destination exists and is not an MPlot result",
+            ),
+        )),
+    }
+}
+
+fn is_mplot_result(path: &Path) -> bool {
+    let Ok(metadata) = fs::symlink_metadata(path) else {
+        return false;
+    };
+    if metadata.is_dir() {
+        let Ok(mut entries) = fs::read_dir(path) else {
+            return false;
+        };
+        entries.next().is_none() || starts_with(&path.join("manifest.toml"), MANIFEST_PREFIX)
+    } else {
+        metadata.is_file() && (starts_with(path, MAGIC) || starts_with(path, MANIFEST_PREFIX))
+    }
+}
+
+fn starts_with(path: &Path, prefix: &[u8]) -> bool {
+    let mut bytes = vec![0; prefix.len()];
+    fs::File::open(path)
+        .and_then(|mut file| file.read_exact(&mut bytes))
+        .is_ok_and(|()| bytes == prefix)
+}
+
+fn sibling(path: &Path, suffix: &str) -> Result<PathBuf> {
+    let name = path
+        .file_name()
+        .ok_or_else(|| io(path, std::io::Error::other("path has no file name")))?;
+    let parent = match path.parent() {
+        Some(parent) if !parent.as_os_str().is_empty() => parent,
+        _ => Path::new("."),
+    };
+    fs::create_dir_all(parent).map_err(|e| io(parent, e))?;
+    Ok(parent.join(format!(
+        ".{}.{}.{suffix}",
+        name.to_string_lossy(),
+        std::process::id()
+    )))
+}
+
+fn remove_any(path: &Path) {
+    match fs::symlink_metadata(path) {
+        Ok(metadata) if metadata.is_dir() => {
+            let _ = fs::remove_dir_all(path);
         }
+        Ok(_) => {
+            let _ = fs::remove_file(path);
+        }
+        Err(_) => {}
     }
 }
 
@@ -206,9 +330,19 @@ fn usize_len(value: u64) -> Result<usize> {
 
 #[cfg(test)]
 mod tests {
-    use crate::{Document, Manifest, ObjectStore};
-    use std::fs;
+    use super::{PackLimits, pack_artifact, read_packed_manifest, unpack_artifact};
+    use crate::{Document, Manifest, ObjectStore, verify_artifact};
+    use std::{fs, path::Path};
     use tempfile::tempdir;
+
+    fn write_result(dir: &Path) -> Vec<u8> {
+        let store = ObjectStore::for_result_dir(dir);
+        let id = store.put_json(&Document::default()).unwrap();
+        let manifest = toml::to_string(&Manifest::new(id)).unwrap();
+        fs::write(dir.join("manifest.toml"), &manifest).unwrap();
+        fs::write(dir.join(".gitignore"), "/objects/\n").unwrap();
+        manifest.into_bytes()
+    }
 
     #[test]
     fn deterministic_pack_round_trip() {
@@ -220,14 +354,100 @@ mod tests {
         fs::write(&source, toml::to_string(&Manifest::new(id)).unwrap()).unwrap();
         let one = dir.path().join("one.mplot");
         let two = dir.path().join("two.mplot");
-        super::pack_artifact(&source, &one).unwrap();
-        super::pack_artifact(&source, &two).unwrap();
+        pack_artifact(&source, &one).unwrap();
+        pack_artifact(&source, &two).unwrap();
         assert_eq!(fs::read(&one).unwrap(), fs::read(&two).unwrap());
-        let destination = dir.path().join("out/result.mplot.toml");
-        super::unpack_artifact(&one, &destination, super::PackLimits::default()).unwrap();
+        let destination = dir.path().join("out/result.mplot");
+        unpack_artifact(&one, &destination, PackLimits::default()).unwrap();
+        assert!(destination.is_dir());
         assert_eq!(
-            crate::verify_artifact(&destination).unwrap().object_count,
-            1
+            fs::read_to_string(destination.join(".gitignore")).unwrap(),
+            "/objects/\n"
         );
+        assert_eq!(
+            fs::read(destination.join("manifest.toml")).unwrap(),
+            fs::read(&source).unwrap()
+        );
+        assert_eq!(verify_artifact(&destination).unwrap().object_count, 1);
+        assert_eq!(
+            read_packed_manifest(&one, PackLimits::default()).unwrap(),
+            fs::read(&source).unwrap()
+        );
+    }
+
+    #[test]
+    fn directory_result_round_trip() {
+        let dir = tempdir().unwrap();
+        let source = dir.path().join("fit.mplot");
+        fs::create_dir(&source).unwrap();
+        let manifest = write_result(&source);
+        let packed = dir.path().join("fit.packed");
+        pack_artifact(&source, &packed).unwrap();
+        let via_manifest = dir.path().join("via-manifest.packed");
+        pack_artifact(&source.join("manifest.toml"), &via_manifest).unwrap();
+        assert_eq!(fs::read(&packed).unwrap(), fs::read(&via_manifest).unwrap());
+        let restored = dir.path().join("restored/fit.mplot");
+        unpack_artifact(&packed, &restored, PackLimits::default()).unwrap();
+        assert_eq!(fs::read(restored.join("manifest.toml")).unwrap(), manifest);
+        assert_eq!(verify_artifact(&restored).unwrap().object_count, 1);
+        assert_eq!(
+            fs::read_dir(dir.path().join("restored")).unwrap().count(),
+            1,
+            "no staging leftovers"
+        );
+    }
+
+    #[test]
+    fn unpack_replaces_existing_result() {
+        let dir = tempdir().unwrap();
+        let source = dir.path().join("fit.mplot");
+        fs::create_dir(&source).unwrap();
+        write_result(&source);
+        let packed = dir.path().join("fit.packed");
+        pack_artifact(&source, &packed).unwrap();
+        let destination = dir.path().join("restored.mplot");
+        fs::create_dir(&destination).unwrap();
+        fs::write(
+            destination.join("manifest.toml"),
+            "format = \"mplot\"\nstale = true\n",
+        )
+        .unwrap();
+        fs::write(destination.join("stale.bin"), b"old").unwrap();
+        unpack_artifact(&packed, &destination, PackLimits::default()).unwrap();
+        assert!(!destination.join("stale.bin").exists());
+        verify_artifact(&destination).unwrap();
+        unpack_artifact(&packed, &destination, PackLimits::default()).unwrap();
+        let packed_destination = dir.path().join("was-packed.mplot");
+        fs::copy(&packed, &packed_destination).unwrap();
+        unpack_artifact(&packed, &packed_destination, PackLimits::default()).unwrap();
+        assert!(packed_destination.is_dir());
+        assert_eq!(fs::read_dir(dir.path()).unwrap().count(), 4);
+    }
+
+    #[test]
+    fn unpack_refuses_to_replace_other_directories() {
+        let dir = tempdir().unwrap();
+        let source = dir.path().join("fit.mplot");
+        fs::create_dir(&source).unwrap();
+        write_result(&source);
+        let packed = dir.path().join("fit.packed");
+        pack_artifact(&source, &packed).unwrap();
+        let destination = dir.path().join("notes");
+        fs::create_dir(&destination).unwrap();
+        fs::write(destination.join("notes.txt"), b"keep me").unwrap();
+        assert!(unpack_artifact(&packed, &destination, PackLimits::default()).is_err());
+        assert_eq!(fs::read(destination.join("notes.txt")).unwrap(), b"keep me");
+        assert_eq!(fs::read_dir(&destination).unwrap().count(), 1);
+        assert_eq!(fs::read_dir(dir.path()).unwrap().count(), 3);
+        let file = dir.path().join("notes.txt");
+        fs::write(&file, b"plain").unwrap();
+        assert!(unpack_artifact(&packed, &file, PackLimits::default()).is_err());
+        assert_eq!(fs::read(&file).unwrap(), b"plain");
+        assert!(pack_artifact(&source, &file).is_err());
+        assert_eq!(fs::read(&file).unwrap(), b"plain");
+        let repacked = dir.path().join("fit.mplot.packed");
+        fs::create_dir(&repacked).unwrap();
+        pack_artifact(&source, &repacked).unwrap();
+        assert!(repacked.is_file());
     }
 }

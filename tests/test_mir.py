@@ -125,3 +125,20 @@ def test_mir_validation_requires_processing_metadata() -> None:
     builder = MirBuilder(metadata={})
     with pytest.raises(MirValidationError, match="metadata.created_utc is required"):
         builder.build({"schema_version": 1, "figures": [], "links": [], "selections": []})
+
+
+def test_mir_validation_rejects_bad_and_duplicate_figure_names() -> None:
+    builder = MirBuilder(metadata={"created_utc": "2026-01-01T00:00:00Z"})
+    document = {
+        "schema_version": 2,
+        "figures": [
+            {"id": "figure-0", "name": "spectrum", "axes": []},
+            {"id": "figure-1", "name": "spectrum", "axes": []},
+            {"id": "figure-2", "name": "", "axes": []},
+        ],
+        "links": [],
+        "selections": [],
+    }
+    with pytest.raises(MirValidationError, match="duplicate figure name") as error:
+        builder.build(document)
+    assert "figures[2].name must be a non-empty string" in str(error.value)

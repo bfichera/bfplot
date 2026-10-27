@@ -7,6 +7,7 @@ from typing import Any
 import numpy as np
 
 MIR_VERSION = "1.0"
+DOCUMENT_SCHEMA_VERSION = 2
 _SUPPORTED_DTYPE_KINDS = {"b", "i", "u", "f"}
 
 
@@ -91,6 +92,7 @@ def validate_mir(mir: MirDocument) -> None:
         figures = []
 
     ids: set[str] = set()
+    figure_names: set[str] = set()
     axes_ids: set[str] = set()
     artist_ids: set[str] = set()
     parent_refs: list[str] = []
@@ -112,6 +114,14 @@ def validate_mir(mir: MirDocument) -> None:
             errors.append(f"{location} must be an object")
             continue
         register(figure.get("id"), location)
+        if "name" in figure:
+            name = figure["name"]
+            if not isinstance(name, str) or not name:
+                errors.append(f"{location}.name must be a non-empty string")
+            elif name in figure_names:
+                errors.append(f"duplicate figure name {name!r} at {location}")
+            else:
+                figure_names.add(name)
         axes = figure.get("axes")
         if not isinstance(axes, list):
             errors.append(f"{location}.axes must be an array")

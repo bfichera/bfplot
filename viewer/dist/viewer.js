@@ -215,7 +215,7 @@ export class MPlotViewer extends EventTarget {
         heading.className = "mplot-figure-header";
         const title = document.createElement("h2");
         title.className = "mplot-figure-title";
-        title.textContent = figure.title ?? `Figure ${index + 1}`;
+        title.textContent = figure.title ?? figure.name ?? `Figure ${index + 1}`;
         const axisIds = this.figureAxisIds(figure);
         const plotAxisIds = axisIds.filter((axisId) => this.model.document.axes.find((axis) => axis.id === axisId)?.role !== "colorbar");
         const primaryPlotCount = plotAxisIds.filter((axisId) => this.model.document.axes.find((axis) => axis.id === axisId)?.role !== "inset").length;
@@ -427,7 +427,7 @@ export class MPlotViewer extends EventTarget {
         const pages = document.createElement("div");
         pages.className = "mplot-page-list";
         const pageEntries = [
-            ...this.model.document.figures.map((figure, index) => ({ id: figure.id, number: String(index + 1).padStart(2, "0"), name: figure.title ?? `Figure ${index + 1}` })),
+            ...this.model.document.figures.map((figure, index) => ({ id: figure.id, number: String(index + 1).padStart(2, "0"), name: figure.title ?? figure.name ?? `Figure ${index + 1}` })),
             ...(this.comparison.open ? [{ id: this.comparisonPageId, number: "↔", name: "Comparison" }] : []),
             { id: this.metadataPageId, number: "—", name: "Metadata" },
         ];

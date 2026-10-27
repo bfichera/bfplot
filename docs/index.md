@@ -23,13 +23,13 @@ fig, ax = plt.subplots()
 ax.plot(x, y, label="signal")
 ax.legend()
 
-mplot.savefig("results/sine_wave", fig)
+mplot.savefig("results/sine_wave.mplot", fig)
 ```
 
 Then open it:
 
 ```console
-$ mplot view results/sine_wave.mplot.toml
+$ mplot view results/sine_wave.mplot
 ```
 
 That’s it! If you already know Matplotlib, you already know almost everything you need to start using MPlot.
@@ -50,7 +50,7 @@ That’s it! If you already know Matplotlib, you already know almost everything 
   <article class="mplot-feature">
     <span class="mplot-feature__icon">↗</span>
     <h3>Share without flattening</h3>
-    <p>Use Git-friendly split outputs while you work, then pack everything into one file.</p>
+    <p>Use Git-friendly result directories while you work, then pack everything into one file.</p>
   </article>
   <article class="mplot-feature">
     <span class="mplot-feature__icon">⌁</span>

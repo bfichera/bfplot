@@ -13,7 +13,7 @@ from .mir import MirBuffer, MirDocument
 
 FigureSource: TypeAlias = Figure | Iterable[Figure] | None
 Translator: TypeAlias = Callable[[FigureSource, dict[str, Any]], MirDocument]
-Compiler: TypeAlias = Callable[[MirDocument, str | Path, bool | None], Path]
+Finisher: TypeAlias = Callable[[MirDocument], Path | None]
 
 _ALLOWED_ARTIST_SECTIONS = {"data", "props"}
 _ALLOWED_AXES_FIELDS = {"title", "x", "y", "z", "view", "bounds", "facecolor"}
@@ -25,27 +25,25 @@ class Animation:
 
     def __init__(
         self,
-        path: str | Path,
         figure: FigureSource,
         *,
         fps: float = 30,
-        packed: bool | None = None,
         loop: bool = True,
         translator: Translator,
-        compiler: Compiler,
+        finisher: Finisher,
         metadata: dict[str, Any],
     ):
         if not math.isfinite(fps) or fps <= 0:
             raise ValueError("fps must be a positive finite number")
-        self.path = Path(path)
         self.figure = figure
         self.fps = float(fps)
-        self.packed = packed
         self.loop = bool(loop)
         self._translator = translator
-        self._compiler = compiler
+        self._finisher = finisher
         self._closed = False
+        self._finished = False
         self._result: Path | None = None
+        self._final: MirDocument | None = None
         self._next_time = 1 / self.fps
         self._initial = translator(figure, metadata)
         self._previous = self._initial
@@ -56,7 +54,12 @@ class Animation:
 
     @property
     def result(self) -> Path | None:
+        """The written artifact, or ``None`` while recording or inside a larger result."""
         return self._result
+
+    @property
+    def closed(self) -> bool:
+        return self._closed
 
     @property
     def frame_count(self) -> int:
@@ -71,6 +74,13 @@ class Animation:
             buffers=dict(self._initial.buffers),
             metadata=copy.deepcopy(self._initial.metadata),
         )
+
+    @property
+    def finalized_mir(self) -> MirDocument:
+        """The validated temporal MIR produced by ``close()``."""
+        if self._final is None:
+            raise RuntimeError("animation has not been closed")
+        return self._final
 
     def capture(self, *, time: float | None = None) -> None:
         """Capture the current Matplotlib state at a strictly increasing time."""
@@ -89,12 +99,16 @@ class Animation:
         self._previous = current
         self._next_time = timestamp + 1 / self.fps
 
-    def close(self) -> Path:
-        """Validate and compile the finalized temporal MIR document."""
-        if self._result is not None:
+    def close(self) -> Path | None:
+        """Validate the finalized temporal MIR document and hand it to its destination.
+
+        Standalone animations return the written artifact. Animations recorded inside
+        ``mplot.result()`` return ``None``; the result writes them when it closes.
+        """
+        if self._finished:
             return self._result
         if self._closed:
-            raise RuntimeError("animation closed without producing an artifact")
+            raise RuntimeError("animation was aborted")
         self._closed = True
         duration = self._frames[-1]["time"] if self._frames else 0.0
         self._document["timeline"] = {
@@ -113,7 +127,9 @@ class Animation:
             },
         )
         mir.validate()
-        self._result = self._compiler(mir, self.path, self.packed)
+        self._final = mir
+        self._result = self._finisher(mir)
+        self._finished = True
         return self._result
 
     def __enter__(self) -> Animation:

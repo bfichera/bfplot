@@ -9,39 +9,16 @@ from collections.abc import Callable, Iterable
 from pathlib import Path
 from typing import Any, TypeVar
 
-import matplotlib.pyplot as plt
 from matplotlib.figure import Figure
 
 from .adapters.matplotlib import translate_figures
-from .artifact import materialize_document
-from .lower import lower_mir
+from .artifact import Layout, prepare_destination
 from .mir import MirDocument
-from .provenance import collect_provenance, processing_metadata
-from .store import ContentStore
+from .provenance import processing_metadata
+from .result import Result, compile_document, figures_from, provenance_metadata, result
 from .temporal import Animation
 
 Frame = TypeVar("Frame")
-
-
-def _figures(figure: Figure | Iterable[Figure] | None) -> list[Figure]:
-    if figure is None:
-        return [plt.figure(number) for number in plt.get_fignums()]
-    if isinstance(figure, Figure):
-        return [figure]
-    figures = list(figure)
-    if not all(isinstance(item, Figure) for item in figures):
-        raise TypeError("figure must be a Matplotlib Figure or iterable of Figures")
-    return figures
-
-
-def _metadata(provenance: bool | dict[str, Any]) -> dict[str, Any]:
-    if provenance is True:
-        return collect_provenance()
-    if provenance is False:
-        return processing_metadata()
-    if isinstance(provenance, dict):
-        return collect_provenance(extra=provenance)
-    raise TypeError("provenance must be bool or a dictionary")
 
 
 def translate(
@@ -55,27 +32,21 @@ def translate(
         if not isinstance(metadata, dict):
             raise TypeError("metadata must be a dictionary")
         processing.update(metadata)
-    return translate_figures(_figures(figure), processing)
+    return translate_figures(figures_from(figure), processing)
 
 
 def compile(
     document: MirDocument,
     path: str | Path,
     *,
-    packed: bool | None = None,
+    layout: Layout = "directory",
 ) -> Path:
-    """Compile validated MIR into a content-addressed MPlot artifact."""
+    """Compile validated MIR into one content-addressed MPlot result at exactly ``path``."""
     if not isinstance(document, MirDocument):
         raise TypeError("document must be a MirDocument")
     output = Path(path)
-    if packed is None:
-        packed = output.suffix == ".mplot"
-    with tempfile.TemporaryDirectory(prefix="mplot-") as temporary:
-        store = ContentStore(Path(temporary) / "objects")
-        artifact_document = lower_mir(document, store)
-        provenance = processing_metadata()
-        provenance.update(document.metadata)
-        return materialize_document(output, artifact_document, provenance, store, packed=packed)
+    layout = prepare_destination(output, layout)
+    return compile_document(document, output, layout)
 
 
 def animation(
@@ -83,29 +54,26 @@ def animation(
     figure: Figure | Iterable[Figure] | None = None,
     *,
     fps: float = 30,
-    packed: bool | None = None,
+    layout: Layout = "directory",
     provenance: bool | dict[str, Any] = True,
     loop: bool = True,
 ) -> Animation:
-    """Record mutable Matplotlib figures into one temporal MPlot artifact."""
-    metadata = _metadata(provenance)
+    """Record mutable Matplotlib figures into one temporal MPlot result."""
+    output = Path(path)
+    layout = prepare_destination(output, layout)
+    metadata = provenance_metadata(provenance)
 
     def translator(
         source: Figure | Iterable[Figure] | None, frame_metadata: dict[str, Any]
     ) -> MirDocument:
-        return translate_figures(_figures(source), frame_metadata)
-
-    def compiler(document: MirDocument, output: str | Path, packed_value: bool | None) -> Path:
-        return compile(document, output, packed=packed_value)
+        return translate_figures(figures_from(source), frame_metadata)
 
     return Animation(
-        path,
         figure,
         fps=fps,
-        packed=packed,
         loop=loop,
         translator=translator,
-        compiler=compiler,
+        finisher=lambda document: compile_document(document, output, layout),
         metadata=metadata,
     )
 
@@ -117,36 +85,42 @@ def save_animation(
     update: Callable[[Frame], Any],
     *,
     fps: float = 30,
-    packed: bool | None = None,
+    layout: Layout = "directory",
     provenance: bool | dict[str, Any] = True,
     loop: bool = True,
 ) -> Path:
     """Apply ``update(frame)`` and capture each resulting Matplotlib state."""
-    recording = animation(path, figure, fps=fps, packed=packed, provenance=provenance, loop=loop)
+    recording = animation(path, figure, fps=fps, layout=layout, provenance=provenance, loop=loop)
     try:
         for frame in frames:
             update(frame)
             recording.capture()
-        return recording.close()
+        written = recording.close()
     except BaseException:
         recording.abort()
         raise
+    assert written is not None
+    return written
 
 
 def savefig(
     path: str | Path,
     figure: Figure | Iterable[Figure] | None = None,
     *,
-    packed: bool | None = None,
+    name: str | Iterable[str | None] | None = None,
+    layout: Layout = "directory",
     provenance: bool | dict[str, Any] = True,
 ) -> Path:
-    """Translate Matplotlib figures through MIR and compile an MPlot artifact.
+    """Save Matplotlib figures as one MPlot result at exactly ``path``.
 
-    ``*.mplot`` paths are deterministic packed artifacts. Other paths produce a split
-    ``*.mplot.toml`` manifest and a sibling ``.mplot/objects`` store. Passing
-    ``provenance=False`` omits environment details but still records creation time.
+    The default ``layout="directory"`` writes a self-contained result directory whose
+    numerical objects are ignored by Git. ``layout="file"`` writes one packed file. An
+    existing MPlot result at ``path`` is replaced. Passing ``provenance=False`` omits
+    environment details but still records creation time and the Git commit.
     """
-    return compile(translate(figure, metadata=_metadata(provenance)), path, packed=packed)
+    output = Result(path, layout=layout, provenance=provenance, _stacklevel=2)
+    output.add(figure, name=name)
+    return output.close()
 
 
 def show(
@@ -154,13 +128,13 @@ def show(
     *,
     path: str | Path | None = None,
     open_browser: bool = True,
-    packed: bool | None = None,
+    layout: Layout = "directory",
 ) -> Path:
     """Save an artifact and ask an installed MPlot viewer to open it."""
     if path is None:
         path = Path(tempfile.mkdtemp(prefix="mplot-show-")) / "figure.mplot"
-        packed = True
-    artifact = savefig(path, figure, packed=packed)
+        layout = "file"
+    artifact = savefig(path, figure, layout=layout)
     if open_browser:
         executable = shutil.which("mplot")
         if executable is None:
@@ -200,7 +174,7 @@ class Stream:
             raise RuntimeError("stream is closed")
         number = len(self._entries)
         frame = savefig(
-            self.frames / f"{number:08d}.mplot", figure, packed=True, provenance=self.provenance
+            self.frames / f"{number:08d}.mplot", figure, layout="file", provenance=self.provenance
         )
         self._entries.append(
             {
@@ -238,3 +212,18 @@ class Stream:
 
 def stream(path: str | Path, *, provenance: bool | dict[str, Any] = True) -> Stream:
     return Stream(path, provenance=provenance)
+
+
+__all__ = [
+    "Animation",
+    "Result",
+    "Stream",
+    "animation",
+    "compile",
+    "result",
+    "save_animation",
+    "savefig",
+    "show",
+    "stream",
+    "translate",
+]

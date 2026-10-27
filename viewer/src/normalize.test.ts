@@ -18,6 +18,12 @@ describe("document normalization",()=>{
     expect(result.axes[1]).toMatchObject({id:"c",role:"colorbar",position:[.82,.2,.03,.7],colorbar:{orientation:"vertical",label:"intensity",limits:[-1,1],ticks:[-1,0,1]}});
   });
 
+  it("keeps named figures from schema 2 results",()=>{
+    const result=normalizeDocument({schema_version:2,figures:[{id:"f",name:"spectrum",axes:[]},{id:"g",axes:[]}]});
+    expect(result.figures[0]).toMatchObject({id:"f",name:"spectrum"});
+    expect(result.figures[1]?.name).toBeUndefined();
+  });
+
   it("adapts matrix and segmented path arrays",()=>{
     const scatter=normalizeArtistData("mplot.scatter",{xy:ref([2,2])},{xy:new Float64Array([1,2,3,4])});
     expect(scatter).toMatchObject({x:[1,3],y:[2,4]});

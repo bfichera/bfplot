@@ -33,7 +33,7 @@ mplot-cli 0.9.9
 The browser viewer is included in `viewer/dist`. When you run the CLI from the repository, MPlot finds it automatically:
 
 ```console
-$ mplot view my_plot.mplot.toml
+$ mplot view my_plot.mplot
 ```
 
 If you run the installed CLI elsewhere, tell it where the viewer lives:
@@ -41,14 +41,14 @@ If you run the installed CLI elsewhere, tell it where the viewer lives:
 === "Command-line option"
 
     ```console
-    $ mplot view my_plot.mplot.toml --viewer-dir /path/to/mplot/viewer/dist
+    $ mplot view my_plot.mplot --viewer-dir /path/to/mplot/viewer/dist
     ```
 
 === "Environment variable"
 
     ```console
     $ export MPLOT_VIEWER_DIR=/path/to/mplot/viewer/dist
-    $ mplot view my_plot.mplot.toml
+    $ mplot view my_plot.mplot
     ```
 
 !!! tip

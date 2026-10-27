@@ -85,7 +85,7 @@ export function normalizeDocument(value: unknown): MPlotDocument {
       for (const artistValue of list(axisSource.artists)) artists.push(normalizeArtist(artistValue, axis.id));
     }
     const sizeInches = pair(source.size_inches), dpi = Number(source.dpi ?? 100);
-    figures.push({ id: figureId, ...(text(source.title) ? { title: text(source.title) } : {}), axes: axisIds, ...(pair(source.size) ? { size: pair(source.size)! } : sizeInches ? { size: [sizeInches[0] * dpi, sizeInches[1] * dpi] } : {}), props: normalizeProps(props) });
+    figures.push({ id: figureId, ...(text(source.title) ? { title: text(source.title) } : {}), ...(text(source.name) ? { name: text(source.name) } : {}), axes: axisIds, ...(pair(source.size) ? { size: pair(source.size)! } : sizeInches ? { size: [sizeInches[0] * dpi, sizeInches[1] * dpi] } : {}), props: normalizeProps(props) });
   }
   for (const axisValue of list(raw.axes)) { const axis = normalizeAxis(axisValue, text(record(axisValue).figure_id)); if (!axes.some((item) => item.id === axis.id)) axes.push(axis); }
   for (const artistValue of list(raw.artists)) { const artist = normalizeArtist(artistValue, text(record(artistValue).axes_id)); if (!artists.some((item) => item.id === artist.id)) artists.push(artist); }

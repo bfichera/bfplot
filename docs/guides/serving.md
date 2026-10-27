@@ -3,15 +3,15 @@
 The MPlot viewer is a browser application served by a small Rust server. For ordinary local viewing, use:
 
 ```console
-$ mplot view result.mplot.toml
+$ mplot view result.mplot
 ```
 
-This starts the server, opens your default browser, and keeps the plot on your own machine.
+This starts the server, opens your default browser, and keeps the plot on your own machine. `view` and `serve` accept a result directory, a packed file, or an older `*.mplot.toml` manifest.
 
 ## Serve without opening a browser
 
 ```console
-$ mplot serve result.mplot.toml
+$ mplot serve result.mplot
 ```
 
 By default, the server listens at `127.0.0.1:8080`.
@@ -19,7 +19,7 @@ By default, the server listens at `127.0.0.1:8080`.
 Choose another port if needed:
 
 ```console
-$ mplot serve result.mplot.toml --port 9000
+$ mplot serve result.mplot --port 9000
 ```
 
 ## Find the viewer assets
@@ -27,7 +27,7 @@ $ mplot serve result.mplot.toml --port 9000
 If the CLI cannot locate `viewer/dist`, provide it explicitly:
 
 ```console
-$ mplot view result.mplot.toml --viewer-dir /path/to/mplot/viewer/dist
+$ mplot view result.mplot --viewer-dir /path/to/mplot/viewer/dist
 ```
 
 or:
@@ -41,7 +41,7 @@ $ export MPLOT_VIEWER_DIR=/path/to/mplot/viewer/dist
 Binding to a non-loopback address is an explicit choice:
 
 ```console
-$ mplot serve result.mplot.toml --bind 0.0.0.0 --port 8080
+$ mplot serve result.mplot --bind 0.0.0.0 --port 8080
 ```
 
 !!! danger "Please do not put this naked on the public internet"

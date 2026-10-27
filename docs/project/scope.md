@@ -7,13 +7,13 @@ MPlot is a way to save Matplotlib figures as interactive scientific artifacts. I
 It is designed around ordinary Python scripts:
 
 ```python
-mplot.savefig("result", fig)
+mplot.savefig("result.mplot", fig)
 ```
 
 and ordinary command-line tools:
 
 ```console
-$ mplot view result.mplot.toml
+$ mplot view result.mplot
 ```
 
 ## What MPlot is not

@@ -80,7 +80,7 @@ A good test explains the behavior you care about and fails for the bug you fixed
 - Numerical changes should test dtype, shape, non-finite values, and empty arrays.
 - Renderer changes should test ordinary output and the visible fallback for bad data.
 - New artist types should include Python extraction and viewer rendering tests.
-- Format changes need a packed/split round trip and compatibility fixture.
+- Format changes need a directory/packed round trip and compatibility fixture.
 
 Please do not rely only on a screenshot. A screenshot can tell us that pixels moved; a semantic test can tell us whether the data remained correct.
 
@@ -102,7 +102,7 @@ If a change needs to alter one of these rules, it needs a format/security discus
 Documentation should be friendly, accurate, and easy to copy from. Lead with the task the user came to accomplish. Explain jargon when it is unavoidable. A person should not need to understand content-addressed storage before seeing:
 
 ```python
-mplot.savefig("my_plot", fig)
+mplot.savefig("my_plot.mplot", fig)
 ```
 
 Also, please do not document planned functionality as if it already works. Honest limitations are much more useful than impressive fiction.

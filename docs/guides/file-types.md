@@ -1,49 +1,63 @@
 # Choosing a file type
 
-MPlot can save your figure in two forms. They contain the same scientific information; they are simply convenient for different jobs.
+Every MPlot output holds one result: all the figures you saved together, an optional animation, and metadata. A result can live on disk in two forms. They contain the same scientific information; they are simply convenient for different jobs.
 
-## Split artifacts: pleasant for projects and Git
+MPlot uses your path exactly as given. If the name does not end in `.mplot`, it warns you but still writes exactly that path.
+
+## Result directories: pleasant for projects and Git
 
 ```python
-mplot.savefig("results/experiment", fig)
+mplot.savefig("results/experiment.mplot", fig)
 ```
 
-This creates:
+This is the default. It creates:
 
 ```text
-results/
-├── experiment.mplot.toml
-└── .mplot/
-    └── objects/
-        └── sha256/
+results/experiment.mplot/
+├── manifest.toml      ← small, readable; commit this
+├── .gitignore         ← written by MPlot, contains "/objects/"
+└── objects/sha256/…   ← this result's numerical data only
 ```
 
-The TOML manifest is small and readable. Numerical arrays live in a content-addressed object store where identical data can be reused.
+The TOML manifest is small and readable. Numerical arrays live in the `objects/` folder, and nothing is shared with other results. Copying, zipping, or deleting the folder copies, zips, or deletes the whole result.
 
-Use this form when you are actively working on an analysis, comparing outputs, or keeping manifests in version control.
+Use this form when you are actively working on an analysis, comparing outputs, or keeping manifests in version control. See [Using MPlot with Git](version-control.md).
 
-## Packed artifacts: pleasant for people and archives
+## Single files: pleasant for people and archives
 
 ```python
-mplot.savefig("experiment.mplot", fig)
+mplot.savefig("experiment.mplot", fig, layout="file")
 ```
 
-This creates one self-contained file. Use it when you want to:
+This creates one self-contained packed file with the same manifest and object hashes. Use it when you want to:
 
-- email an artifact;
+- email a result;
 - attach it to a release;
 - copy it to another machine;
-- archive a final output;
-- avoid explaining why the hidden `.mplot` directory matters.
+- archive a final output.
 
 ## Convert whenever you like
 
 ```console
-$ mplot pack experiment.mplot.toml experiment.mplot
-$ mplot unpack experiment.mplot restored/experiment.mplot.toml
+$ mplot pack results/experiment.mplot shared/experiment.mplot
+$ mplot unpack shared/experiment.mplot restored/experiment.mplot
 ```
 
-Packing and unpacking preserve the object hashes. The numerical data does not change just because its luggage did.
+Packing and unpacking preserve the object hashes. The numerical data does not change just because its luggage did. `mplot view`, `mplot serve`, and `mplot verify` accept both forms.
 
 !!! tip "A useful rule of thumb"
-    **Split while you work. Pack when you share.**
+    **Directories while you work, single files when you share.**
+
+## Saving over an old result
+
+Saving to a path that already holds an MPlot result (in either form, or an empty directory) replaces it. The new result is fully built first and only then swapped in, so a crash halfway through leaves the old one alone. Replacing a directory also drops the data of the old version.
+
+If the path holds something that is *not* an MPlot result—a folder with your own files, a plain text file—MPlot refuses to touch it and raises `FileExistsError`. It checks this when the save starts, before any expensive work.
+
+## Older artifacts
+
+Earlier versions of MPlot wrote a `*.mplot.toml` manifest next to a shared hidden `.mplot/objects/` folder. MPlot no longer writes this form, but it can still view, verify, and pack it:
+
+```console
+$ mplot pack old.mplot.toml new.mplot
+```

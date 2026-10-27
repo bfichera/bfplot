@@ -47,7 +47,7 @@ def test_animation_records_semantic_buffer_updates(tmp_path):
     (line,) = axes.plot(x, x)
 
     with mplot.animation(
-        tmp_path / "wave.mplot", figure, fps=10, provenance=False, loop=False
+        tmp_path / "wave.mplot", figure, fps=10, layout="file", provenance=False, loop=False
     ) as recording:
         line.set_ydata(x**2)
         recording.capture()
@@ -76,7 +76,7 @@ def test_animation_records_semantic_buffer_updates(tmp_path):
 def test_empty_animation_is_valid_and_has_zero_duration(tmp_path):
     figure, axes = plt.subplots()
     axes.plot([0, 1], [0, 1])
-    recording = mplot.animation(tmp_path / "still.mplot", figure, provenance=False)
+    recording = mplot.animation(tmp_path / "still.mplot", figure, layout="file", provenance=False)
     output = recording.close()
     _, document = _packed_document(output)
     assert document["timeline"]["duration"] == 0
@@ -86,7 +86,7 @@ def test_empty_animation_is_valid_and_has_zero_duration(tmp_path):
 def test_animation_rejects_structural_changes_and_bad_times(tmp_path):
     figure, axes = plt.subplots()
     (line,) = axes.plot([0, 1], [0, 1])
-    recording = mplot.animation(tmp_path / "invalid", figure, fps=2)
+    recording = mplot.animation(tmp_path / "invalid.mplot", figure, fps=2)
     line.set_ydata([1, 0])
     recording.capture(time=0.5)
     with pytest.raises(ValueError, match="strictly increasing"):
@@ -99,7 +99,9 @@ def test_animation_rejects_structural_changes_and_bad_times(tmp_path):
 def test_animation_records_property_and_axes_updates(tmp_path):
     figure, axes = plt.subplots()
     (line,) = axes.plot([0, 1], [0, 1], color="red")
-    recording = mplot.animation(tmp_path / "properties.mplot", figure, fps=2, provenance=False)
+    recording = mplot.animation(
+        tmp_path / "properties.mplot", figure, fps=2, layout="file", provenance=False
+    )
     line.set_color("blue")
     axes.set_title("Updated")
     recording.capture()
@@ -130,6 +132,7 @@ def test_save_animation_convenience_api(tmp_path):
         [2, 3],
         lambda power: line.set_ydata(x**power),
         fps=5,
+        layout="file",
         provenance=False,
     )
 

@@ -16,7 +16,7 @@ from matplotlib.patches import Patch, Polygon
 from matplotlib.spines import Spine
 from matplotlib.text import Text
 
-from ..mir import MirBuilder, MirDocument
+from ..mir import DOCUMENT_SCHEMA_VERSION, MirBuilder, MirDocument
 
 
 def _finite(value: Any) -> Any:
@@ -95,21 +95,52 @@ class ExtractionContext:
         }
 
 
-def translate_figures(figures: list[Any], metadata: dict[str, Any]) -> MirDocument:
+def translate_figures(
+    figures: list[Any],
+    metadata: dict[str, Any],
+    *,
+    names: list[str | None] | None = None,
+    first_figure: int = 0,
+    first_artist: int = 0,
+) -> MirDocument:
     """Translate Matplotlib figures into storage-independent MIR."""
+    return translate_group(
+        figures, metadata, names=names, first_figure=first_figure, first_artist=first_artist
+    )[0]
+
+
+def translate_group(
+    figures: list[Any],
+    metadata: dict[str, Any],
+    *,
+    names: list[str | None] | None = None,
+    first_figure: int = 0,
+    first_artist: int = 0,
+) -> tuple[MirDocument, int]:
+    """Translate figures and return the next unused artist number.
+
+    ``first_figure`` and ``first_artist`` offset generated IDs so separately translated
+    groups can be combined into one document without collisions.
+    """
+    if names is not None and len(names) != len(figures):
+        raise ValueError("names must match the number of figures")
     builder = MirBuilder(metadata=metadata)
-    context = ExtractionContext(builder)
-    extracted = [
-        _extract_figure(figure, f"figure-{index}", context) for index, figure in enumerate(figures)
-    ]
-    return builder.build(
+    context = ExtractionContext(builder, _next_artist=first_artist)
+    extracted = []
+    for index, figure in enumerate(figures):
+        record = _extract_figure(figure, f"figure-{first_figure + index}", context)
+        if names is not None and names[index] is not None:
+            record["name"] = names[index]
+        extracted.append(record)
+    document = builder.build(
         {
-            "schema_version": 1,
+            "schema_version": DOCUMENT_SCHEMA_VERSION,
             "figures": extracted,
             "links": [],
             "selections": [],
         }
     )
+    return document, context._next_artist
 
 
 def _extract_figure(figure: Any, figure_id: str, context: ExtractionContext) -> dict[str, Any]:

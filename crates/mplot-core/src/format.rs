@@ -79,7 +79,7 @@ impl Manifest {
         Self {
             format: "mplot".into(),
             version: "0.9.9".into(),
-            schema_version: default_schema_version(),
+            schema_version: SCHEMA_VERSION,
             document,
             provenance: BTreeMap::new(),
         }
@@ -96,7 +96,7 @@ impl Manifest {
                 "unsupported version",
             ));
         }
-        if self.schema_version != 1 {
+        if !SUPPORTED_SCHEMA_VERSIONS.contains(&self.schema_version) {
             issues.push(ValidationIssue::new(
                 "manifest.schema_version",
                 "unsupported schema version",
@@ -125,7 +125,7 @@ pub struct Document {
 impl Default for Document {
     fn default() -> Self {
         Self {
-            schema_version: default_schema_version(),
+            schema_version: SCHEMA_VERSION,
             figures: Vec::new(),
             links: Vec::new(),
             selections: Vec::new(),
@@ -242,6 +242,11 @@ impl fmt::Display for ValidationIssue {
     }
 }
 
+/// Schema version written by current producers.
+pub const SCHEMA_VERSION: u32 = 2;
+const SUPPORTED_SCHEMA_VERSIONS: &[u32] = &[1, 2];
+
+/// Schema version assumed when the field is absent (legacy artifacts).
 const fn default_schema_version() -> u32 {
     1
 }
@@ -265,7 +270,7 @@ const BUILT_INS: &[&str] = &[
 
 pub fn validate_document(document: &Document) -> Vec<ValidationIssue> {
     let mut issues = Vec::new();
-    if document.schema_version != 1 {
+    if !SUPPORTED_SCHEMA_VERSIONS.contains(&document.schema_version) {
         issues.push(ValidationIssue::new(
             "schema_version",
             "unsupported schema version",
@@ -289,6 +294,7 @@ pub fn validate_document(document: &Document) -> Vec<ValidationIssue> {
     let mut figure_ids = HashSet::new();
     let mut axes_ids = HashSet::new();
     let mut artist_ids = HashSet::new();
+    let mut figure_names = HashSet::new();
     for (fi, figure) in document.figures.iter().enumerate() {
         unique_id(
             &mut ids,
@@ -296,6 +302,25 @@ pub fn validate_document(document: &Document) -> Vec<ValidationIssue> {
             format!("figures[{fi}].id"),
             &mut issues,
         );
+        match figure.metadata.get("name") {
+            None => {}
+            Some(Value::String(name)) if name.is_empty() => issues.push(ValidationIssue::new(
+                format!("figures[{fi}].name"),
+                "must not be empty",
+            )),
+            Some(Value::String(name)) => {
+                if !figure_names.insert(name.as_str()) {
+                    issues.push(ValidationIssue::new(
+                        format!("figures[{fi}].name"),
+                        "duplicate figure name",
+                    ));
+                }
+            }
+            Some(_) => issues.push(ValidationIssue::new(
+                format!("figures[{fi}].name"),
+                "must be a string",
+            )),
+        }
         figure_ids.insert(figure.id.as_str());
         for (ai, axes) in figure.axes.iter().enumerate() {
             unique_id(
@@ -661,5 +686,87 @@ mod tests {
                 .iter()
                 .any(|issue| issue.message.contains("plugins are not supported"))
         );
+    }
+
+    fn named_figure(id: &str, name: Value) -> Figure {
+        Figure {
+            id: id.into(),
+            props: BTreeMap::new(),
+            axes: Vec::new(),
+            metadata: BTreeMap::from([("name".into(), name)]),
+        }
+    }
+
+    #[test]
+    fn validates_figure_names() {
+        let valid = Document {
+            figures: vec![
+                named_figure("a", json!("spectrum")),
+                named_figure("b", json!("residuals")),
+            ],
+            ..Document::default()
+        };
+        assert!(validate_document(&valid).is_empty());
+
+        for (name, message) in [
+            (json!(""), "must not be empty"),
+            (json!(3), "must be a string"),
+            (Value::Null, "must be a string"),
+        ] {
+            let document = Document {
+                figures: vec![named_figure("a", name)],
+                ..Document::default()
+            };
+            assert_eq!(
+                validate_document(&document),
+                vec![ValidationIssue::new("figures[0].name", message)]
+            );
+        }
+
+        let duplicate = Document {
+            figures: vec![
+                named_figure("a", json!("spectrum")),
+                named_figure("b", json!("spectrum")),
+            ],
+            ..Document::default()
+        };
+        assert_eq!(
+            validate_document(&duplicate),
+            vec![ValidationIssue::new(
+                "figures[1].name",
+                "duplicate figure name"
+            )]
+        );
+    }
+
+    #[test]
+    fn accepts_schema_one_and_two_and_rejects_three() {
+        assert_eq!(Document::default().schema_version, SCHEMA_VERSION);
+        let legacy: Document = serde_json::from_str("{}").unwrap();
+        assert_eq!(legacy.schema_version, 1);
+        for version in [1, 2] {
+            let document = Document {
+                schema_version: version,
+                ..Document::default()
+            };
+            assert!(validate_document(&document).is_empty());
+            let mut manifest = Manifest::new(ObjectId::from_bytes(b"document"));
+            manifest.schema_version = version;
+            assert!(manifest.validate().is_empty());
+        }
+        let document = Document {
+            schema_version: 3,
+            ..Document::default()
+        };
+        assert_eq!(validate_document(&document)[0].path, "schema_version");
+        let mut manifest = Manifest::new(ObjectId::from_bytes(b"document"));
+        manifest.schema_version = 3;
+        assert_eq!(manifest.validate()[0].path, "manifest.schema_version");
+        let missing: Manifest = toml::from_str(&format!(
+            "format = \"mplot\"\nversion = \"0.9.9\"\ndocument = \"{}\"\n",
+            ObjectId::from_bytes(b"document")
+        ))
+        .unwrap();
+        assert_eq!(missing.schema_version, 1);
     }
 }

@@ -37,6 +37,7 @@
       "required": ["id", "axes"],
       "properties": {
         "id": {"type": "string", "minLength": 1},
+        "name": {"type": "string", "minLength": 1},
         "axes": {"type": "array", "items": {"$ref": "#/$defs/axes"}}
       },
       "additionalProperties": true

@@ -1,6 +1,8 @@
 use std::fs;
 
-use mplot_core::{Document, Manifest, ObjectStore, canonical_json_bytes, verify_artifact};
+use mplot_core::{
+    Document, Manifest, ObjectStore, canonical_json_bytes, load_artifact, verify_artifact,
+};
 use tempfile::tempdir;
 
 const PYTHON_DOCUMENT: &str = include_str!("fixtures/python-document.json");
@@ -43,4 +45,48 @@ fn verifies_python_shaped_split_artifact_end_to_end() {
 
     let manifest: Manifest = toml::from_str(&fs::read_to_string(manifest_path).unwrap()).unwrap();
     assert_eq!(manifest.schema_version, 1);
+}
+
+#[test]
+fn verifies_directory_layout_result_end_to_end() {
+    let directory = tempdir().unwrap();
+    let result = directory.path().join("fit.mplot");
+    let store = ObjectStore::for_result_dir(&result);
+    let array_id = store.put(b"python-array").unwrap();
+    assert_eq!(
+        store.path(&array_id),
+        result.join(format!(
+            "objects/sha256/{}/{}",
+            &array_id.digest()[..2],
+            array_id.digest()
+        ))
+    );
+
+    let mut document: serde_json::Value = serde_json::from_str(PYTHON_DOCUMENT).unwrap();
+    document["schema_version"] = 2.into();
+    document["figures"][0]["name"] = "spectrum".into();
+    let document: Document = serde_json::from_value(document).unwrap();
+    assert_eq!(document.figures[0].metadata["name"], "spectrum");
+    let document_id = store
+        .put(&canonical_json_bytes(&document).unwrap())
+        .unwrap();
+    fs::write(
+        result.join("manifest.toml"),
+        format!(
+            "format = \"mplot\"\nversion = \"0.9.9\"\nschema_version = 2\ndocument = \"{document_id}\"\n"
+        ),
+    )
+    .unwrap();
+    fs::write(result.join(".gitignore"), "/objects/\n").unwrap();
+
+    assert_eq!(verify_artifact(&result).unwrap().object_count, 2);
+    assert_eq!(
+        verify_artifact(&result.join("manifest.toml"))
+            .unwrap()
+            .object_count,
+        2
+    );
+    let artifact = load_artifact(&result).unwrap();
+    assert_eq!(artifact.manifest.schema_version, 2);
+    assert_eq!(artifact.document.figures[0].metadata["name"], "spectrum");
 }

@@ -16,13 +16,13 @@ y = [1, 4, 9, 16]
 fig, ax = plt.subplots()
 ax.plot(x, y, marker="o")
 
-mplot.savefig("my_plot", fig)
+mplot.savefig("my_plot.mplot", fig)
 ```
 
-That creates `my_plot.mplot.toml`. Open it with:
+That creates a `my_plot.mplot/` result directory. Open it with:
 
 ```console
-$ mplot view my_plot.mplot.toml
+$ mplot view my_plot.mplot
 ```
 
 That’s it! If you already know Matplotlib, you already know almost everything you need to start using MPlot.
@@ -47,7 +47,7 @@ The boundary is public when you do need it:
 
 ```python
 mir = mplot.translate(fig)       # Matplotlib -> generic MIR
-mplot.compile(mir, "my_plot")   # generic MIR -> artifact
+mplot.compile(mir, "my_plot.mplot")   # generic MIR -> artifact
 ```
 
 Adapters never handle hashes, compression, manifests, object stores, or packing. The compiler never imports or understands Matplotlib, which makes MIR the common target for future R, Julia, and other producers.
@@ -66,7 +66,7 @@ $ cargo install --path crates/mplot-cli
 The browser viewer is included in the repository. From the repository directory, MPlot finds it automatically. If you run the CLI elsewhere, point it at the built viewer with `--viewer-dir` or set `MPLOT_VIEWER_DIR`:
 
 ```console
-$ mplot view my_plot.mplot.toml --viewer-dir /path/to/mplot/viewer/dist
+$ mplot view my_plot.mplot --viewer-dir /path/to/mplot/viewer/dist
 ```
 
 Prebuilt packages are planned for the 1.0 release. Until then, this slightly nerdier installation is the price of admission. Sorry!
@@ -89,15 +89,17 @@ ax.fill_between(x, y - 0.1, y + 0.1, alpha=0.2, label="uncertainty")
 ax.set(xlabel="time (s)", ylabel="voltage (V)", title="A very scientific sine wave")
 ax.legend()
 
-output = mplot.savefig("results/sine_wave", fig)
+output = mplot.savefig("results/sine_wave.mplot", fig)
 print(f"Saved {output}")
 ```
 
 Then:
 
 ```console
-$ mplot view results/sine_wave.mplot.toml
+$ mplot view results/sine_wave.mplot
 ```
+
+MPlot uses the path exactly as you give it. If the name does not end in `.mplot`, MPlot warns you but still writes exactly that path. Saving again replaces an existing MPlot result at the same path, so a long script never fails at the very end because last week's output is in the way. If something else lives there—say, a folder of your own files—MPlot refuses to touch it and raises `FileExistsError` before doing any expensive work.
 
 MPlot currently understands lines, scatter plots, images, error bars, filled regions, histograms, contours, text, patches, and common 3D plots. New artist types must be implemented in MPlot itself so artifacts remain portable and use one reviewed renderer set.
 
@@ -106,66 +108,82 @@ MPlot currently understands lines, scatter plots, images, error bars, filled reg
 Pass a figure explicitly when you can:
 
 ```python
-mplot.savefig("result", fig)
+mplot.savefig("result.mplot", fig)
 ```
 
 If you leave out `fig`, MPlot saves all currently open Matplotlib figures:
 
 ```python
-mplot.savefig("all_my_figures")
+mplot.savefig("all_my_figures.mplot")
 ```
 
 Passing the figure explicitly usually makes a script easier to read, so that is what we recommend.
 
+## Several figures in one result
+
+One output holds one result: every figure you save together, an optional animation, and your metadata. Use `mplot.result()` to build one up step by step:
+
+```python
+with mplot.result("results/fit.mplot") as result:
+    result.add(fig_spectrum, name="spectrum")
+    result.add(fig_residuals, name="residuals")
+    result.metadata["chi2"] = chi2
+```
+
+`add()` captures the figure as it looks at that moment. Nothing is written until the `with` block ends, and if the block raises an error, nothing is written at all. Names must be unique within a result; the viewer uses them as headings for figures without a title.
+
 ## Saving one file instead
 
-The default output is split into a small manifest and a hidden object directory:
+By default, a result is a small directory:
 
 ```text
 results/
-├── sine_wave.mplot.toml
-└── .mplot/
+└── sine_wave.mplot/
+    ├── manifest.toml
+    ├── .gitignore
     └── objects/
 ```
 
-This layout is useful during development because the readable manifest can live in Git while the large numerical blobs can stay out of it.
+Everything belongs to this one result, so copying, zipping, or deleting the folder copies, zips, or deletes the whole thing.
 
-If you want one file for emailing, archiving, or copying to another machine, use a `.mplot` filename:
+If you want one file for emailing, archiving, or copying to another machine, ask for the file layout:
 
 ```python
-mplot.savefig("sine_wave.mplot", fig)
+mplot.savefig("sine_wave.mplot", fig, layout="file")
 ```
 
 You can also convert between the two forms:
 
 ```console
-$ mplot pack sine_wave.mplot.toml sine_wave.mplot
-$ mplot unpack sine_wave.mplot unpacked/sine_wave.mplot.toml
+$ mplot pack results/sine_wave.mplot shared/sine_wave.mplot
+$ mplot unpack shared/sine_wave.mplot restored/sine_wave.mplot
 ```
 
-The data hashes stay the same when you pack and unpack the artifact.
+The data hashes stay the same when you pack and unpack the result.
 
 ## A nice Git workflow
 
-Commit the small manifests and ignore the object store:
+No `.gitignore` setup is needed. MPlot writes a `.gitignore` inside each result directory that ignores its `objects/`, so:
 
-```gitignore
-.mplot/objects/
-.mplot/cache/
+```console
+$ git add results/
 ```
 
-Then a project can look like this:
+stages only the small, readable manifests. A project can look like this:
 
 ```text
 analysis.py
 results/
-└── sine_wave.mplot.toml
+└── sine_wave.mplot/
+    └── manifest.toml
 ```
 
-Before trusting an artifact, verify it:
+Git keeps the manifest but not the numerical data, so a fresh clone has manifests without data. Re-run your analysis, or share the result directory or a packed file another way.
+
+Before trusting a result, verify it:
 
 ```console
-$ mplot verify results/sine_wave.mplot.toml
+$ mplot verify results/sine_wave.mplot
 verified 12 objects (22907 bytes)
 ```
 
@@ -177,7 +195,7 @@ MPlot gathers basic provenance automatically. You can add the details that only 
 
 ```python
 mplot.savefig(
-    "results/calibration",
+    "results/calibration.mplot",
     fig,
     provenance={
         "sample": "crystal-17",
@@ -190,7 +208,7 @@ mplot.savefig(
 To omit environment and user details while retaining baseline processing metadata (creation time and the producing Git commit when available):
 
 ```python
-mplot.savefig("anonymous_plot", fig, provenance=False)
+mplot.savefig("anonymous_plot.mplot", fig, provenance=False)
 ```
 
 MPlot 0.9.9 records source and working-directory paths, but it does **not** copy your source code into the artifact. Full Git patches and source snapshots are planned work, not a feature we want to pretend already exists.

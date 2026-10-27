@@ -11,13 +11,13 @@ import mplot
 fig, ax = plt.subplots()
 ax.plot([1, 2, 3, 4], [1, 4, 9, 16], marker="o")
 
-mplot.savefig("my_plot", fig)
+mplot.savefig("my_plot.mplot", fig)
 ```
 
-MPlot creates `my_plot.mplot.toml`. Open it with:
+MPlot creates a `my_plot.mplot/` result directory. Open it with:
 
 ```console
-$ mplot view my_plot.mplot.toml
+$ mplot view my_plot.mplot
 ```
 
 You now have a saved plot that can still zoom and pan. Not bad for one new line!
@@ -46,7 +46,7 @@ You now have a saved plot that can still zoom and pan. Not bad for one new line!
 
     ---
 
-    Learn when to use `.mplot.toml` and when to use `.mplot`.
+    Learn when to keep a result directory and when to save one file.
 
     [:octicons-arrow-right-24: Choosing a file type](../guides/file-types.md)
 
@@ -54,7 +54,7 @@ You now have a saved plot that can still zoom and pan. Not bad for one new line!
 
     ---
 
-    Track small manifests while large arrays stay out of the repository.
+    Commit small manifests while large arrays stay out of the repository.
 
     [:octicons-arrow-right-24: Version control](../guides/version-control.md)
 

@@ -64,6 +64,7 @@ nav:
       - Choosing a file type: guides/file-types.md
       - Using MPlot with Git: guides/version-control.md
       - Provenance and metadata: guides/provenance.md
+      - Using MPlot with Snakemake: guides/snakemake.md
       - Live plots: guides/streaming.md
       - Serving plots: guides/serving.md
   - Reference:
@@ -71,7 +72,6 @@ nav:
       - Command-line interface: reference/cli.md
       - Supported plots: reference/supported-plots.md
       - File format: format.md
-  - Extend MPlot:
   - Project:
       - What MPlot is (and isn't): project/scope.md
       - Contributing: project/contributing.md

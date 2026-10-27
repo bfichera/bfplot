@@ -17,8 +17,8 @@ use axum::{
 };
 use clap::{Parser, Subcommand};
 use mplot_core::{
-    PackLimits, StreamFrame, StreamReader, StreamWriter, load_artifact, pack_artifact,
-    unpack_artifact, verify_artifact, verify_packed,
+    PackLimits, StreamFrame, StreamReader, StreamWriter, load_artifact, locate_artifact,
+    pack_artifact, read_packed_manifest, unpack_artifact, verify_artifact, verify_packed,
 };
 
 #[derive(Parser)]
@@ -30,15 +30,19 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Command {
-    /// Pack a split manifest and its referenced objects.
-    Pack { manifest: PathBuf, output: PathBuf },
-    /// Unpack an artifact into a split manifest and object store.
+    /// Pack a result directory or legacy manifest into one file.
+    Pack { source: PathBuf, output: PathBuf },
+    /// Unpack a packed file into a result directory.
     Unpack {
         artifact: PathBuf,
-        manifest: PathBuf,
+        destination: PathBuf,
     },
     /// Verify hashes, schema, and referenced objects.
     Verify { artifact: PathBuf },
+    /// Print the manifest TOML exactly as stored.
+    ///
+    /// Suitable as a Git textconv: `git config diff.mplot.textconv "mplot manifest"`.
+    Manifest { artifact: PathBuf },
     /// Serve an artifact over HTTP (loopback by default).
     Serve {
         artifact: PathBuf,
@@ -82,8 +86,8 @@ async fn main() -> anyhow::Result<()> {
         .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
         .init();
     match Cli::parse().command {
-        Command::Pack { manifest, output } => {
-            let report = pack_artifact(&manifest, &output)?;
+        Command::Pack { source, output } => {
+            let report = pack_artifact(&source, &output)?;
             println!(
                 "packed {} objects ({} bytes) to {}",
                 report.object_count,
@@ -91,13 +95,16 @@ async fn main() -> anyhow::Result<()> {
                 output.display()
             );
         }
-        Command::Unpack { artifact, manifest } => {
-            let report = unpack_artifact(&artifact, &manifest, PackLimits::default())?;
+        Command::Unpack {
+            artifact,
+            destination,
+        } => {
+            let report = unpack_artifact(&artifact, &destination, PackLimits::default())?;
             println!(
                 "unpacked {} objects ({} bytes) to {}",
                 report.object_count,
                 report.byte_count,
-                manifest.display()
+                destination.display()
             );
         }
         Command::Verify { artifact } => {
@@ -110,6 +117,11 @@ async fn main() -> anyhow::Result<()> {
                 "verified {} objects ({} bytes)",
                 report.object_count, report.byte_count
             );
+        }
+        Command::Manifest { artifact } => {
+            let mut stdout = io::stdout().lock();
+            stdout.write_all(&manifest_bytes(&artifact)?)?;
+            stdout.flush()?;
         }
         Command::Serve {
             artifact,
@@ -126,6 +138,14 @@ async fn main() -> anyhow::Result<()> {
         Command::Stream { command } => stream(command)?,
     }
     Ok(())
+}
+
+fn manifest_bytes(path: &Path) -> anyhow::Result<Vec<u8>> {
+    if is_packed(path) {
+        return Ok(read_packed_manifest(path, PackLimits::default())?);
+    }
+    let (manifest_path, _) = locate_artifact(path);
+    fs::read(&manifest_path).with_context(|| format!("read {}", manifest_path.display()))
 }
 
 fn is_packed(path: &Path) -> bool {
@@ -227,12 +247,11 @@ fn prepare_serve_artifact(path: &Path) -> anyhow::Result<ServeArtifact> {
     if is_packed(path) {
         verify_packed(path, PackLimits::default())?;
         let extraction = Arc::new(tempfile::tempdir().context("create packed artifact workspace")?);
-        let manifest_path = extraction.path().join("artifact.mplot.toml");
-        unpack_artifact(path, &manifest_path, PackLimits::default())?;
-        let artifact = load_artifact(&manifest_path)?;
+        let result = extraction.path().join("artifact.mplot");
+        unpack_artifact(path, &result, PackLimits::default())?;
+        let artifact = load_artifact(&result)?;
         return Ok(ServeArtifact {
-            manifest: fs::read(&manifest_path)
-                .with_context(|| format!("read {}", manifest_path.display()))?,
+            manifest: manifest_bytes(&result)?,
             manifest_data: artifact.manifest,
             document: artifact.document,
             objects: artifact.store,
@@ -243,7 +262,7 @@ fn prepare_serve_artifact(path: &Path) -> anyhow::Result<ServeArtifact> {
     verify_artifact(path)?;
     let artifact = load_artifact(path)?;
     Ok(ServeArtifact {
-        manifest: fs::read(path).with_context(|| format!("read {}", path.display()))?,
+        manifest: manifest_bytes(path)?,
         manifest_data: artifact.manifest,
         document: artifact.document,
         objects: artifact.store,
@@ -501,6 +520,14 @@ mod tests {
         assert_eq!(value["axes"][0]["projection"], "2d");
         assert_eq!(value["artists"][0]["id"], "artist-0");
         assert_eq!(value["figures"][0]["axes"][0], "figure-0-axes-0");
+        assert!(value["figures"][0].get("name").is_none());
+        let mut named = document.clone();
+        named.figures[0]
+            .metadata
+            .insert("name".into(), serde_json::json!("spectrum"));
+        let value: serde_json::Value =
+            serde_json::from_slice(&viewer_document(&named, &manifest).unwrap()).unwrap();
+        assert_eq!(value["figures"][0]["name"], "spectrum");
         assert_eq!(value["metadata"]["artifact"]["version"], "0.9.9");
         assert_eq!(
             value["metadata"]["provenance"]["created_utc"],
@@ -543,10 +570,46 @@ mod tests {
     }
 
     #[test]
+    fn prepares_directory_results_for_the_server() {
+        let directory = tempfile::tempdir().unwrap();
+        let result = directory.path().join("fit.mplot");
+        let store = ObjectStore::for_result_dir(&result);
+        let mut document = Document::default();
+        document.figures.push(mplot_core::Figure {
+            id: "figure".into(),
+            props: Default::default(),
+            axes: Vec::new(),
+            metadata: [("name".to_string(), serde_json::json!("spectrum"))].into(),
+        });
+        let document_id = store.put_json(&document).unwrap();
+        let manifest_text = toml::to_string(&Manifest::new(document_id.clone())).unwrap();
+        fs::write(result.join("manifest.toml"), &manifest_text).unwrap();
+        fs::write(result.join(".gitignore"), "/objects/\n").unwrap();
+        let packed_path = directory.path().join("fit.packed");
+        pack_artifact(&result, &packed_path).unwrap();
+
+        for source in [&result, &result.join("manifest.toml"), &packed_path] {
+            let served = prepare_serve_artifact(source).unwrap();
+            assert_eq!(served.manifest, manifest_text.as_bytes());
+            assert_eq!(served.manifest_data.schema_version, 2);
+            assert_eq!(served.document.figures[0].metadata["name"], "spectrum");
+            assert!(served.objects.get(&document_id).is_ok());
+            assert_eq!(manifest_bytes(source).unwrap(), manifest_text.as_bytes());
+            let value: serde_json::Value = serde_json::from_slice(
+                &viewer_document(&served.document, &served.manifest_data).unwrap(),
+            )
+            .unwrap();
+            assert_eq!(value["figures"][0]["name"], "spectrum");
+        }
+    }
+
+    #[test]
     fn all_required_commands_parse() {
         for arguments in [
             vec!["mplot", "pack", "in.mplot.toml", "out.mplot"],
-            vec!["mplot", "unpack", "in.mplot", "out.mplot.toml"],
+            vec!["mplot", "pack", "in.mplot", "out-file.mplot"],
+            vec!["mplot", "unpack", "in.mplot", "restored.mplot"],
+            vec!["mplot", "manifest", "in.mplot"],
             vec!["mplot", "verify", "in.mplot"],
             vec!["mplot", "view", "in.mplot.toml"],
             vec!["mplot", "stream", "encode"],

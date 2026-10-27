@@ -52,7 +52,7 @@ Run the complete smoke script before submitting code.
 - Numerical changes test dtype, shape, non-finite values, and empty arrays.
 - Renderer changes test ordinary output and visible fallback behavior.
 - New artist types include Python extraction and viewer rendering tests.
-- Format changes include packed/split round trips and compatibility fixtures.
+- Format changes include directory/packed round trips and compatibility fixtures.
 
 Please do not rely only on a screenshot. A screenshot tells us that pixels moved; a semantic test can tell us whether the data remained correct.
 
@@ -70,7 +70,7 @@ Please do not rely only on a screenshot. A screenshot tells us that pixels moved
 Documentation should be friendly, accurate, and easy to copy from. Lead with the task the user came to accomplish. A person should not need to understand content-addressed storage before seeing:
 
 ```python
-mplot.savefig("my_plot", fig)
+mplot.savefig("my_plot.mplot", fig)
 ```
 
 Please do not document planned functionality as if it already works. Honest limitations are much more useful than impressive fiction.

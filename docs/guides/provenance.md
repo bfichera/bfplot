@@ -22,7 +22,7 @@ This information lives in the manifest, where it can be inspected and diffed.
 
 ```python
 mplot.savefig(
-    "results/calibration",
+    "results/calibration.mplot",
     fig,
     provenance={
         "sample": "crystal-17",
@@ -35,10 +35,20 @@ mplot.savefig(
 
 Use short keys and values that another scientist—or future you—can understand without consulting your memory.
 
+With [`mplot.result()`](../reference/python-api.md#mplotresult), you can also add metadata as your script goes. Values are checked when you assign them, and nested dictionaries are fine:
+
+```python
+with mplot.result("results/fit.mplot") as result:
+    result.add(fig, name="fit")
+    result.metadata["chi2"] = chi2
+```
+
+Both `provenance={...}` and `result.metadata` end up under `[provenance.extra]` in the manifest.
+
 ## Disable provenance
 
 ```python
-mplot.savefig("anonymous_plot", fig, provenance=False)
+mplot.savefig("anonymous_plot.mplot", fig, provenance=False)
 ```
 
 This omits environment and user details while retaining baseline processing metadata: the creation time and, when available, the producing Git commit.

@@ -11,23 +11,25 @@ Still here? Great. This page explains what MPlot puts on disk and why it looks a
 When you run:
 
 ```python
-mplot.savefig("experiment", fig)
+mplot.savefig("experiment.mplot", fig)
 ```
 
-MPlot creates:
+MPlot creates one result directory:
 
 ```text
-experiment.mplot.toml
-.mplot/objects/sha256/ab/abcdef...
+experiment.mplot/
+├── manifest.toml
+├── .gitignore                    ← contains "/objects/"
+└── objects/sha256/ab/abcdef...
 ```
 
-The TOML file is a small, readable manifest. The object directory contains the plot document and compressed numerical arrays. Every object is named using its SHA-256 hash.
+The TOML file is a small, readable manifest. The `objects/` folder contains the plot document and compressed numerical arrays for this result only. Every object is stored at `objects/sha256/<first two hex digits>/<digest>`, named using its SHA-256 hash.
 
-Why split things up? Scientific arrays can be enormous, while manifests are small and useful to inspect in Git. Keeping those jobs separate works rather nicely.
+Why keep them apart? Scientific arrays can be enormous, while manifests are small and useful to inspect in Git. The generated `.gitignore` keeps the objects out of Git, so committing the directory commits only the manifest.
 
 ## The manifest
 
-The `*.mplot.toml` file is the front door to an artifact. It tells MPlot:
+`manifest.toml` is the front door to a result. It tells MPlot:
 
 - which format and MPlot version created the output;
 - which content-addressed object contains the plot document;
@@ -38,7 +40,7 @@ A manifest looks roughly like this:
 ```toml
 format = "mplot"
 version = "0.9.9"
-schema_version = 1
+schema_version = 2
 document = "sha256:0123456789abcdef..."
 
 [provenance]
@@ -50,7 +52,7 @@ The manifest is intended to be small enough to read, diff, and commit.
 
 ## The plot document
 
-The document is canonical JSON describing the figures, axes, artists, links, selections, and references to numerical arrays.
+The document is canonical JSON describing the figures, axes, artists, links, selections, and references to numerical arrays. Each figure record may carry an optional `name`: a non-empty string that is unique within the result.
 
 “Canonical” sounds fancy, but it just means MPlot writes equivalent JSON in one predictable way:
 
@@ -102,7 +104,7 @@ MPlot verifies the stored bytes *before* decoding them. Readers also check the d
 An object’s filename is the lowercase SHA-256 digest of its exact stored bytes. If even one byte changes, verification fails:
 
 ```console
-$ mplot verify experiment.mplot.toml
+$ mplot verify experiment.mplot
 verified 12 objects (22907 bytes)
 ```
 
@@ -110,20 +112,24 @@ The hash provides integrity. It tells you whether the bytes still match their re
 
 ## Packed files
 
-Sometimes you do not want a manifest plus an object directory. You want one file that you can attach to an email or copy onto a drive:
+Sometimes you do not want a directory. You want one file that you can attach to an email or copy onto a drive:
 
 ```python
-mplot.savefig("experiment.mplot", fig)
+mplot.savefig("experiment.mplot", fig, layout="file")
 ```
 
-A packed `*.mplot` file contains the same manifest and objects in a deterministic binary container. Packing does not change object contents or hashes.
+A packed file contains the same manifest and objects in a deterministic binary container. Packing does not change object contents or hashes. With `SOURCE_DATE_EPOCH` set, which fixes `created_utc`, packed files are byte-for-byte reproducible.
 
 ```console
-$ mplot pack experiment.mplot.toml experiment.mplot
-$ mplot unpack experiment.mplot restored/experiment.mplot.toml
+$ mplot pack experiment.mplot shared/experiment.mplot
+$ mplot unpack shared/experiment.mplot restored/experiment.mplot
 ```
 
-A split → packed → split trip should preserve the scientific artifact. No numerical luggage should go missing along the way.
+A directory → packed → directory trip preserves the scientific result. No numerical luggage should go missing along the way.
+
+## Older artifacts
+
+Earlier versions wrote a `*.mplot.toml` manifest next to a shared hidden `.mplot/objects/` store. MPlot no longer writes this form, but it can still view, verify, and pack it (`mplot pack old.mplot.toml new.mplot`).
 
 ## Are MPlot files safe to open?
 
@@ -133,6 +139,6 @@ Files are still untrusted input, so readers must validate hashes, paths, array s
 
 ## Compatibility
 
-MPlot 0.9.9 is pre-1.0. Producers record their version, and readers reject unsupported schemas instead of making a heroic—and potentially incorrect—guess.
+MPlot 0.9.9 is pre-1.0. Producers record their version, and readers reject unsupported schemas instead of making a heroic—and potentially incorrect—guess. New output uses manifest and document `schema_version = 2`, which adds figure names; readers accept versions 1 and 2.
 
 The goal for 1.0 is a format that can be opened for a long time. The point of saving a scientific result is, after all, to be able to look at it later.

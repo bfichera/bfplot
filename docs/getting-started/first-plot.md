@@ -28,7 +28,7 @@ ax.set(
 )
 ax.legend()
 
-output = mplot.savefig("results/sine_wave", fig)
+output = mplot.savefig("results/sine_wave.mplot", fig)
 print(f"Saved {output}")
 ```
 
@@ -36,13 +36,13 @@ Run it like any ordinary Python script:
 
 ```console
 $ python analysis.py
-Saved results/sine_wave.mplot.toml
+Saved results/sine_wave.mplot
 ```
 
 ## 2. Open the saved plot
 
 ```console
-$ mplot view results/sine_wave.mplot.toml
+$ mplot view results/sine_wave.mplot
 ```
 
 MPlot starts a small local server and opens the viewer in your browser. The server binds to your own machine by default; it does not publish the plot to the internet.
@@ -53,7 +53,7 @@ MPlot records basic provenance automatically. Add the experimental details that 
 
 ```python
 mplot.savefig(
-    "results/sine_wave",
+    "results/sine_wave.mplot",
     fig,
     provenance={
         "sample": "crystal-17",
@@ -66,7 +66,7 @@ mplot.savefig(
 If you do not want provenance for a particular output:
 
 ```python
-mplot.savefig("anonymous_plot", fig, provenance=False)
+mplot.savefig("anonymous_plot.mplot", fig, provenance=False)
 ```
 
 ## Which figure gets saved?
@@ -74,23 +74,23 @@ mplot.savefig("anonymous_plot", fig, provenance=False)
 Passing the figure explicitly is clearest:
 
 ```python
-mplot.savefig("result", fig)
+mplot.savefig("result.mplot", fig)
 ```
 
 If you leave it out, MPlot saves all currently open Matplotlib figures:
 
 ```python
-mplot.savefig("all_my_figures")
+mplot.savefig("all_my_figures.mplot")
 ```
 
 That can be convenient, but explicit figure arguments usually make analysis scripts easier to understand later.
 
 ## One file or a Git-friendly output?
 
-The example above creates a split artifact. To save one portable file instead, include the `.mplot` extension:
+The example above creates a result directory, `results/sine_wave.mplot/`. To save one portable file instead, pass `layout="file"`:
 
 ```python
-mplot.savefig("sine_wave.mplot", fig)
+mplot.savefig("sine_wave.mplot", fig, layout="file")
 ```
 
-Read [Choosing a file type](../guides/file-types.md) for the tradeoff. The short answer is: split while you work, packed when you share.
+Read [Choosing a file type](../guides/file-types.md) for the tradeoff. The short answer is: directories while you work, single files when you share.

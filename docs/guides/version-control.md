@@ -1,33 +1,34 @@
 # Using MPlot with Git
 
-MPlot’s split format is designed to keep the useful, readable part of a scientific output in Git without asking Git to become a high-performance numerical database.
+MPlot’s result directories are designed to keep the useful, readable part of a scientific output in Git without asking Git to become a high-performance numerical database.
 
-## Ignore the object store
+## Commit your results
 
-Add this to `.gitignore`:
+No `.gitignore` setup is needed. Each result directory contains its own `.gitignore` that ignores its `objects/` folder, so:
 
-```gitignore
-.mplot/objects/
-.mplot/cache/
+```console
+$ git add analysis.py results/
 ```
 
-Commit your analysis code and manifests:
+stages your code plus the small manifests:
 
 ```text
 analysis.py
 results/
-└── calibration.mplot.toml
+└── calibration.mplot/
+    ├── manifest.toml
+    └── .gitignore
 ```
 
 The manifest records the document hash and provenance, so a diff still tells you that an output changed. Large compressed arrays remain outside ordinary Git history.
 
-!!! warning "Do not delete the only copy of your data"
-    Ignoring `.mplot/objects/` means Git does not preserve those objects. Back them up separately, use shared storage, or pack important final outputs into `.mplot` files.
+!!! warning "Git keeps the manifest, not the data"
+    A fresh clone has manifests without their numerical data. Re-run the pipeline to recreate it, or share the result directory or a packed file another way. Do not delete the only copy of important data.
 
 ## Verify an output
 
 ```console
-$ mplot verify results/calibration.mplot.toml
+$ mplot verify results/calibration.mplot
 verified 12 objects (22907 bytes)
 ```
 
@@ -38,11 +39,23 @@ Verification checks the manifest, schemas, references, and SHA-256 identity of e
 When an analysis is ready to preserve or release:
 
 ```console
-$ mplot pack results/calibration.mplot.toml releases/calibration.mplot
+$ mplot pack results/calibration.mplot releases/calibration.mplot
 $ mplot verify releases/calibration.mplot
 ```
 
 You can store the packed file in a release system, object store, institutional archive, or Git LFS.
+
+## Readable diffs for packed files
+
+Git already diffs a result directory’s `manifest.toml` as text. If you commit packed files, teach Git to show their manifests too:
+
+```text title=".gitattributes"
+*.mplot diff=mplot
+```
+
+```console
+$ git config diff.mplot.textconv "mplot manifest"
+```
 
 ## What the hashes mean
 

@@ -2,9 +2,11 @@
 
 from .api import (
     Animation,
+    Result,
     Stream,
     animation,
     compile,
+    result,
     save_animation,
     savefig,
     show,
@@ -19,9 +21,11 @@ __all__ = [
     "MirBuffer",
     "MirDocument",
     "MirValidationError",
+    "Result",
     "Stream",
     "animation",
     "compile",
+    "result",
     "save_animation",
     "savefig",
     "show",

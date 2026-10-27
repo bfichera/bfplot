@@ -36,11 +36,15 @@ Temporal MIR uses one immutable initial scene plus a restricted timeline of stab
 
 `src/mplot/lower.py` is the MIR compiler boundary. It validates MIR, encodes each local typed buffer into a compressed content-addressed artifact array, and emits the canonical artifact document. It does not import or understand Matplotlib. No unresolved `$buffer` reference may enter an artifact.
 
-`src/mplot/artifact.py` owns final split/packed materialization and `src/mplot/store.py` owns content-addressed storage.
+`src/mplot/artifact.py` owns result materialization (directory and packed layouts, atomic replace, manifest TOML) and `src/mplot/store.py` owns content-addressed storage. `src/mplot/result.py` owns `mplot.result()`: composing named figures, at most one animation, and metadata into one MIR document.
+
+One output path holds exactly one result and is used exactly as given; no suffix is added or rewritten. An existing MPlot result (either layout, or an empty directory) at the path is replaced only after the new result is fully built in a hidden temporary sibling. Any other existing path is refused with `FileExistsError` before expensive work starts.
 
 ## Stable artifact layout
 
-A split artifact consists of a UTF-8 TOML manifest (`*.mplot.toml`) and immutable blobs in `.mplot/objects/sha256/<first-two>/<digest>`. Every blob is addressed by SHA-256 of its exact stored bytes. Packed artifacts (`*.mplot`) preserve the same manifest and blob identities.
+The default result directory contains a UTF-8 TOML `manifest.toml`, a generated `.gitignore` containing `/objects/`, and immutable blobs in `objects/sha256/<first-two>/<digest>`. Objects are never shared between results. Every blob is addressed by SHA-256 of its exact stored bytes. A packed file (`layout="file"`) preserves the same manifest and blob identities in one deterministic container; the two layouts convert losslessly.
+
+Manifest and document `schema_version` is 2, which adds an optional unique, non-empty `name` on each figure record. Readers accept versions 1 and 2. Legacy split artifacts (`*.mplot.toml` plus a shared `.mplot/objects/` store) remain readable, verifiable, and packable but are no longer written.
 
 The manifest owns provenance and references one document blob. The document is JSON and contains figures, axes, artists, links, selections, and references to typed array blobs. JSON is used in 0.9.9 to keep the pre-1.0 format inspectable. Canonical JSON (recursive key sorting, compact separators, finite numbers) is required for hashes.
 

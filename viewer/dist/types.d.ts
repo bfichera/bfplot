@@ -49,6 +49,7 @@ export interface Axis {
 export interface Figure {
     id: string;
     title?: string;
+    name?: string;
     axes?: string[] | Axis[];
     size?: [number, number];
     props?: Record<string, unknown>;

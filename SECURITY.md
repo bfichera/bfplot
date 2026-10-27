@@ -43,7 +43,7 @@ MPlot does not load third-party artist exporters or viewer renderers. Supported 
 The safe default is local:
 
 ```console
-$ mplot serve result.mplot.toml
+$ mplot serve result.mplot
 ```
 
 Binding to a public interface exposes the artifact data and parser surface to the network. If you choose to do that, use authentication, TLS, isolation, access controls, and resource limits appropriate for your environment. “It was only supposed to be up for five minutes” is, unfortunately, not a security mechanism.
