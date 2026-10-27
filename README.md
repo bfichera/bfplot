@@ -22,16 +22,13 @@ BFPlot 0.9.9 is the release candidate for 1.0. Please try it on real plots and t
 
 ## Installation
 
-Install from a source checkout. You need Python 3.10+ and Rust.
+You need Python 3.10+.
 
 ```console
-$ git clone https://github.com/bfplot-dev/bfplot.git
-$ cd bfplot
-$ python -m pip install -e .
-$ cargo install --path crates/bfplot-cli
+$ python -m pip install bfplot
 ```
 
-The viewer is in `viewer/dist`. Outside the repository, point the CLI at it with `--viewer-dir` or `BFPLOT_VIEWER_DIR`.
+This installs the Python library and the `bfplot` app that opens results, with the viewer built in. To install only the app, use `uv tool install bfplot-cli`, `brew install bfplot-dev/tap/bfplot` or `cargo install bfplot-cli`; see [Installation](https://bfplot-dev.github.io/bfplot/getting-started/installation/).
 
 ## Results
 

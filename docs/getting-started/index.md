@@ -18,7 +18,7 @@ $ bfplot view my_plot.bfplot
 
 ## Next
 
-- [Installation](installation.md): the Python package, the CLI and the viewer.
+- [Installation](installation.md): the Python package and the `bfplot` app.
 - [Your first BFPlot](first-plot.md): labels, metadata and choosing what to save.
 - [Choosing a file type](../guides/file-types.md): directories or single files.
 - [Using BFPlot with Git](../guides/version-control.md): commit manifests, not arrays.

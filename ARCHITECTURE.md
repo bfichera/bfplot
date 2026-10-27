@@ -17,8 +17,8 @@ plotting library -> adapter -> MIR -> writer -> result -> Rust CLI -> viewer
 | Writer | `src/bfplot/artifact.py` | Validates MIR, encodes buffers, writes and replaces results. Knows nothing about Matplotlib. |
 | Results | `src/bfplot/result.py`, `src/bfplot/temporal.py` | `bfplot.result()` and animation recording. |
 | Core | `crates/bfplot-core` | Reads, validates, verifies, packs and unpacks results. |
-| CLI | `crates/bfplot-cli` | `verify`, `pack`, `unpack`, `manifest`, `serve`, `view`. |
-| Viewer | `viewer/` | Browser UI and renderers. The built copy in `viewer/dist` is committed. |
+| App | `crates/bfplot-cli` | The `bfplot` program: `verify`, `pack`, `unpack`, `manifest`, `serve`, `view`. Embeds the viewer. |
+| Viewer | `viewer/` | Browser UI and renderers. The built copy in `viewer/dist` is committed and compiled into the app. |
 
 ## MIR
 
@@ -66,6 +66,21 @@ Writing builds the new result in a hidden sibling and swaps it in only when comp
 ## Artists
 
 Every artist has `type`, `id`, `axes_id`, `props` and `data`. Types use the `bfplot.*` namespace and are implemented in-tree: line, scatter, image, errorbar, fill_between, histogram, contour, contourf, text, patch, line3d, scatter3d, surface3d and mesh3d. The viewer shows a visible placeholder for anything it cannot draw.
+
+## Distribution
+
+The result format is the contract between writers and the app. Writers are native to their language (the Python writer never calls Rust) and only need to produce valid results; the `bfplot` app reads them. Each release builds the app once per platform, and every ecosystem depends on that build instead of bundling its own:
+
+| Package | Contents |
+| --- | --- |
+| `bfplot` (PyPI) | The pure-Python writer. Depends on `bfplot-cli` at exactly the same version. |
+| `bfplot-cli` (PyPI) | Only the `bfplot` binary, as platform wheels built by maturin (`bindings = "bin"`). |
+| `bfplot-cli`, `bfplot-core` (crates.io) | The app and the core library, for `cargo install bfplot-cli`. |
+| GitHub release | Archives, shell and PowerShell installers, and the Homebrew formula in `bfplot-dev/homebrew-tap`, built by cargo-dist. |
+
+Other languages follow the same pattern (Julia, for example, through a `bfplot_jll` package built from the same release). `bfplot.show()` looks for the app in its Python environment's scripts directory before `PATH`.
+
+The viewer is compiled into the app by `crates/bfplot-cli/build.rs` from `viewer/dist`; published crates and the `bfplot-cli` sdist carry a copy staged by `scripts/stage-crates.sh`. `--viewer-dir` (or `BFPLOT_VIEWER_DIR`) serves a different build for viewer development. Releasing is described in `RELEASING.md`.
 
 ## Safety
 

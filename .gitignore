@@ -8,3 +8,7 @@ release-dist/
 /site/
 .DS_Store
 /gallery.bfplot
+# Staged by scripts/stage-crates.sh for packaging.
+/crates/*/LICENSE-APACHE
+/crates/*/LICENSE-MIT
+/crates/bfplot-cli/viewer/

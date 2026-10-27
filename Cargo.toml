@@ -11,6 +11,7 @@ edition = "2024"
 license = "Apache-2.0 OR MIT"
 rust-version = "1.88"
 repository = "https://github.com/bfplot-dev/bfplot"
+homepage = "https://bfplot-dev.github.io/bfplot/"
 
 [workspace.dependencies]
 anyhow = "1.0"
@@ -24,3 +25,8 @@ tempfile = "3.20"
 thiserror = "2.0"
 tokio = { version = "1.47", features = ["macros", "net", "rt-multi-thread"] }
 toml = "0.9"
+
+# The profile that 'dist' will build with
+[profile.dist]
+inherits = "release"
+lto = "thin"

@@ -24,8 +24,9 @@ if [[ -f pyproject.toml ]]; then
     python_bin=.venv/bin/python
   fi
   section "Python lint and format"
-  "$python_bin" -m ruff check src tests examples
-  "$python_bin" -m ruff format --check src tests examples
+  "$python_bin" -m ruff check src tests examples scripts
+  "$python_bin" -m ruff format --check src tests examples scripts
+  "$python_bin" scripts/check_versions.py
   section "Python tests"
   "$python_bin" -m compileall -q src
   if [[ -d tests ]]; then

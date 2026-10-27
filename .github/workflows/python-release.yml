@@ -1,0 +1,231 @@
+# Build the Python packages, and on a release tag publish them (and the crates).
+#
+# * bfplot-cli: the compiled `bfplot` app as platform wheels, plus an sdist.
+# * bfplot:     the pure-Python writer, which depends on bfplot-cli of the same version.
+#
+# Every run builds and test-installs everything. Publishing happens only for a `v*` tag
+# and only when the repository variables PUBLISH_PYPI / PUBLISH_CRATES are "true", using
+# trusted publishing (no stored tokens). See RELEASING.md. Trusted publishing does not
+# work from reusable workflows, so the publish jobs live here.
+#
+# The standalone app (archives, installers, Homebrew) is built by release.yml (cargo-dist).
+
+name: Python and crates release
+
+on:
+  push:
+    tags: ["v*"]
+  pull_request:
+    paths:
+      - ".github/workflows/python-release.yml"
+      - "crates/**"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "pyproject.toml"
+      - "scripts/stage-crates.sh"
+      - "scripts/check_versions.py"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: python-release-${{ github.ref }}
+  cancel-in-progress: ${{ !startsWith(github.ref, 'refs/tags/') }}
+
+jobs:
+  versions:
+    name: Check versions
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.13"
+      - run: python -m pip install packaging
+      - name: All packages declare one version (and match the tag)
+        run: python scripts/check_versions.py ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || '' }}
+
+  cli-wheels:
+    name: bfplot-cli wheel (${{ matrix.name }})
+    needs: versions
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { name: manylinux x86_64, runner: ubuntu-latest, target: x86_64-unknown-linux-gnu, manylinux: auto, native: true }
+          - { name: manylinux aarch64, runner: ubuntu-24.04-arm, target: aarch64-unknown-linux-gnu, manylinux: auto, native: true }
+          - { name: musllinux x86_64, runner: ubuntu-latest, target: x86_64-unknown-linux-musl, manylinux: musllinux_1_2, native: false }
+          - { name: musllinux aarch64, runner: ubuntu-24.04-arm, target: aarch64-unknown-linux-musl, manylinux: musllinux_1_2, native: false }
+          - { name: macOS x86_64, runner: macos-15-intel, target: x86_64-apple-darwin, manylinux: "", native: true }
+          - { name: macOS arm64, runner: macos-latest, target: aarch64-apple-darwin, manylinux: "", native: true }
+          - { name: Windows x64, runner: windows-latest, target: x86_64-pc-windows-msvc, manylinux: "", native: true }
+          - { name: Windows arm64, runner: windows-11-arm, target: aarch64-pc-windows-msvc, manylinux: "", native: true }
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: Stage crate files
+        shell: bash
+        run: bash scripts/stage-crates.sh
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.13"
+      # Linux wheels build in maturin's manylinux/musllinux containers; elsewhere maturin
+      # builds on the runner, which needs rustup (windows-11-arm has none preinstalled).
+      - uses: dtolnay/rust-toolchain@stable
+        if: runner.os != 'Linux'
+        with:
+          targets: ${{ matrix.target }}
+      - uses: PyO3/maturin-action@v1
+        with:
+          target: ${{ matrix.target }}
+          manylinux: ${{ matrix.manylinux }}
+          args: --release --out dist -m crates/bfplot-cli/Cargo.toml
+      - name: Install the wheel and run the app
+        if: matrix.native
+        shell: bash
+        run: |
+          python -m venv "$RUNNER_TEMP/venv"
+          if [[ "$RUNNER_OS" == Windows ]]; then bin="$RUNNER_TEMP/venv/Scripts"; else bin="$RUNNER_TEMP/venv/bin"; fi
+          "$bin/python" -m pip install --no-index --find-links dist bfplot-cli
+          "$bin/bfplot" --version
+      - uses: actions/upload-artifact@v7
+        with:
+          name: cli-wheel-${{ matrix.target }}
+          path: dist/*.whl
+          if-no-files-found: error
+
+  sdists:
+    name: bfplot sdists and pure-Python wheel
+    needs: versions
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.13"
+      - name: Stage crate files
+        run: bash scripts/stage-crates.sh
+      - run: python -m pip install build "maturin>=1.9,<2"
+      - name: bfplot-cli sdist
+        run: maturin sdist -m crates/bfplot-cli/Cargo.toml --out dist-cli
+      - name: bfplot wheel and sdist
+        run: python -m build --outdir dist-py .
+      - uses: actions/upload-artifact@v7
+        with:
+          name: cli-sdist
+          path: dist-cli/*
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v7
+        with:
+          name: python-dists
+          path: dist-py/*
+          if-no-files-found: error
+
+  check:
+    name: Check and test-install the packages
+    needs: [cli-wheels, sdists]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.13"
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: cli-*
+          path: dist-cli
+          merge-multiple: true
+      - uses: actions/download-artifact@v8
+        with:
+          name: python-dists
+          path: dist-py
+      - run: python -m pip install twine
+      - run: twine check --strict dist-cli/* dist-py/*
+      - name: pip install bfplot gives the writer and the app
+        run: |
+          python -m venv "$RUNNER_TEMP/venv"
+          "$RUNNER_TEMP/venv/bin/python" -m pip install --only-binary bfplot-cli --find-links dist-cli --find-links dist-py bfplot
+          cd "$RUNNER_TEMP"
+          "$RUNNER_TEMP/venv/bin/python" -c "
+          import matplotlib; matplotlib.use('Agg')
+          import matplotlib.pyplot as plt, bfplot
+          fig, ax = plt.subplots(); ax.plot([1, 2, 3], [1, 4, 9])
+          bfplot.savefig('check.bfplot', fig)
+          bfplot.savefig('check-packed.bfplot', fig, layout='file')
+          "
+          "$RUNNER_TEMP/venv/bin/bfplot" verify check.bfplot
+          "$RUNNER_TEMP/venv/bin/bfplot" verify check-packed.bfplot
+      - name: The bfplot-cli sdist builds on its own
+        run: |
+          python -m venv "$RUNNER_TEMP/sdist-venv"
+          "$RUNNER_TEMP/sdist-venv/bin/python" -m pip install --no-binary bfplot-cli dist-cli/*.tar.gz
+          "$RUNNER_TEMP/sdist-venv/bin/bfplot" --version
+
+  publish-pypi:
+    name: Publish to PyPI
+    needs: check
+    if: startsWith(github.ref, 'refs/tags/v') && vars.PUBLISH_PYPI == 'true'
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/project/bfplot/
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: cli-*
+          path: dist-cli
+          merge-multiple: true
+      - uses: actions/download-artifact@v8
+        with:
+          name: python-dists
+          path: dist-py
+      # bfplot-cli first, so `pip install bfplot` never sees bfplot without its app.
+      - name: Publish bfplot-cli
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: dist-cli/
+      - name: Publish bfplot
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: dist-py/
+
+  publish-crates:
+    name: Publish to crates.io
+    needs: check
+    if: startsWith(github.ref, 'refs/tags/v') && vars.PUBLISH_CRATES == 'true'
+    runs-on: ubuntu-latest
+    environment:
+      name: crates-io
+      url: https://crates.io/crates/bfplot-cli
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Stage crate files
+        run: bash scripts/stage-crates.sh
+      - uses: rust-lang/crates-io-auth-action@v1
+        id: auth
+      # bfplot-cli depends on bfplot-core, so bfplot-core goes first. --allow-dirty because
+      # the staged files are ignored by Git.
+      - name: Publish bfplot-core
+        run: cargo publish --locked --allow-dirty -p bfplot-core
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ steps.auth.outputs.token }}
+      - name: Publish bfplot-cli
+        run: cargo publish --locked --allow-dirty -p bfplot-cli
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ steps.auth.outputs.token }}

@@ -8,23 +8,24 @@ For a small fix, go ahead. For a new public API, artist type or format change, p
 
 ```text
 src/bfplot/       Python API, Matplotlib adapter, MIR and result writer
-crates/          Rust core library and the bfplot CLI
+crates/          Rust core library and the bfplot app (also the bfplot-cli Python package)
 viewer/          Browser viewer (TypeScript); viewer/dist is the committed build
 docs/            Documentation site (MkDocs)
 tests/           Python tests
-scripts/         Smoke checks
+scripts/         Smoke checks, version check and release builds
 ```
 
 `ARCHITECTURE.md` describes the format and how the parts fit together.
 
 ## Development setup
 
-You need Python 3.10+, Rust and Node.js.
+You need Python 3.10+ with pip 25.1 or newer, Rust and Node.js.
 
 ```console
 $ python -m venv .venv
 $ . .venv/bin/activate
-$ python -m pip install -e '.[test,docs]'
+$ python -m pip install --upgrade pip
+$ python -m pip install ./crates/bfplot-cli -e . --group dev
 $ npm install --prefix viewer
 $ ./scripts/smoke.sh
 ```
@@ -38,7 +39,9 @@ $ npm --prefix viewer test
 $ mkdocs build --strict
 ```
 
-Format with `cargo fmt --all` and `python -m ruff format src tests examples`. Edit `viewer/src`, not `viewer/dist`; rebuild with `npm --prefix viewer run build`.
+The `bfplot` Python package depends on `bfplot-cli`, the package that holds the compiled app, so the install command builds it from `crates/bfplot-cli` first. The app embeds the built viewer: after changing Rust code or rebuilding the viewer, reinstall it with `python -m pip install ./crates/bfplot-cli` (or use `cargo run -p bfplot-cli -- view …`). To try viewer changes without rebuilding the app, point it at the build: `bfplot view result.bfplot --viewer-dir viewer/dist`.
+
+Format with `cargo fmt --all` and `python -m ruff format src tests examples scripts`. Edit `viewer/src`, not `viewer/dist`; rebuild with `npm --prefix viewer run build`.
 
 ## Tests
 

@@ -5,6 +5,13 @@ edition.workspace = true
 license.workspace = true
 rust-version.workspace = true
 repository.workspace = true
+homepage.workspace = true
+description = "Read, validate, pack and unpack BFPlot results"
+readme = "README.md"
+keywords = ["plotting", "visualization", "scientific", "file-format"]
+categories = ["visualization", "science", "parser-implementations"]
+# The license texts are staged by scripts/stage-crates.sh and ignored by Git.
+include = ["/src/**/*.rs", "/tests/**/*", "/README.md", "/LICENSE-APACHE", "/LICENSE-MIT"]
 
 [dependencies]
 hex.workspace = true

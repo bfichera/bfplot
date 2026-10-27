@@ -45,7 +45,8 @@ jobs:
         with:
           python-version: "3.13"
           cache: pip
-      - run: python -m pip install '.[docs]'
+      - run: python -m pip install --upgrade pip
+      - run: python -m pip install --group docs
       - run: mkdocs build --strict
 
   deploy:
@@ -62,7 +63,8 @@ jobs:
         with:
           python-version: "3.13"
           cache: pip
-      - run: python -m pip install '.[docs]'
+      - run: python -m pip install --upgrade pip
+      - run: python -m pip install --group docs
       - run: mkdocs build --strict
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3

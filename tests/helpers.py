@@ -8,8 +8,12 @@ from pathlib import Path
 from typing import Any
 
 import numpy as np
-import tomllib
 import zstandard as zstd
+
+try:
+    import tomllib
+except ModuleNotFoundError:  # Python 3.10
+    import tomli as tomllib
 
 
 def read_objects(path: Path) -> tuple[dict[str, Any], dict[str, bytes]]:

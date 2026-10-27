@@ -1,0 +1,33 @@
+# The `bfplot-cli` Python package: only the compiled `bfplot` app, for `pip install bfplot`.
+# Run scripts/stage-crates.sh before building an sdist, so it carries the viewer.
+
+[build-system]
+requires = ["maturin>=1.9,<2"]
+build-backend = "maturin"
+
+[project]
+name = "bfplot-cli"
+dynamic = ["version"]
+description = "The bfplot app: view, serve, verify and pack BFPlot results"
+readme = "README.md"
+license = "Apache-2.0 OR MIT"
+authors = [{ name = "BFPlot contributors" }]
+keywords = ["plotting", "visualization", "matplotlib", "scientific", "viewer"]
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Environment :: Console",
+  "Intended Audience :: Science/Research",
+  "Programming Language :: Rust",
+  "Topic :: Scientific/Engineering :: Visualization",
+]
+
+[project.urls]
+Homepage = "https://bfplot-dev.github.io/bfplot/"
+Documentation = "https://bfplot-dev.github.io/bfplot/"
+Repository = "https://github.com/bfplot-dev/bfplot"
+Issues = "https://github.com/bfplot-dev/bfplot/issues"
+
+[tool.maturin]
+bindings = "bin"
+locked = true
+strip = true

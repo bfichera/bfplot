@@ -1,13 +1,12 @@
 # Installation
 
-BFPlot 0.9.9 is installed from a source checkout. You need Python 3.10+, a Rust toolchain and a modern browser.
+You need Python 3.10+ and a modern browser.
 
 ```console
-$ git clone https://github.com/bfplot-dev/bfplot.git
-$ cd bfplot
-$ python -m pip install -e .
-$ cargo install --path crates/bfplot-cli
+$ python -m pip install bfplot
 ```
+
+This installs the Python library, which saves your figures, and the `bfplot` app, which opens them. The app is a small compiled program with the viewer built in, so you don't need Rust, Node.js or anything else. It comes from the `bfplot-cli` package, which pip installs automatically at the same version.
 
 Check both parts:
 
@@ -18,15 +17,61 @@ $ bfplot --version
 bfplot-cli 0.9.9
 ```
 
-## The viewer
+If your shell can't find `bfplot`, the environment you installed into is probably not activated. `bfplot.show()` still works, because Python looks for the app in its own environment first.
 
-The built viewer is in `viewer/dist`, and the CLI finds it when run from the repository. Elsewhere, point it there:
+## Just the app
 
-```console
-$ bfplot view my_plot.bfplot --viewer-dir /path/to/bfplot/viewer/dist
-$ export BFPLOT_VIEWER_DIR=/path/to/bfplot/viewer/dist
+To open results that someone else made, or that were written from another language, you only need the app:
+
+=== "pip / uv"
+
+    ```console
+    $ uv tool install bfplot-cli
+    $ pipx install bfplot-cli
+    ```
+
+=== "Homebrew"
+
+    ```console
+    $ brew install bfplot-dev/tap/bfplot
+    ```
+
+=== "Installer script"
+
+    ```console
+    $ curl --proto '=https' --tlsv1.2 -LsSf https://github.com/bfplot-dev/bfplot/releases/latest/download/bfplot-cli-installer.sh | sh
+    ```
+
+    On Windows, in PowerShell:
+
+    ```powershell
+    PS> powershell -ExecutionPolicy Bypass -c "irm https://github.com/bfplot-dev/bfplot/releases/latest/download/bfplot-cli-installer.ps1 | iex"
+    ```
+
+=== "Cargo"
+
+    ```console
+    $ cargo install bfplot-cli
+    ```
+
+Every release also attaches ready-made archives for Linux, macOS and Windows to its [GitHub release](https://github.com/bfplot-dev/bfplot/releases).
+
+## Versions
+
+Any `bfplot` app opens results written by the same or an older version of BFPlot. If a result is newer than your app, it says so:
+
+```text
+error: this result uses BFPlot format version 2, but this bfplot only reads up to version 1; please update bfplot
 ```
 
-## Working on BFPlot
+## From a source checkout
 
-See [How to contribute](../project/contributing.md).
+You need Rust as well, to build the app:
+
+```console
+$ git clone https://github.com/bfplot-dev/bfplot.git
+$ cd bfplot
+$ python -m pip install ./crates/bfplot-cli -e .
+```
+
+To work on BFPlot itself, see [How to contribute](../project/contributing.md).
