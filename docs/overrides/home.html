@@ -2,40 +2,40 @@
 
 {% block tabs %}
 {{ super() }}
-<section class="mplot-hero">
-  <div class="md-grid mplot-hero__inner">
-    <div class="mplot-hero__copy">
-      <div class="mplot-pill">Interactive scientific plots, saved properly</div>
+<section class="bfplot-hero">
+  <div class="md-grid bfplot-hero__inner">
+    <div class="bfplot-hero__copy">
+      <div class="bfplot-pill">Interactive scientific plots, saved properly</div>
       <h1>Your Matplotlib figure deserves better than a screenshot.</h1>
-      <p class="mplot-hero__lead">
-        MPlot saves the real plot—data, structure, metadata, and all—so you can
+      <p class="bfplot-hero__lead">
+        BFPlot saves the real plot—data, structure, metadata, and all—so you can
         zoom in, inspect it, share it, and understand where it came from later.
       </p>
-      <div class="mplot-hero__actions">
-        <a href="{{ 'getting-started/' | url }}" class="md-button md-button--primary">Make your first MPlot</a>
+      <div class="bfplot-hero__actions">
+        <a href="{{ 'getting-started/' | url }}" class="md-button md-button--primary">Make your first BFPlot</a>
         <a href="{{ config.repo_url }}" class="md-button">View on GitHub</a>
       </div>
-      <p class="mplot-hero__note">Script-first · Version-control friendly · No notebook required</p>
+      <p class="bfplot-hero__note">Script-first · Version-control friendly · No notebook required</p>
     </div>
-    <div class="mplot-hero__code" aria-label="MPlot quick example">
-      <div class="mplot-code-window">
-        <div class="mplot-code-window__bar"><i></i><i></i><i></i><span>analysis.py</span></div>
+    <div class="bfplot-hero__code" aria-label="BFPlot quick example">
+      <div class="bfplot-code-window">
+        <div class="bfplot-code-window__bar"><i></i><i></i><i></i><span>analysis.py</span></div>
         <pre><code><span class="k">import</span> matplotlib.pyplot <span class="k">as</span> plt
-<span class="k">import</span> mplot
+<span class="k">import</span> bfplot
 
 fig, ax = plt.subplots()
 ax.plot(x, y)
 
-<span class="call">mplot.savefig</span>(<span class="s">"my_plot.mplot"</span>, fig)</code></pre>
+<span class="call">bfplot.savefig</span>(<span class="s">"my_plot.bfplot"</span>, fig)</code></pre>
       </div>
-      <div class="mplot-command">$ mplot view my_plot.mplot</div>
+      <div class="bfplot-command">$ bfplot view my_plot.bfplot</div>
     </div>
   </div>
 </section>
 {% endblock %}
 
 {% block content %}
-<div class="mplot-home">
+<div class="bfplot-home">
 {{ super() }}
 </div>
 {% endblock %}

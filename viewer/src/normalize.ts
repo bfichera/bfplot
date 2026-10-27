@@ -1,4 +1,4 @@
-import type { ArrayReference, Artist, Axis, Figure, MPlotDocument, ResolvedData, ScaleType, Timeline } from "./types.js";
+import type { ArrayReference, Artist, Axis, Figure, BFPlotDocument, ResolvedData, ScaleType, Timeline } from "./types.js";
 
 type JsonObject = Record<string, unknown>;
 
@@ -67,13 +67,13 @@ function normalizeAxis(rawValue: unknown, figureId: string): Axis {
 function normalizeArtist(rawValue: unknown, axesId: string): Artist {
   const raw = record(rawValue);
   return {
-    type: text(raw.type, "mplot.unknown"), id: text(raw.id),
+    type: text(raw.type, "bfplot.unknown"), id: text(raw.id),
     axes_id: text(raw.axes_id, axesId), props: normalizeProps(raw.props), data: { ...record(raw.data) },
   };
 }
 
 /** Accepts both the nested document written by Python/Rust and the viewer's flat schema. */
-export function normalizeDocument(value: unknown): MPlotDocument {
+export function normalizeDocument(value: unknown): BFPlotDocument {
   const raw = record(value), figures: Figure[] = [], axes: Axis[] = [], artists: Artist[] = [];
   for (const [figureIndex, figureValue] of list(raw.figures).entries()) {
     const figureRaw = record(figureValue), props = record(figureRaw.props), source = { ...props, ...figureRaw };
@@ -114,7 +114,7 @@ const rows = (value: unknown, width: number): number[][] => {
 export function normalizeArtistData(type: string, source: Record<string, unknown>, resolved: ResolvedData): ResolvedData {
   const data: ResolvedData = { ...resolved };
   if (data.xy !== undefined) { const points = rows(data.xy, arrayShape(source.xy)?.[1] ?? 2); data.x = points.map((point) => point[0]); data.y = points.map((point) => point[1]); }
-  if (type === "mplot.histogram" && data.left !== undefined) {
+  if (type === "bfplot.histogram" && data.left !== undefined) {
     const left=numbers(data.left),bottom=numbers(data.bottom),width=numbers(data.width),height=numbers(data.height);
     data.rects=left.map((x,index)=>[x,bottom[index]??0,width[index]??0,height[index]??0]);
   }

@@ -1,9 +1,9 @@
 // @vitest-environment jsdom
 import { describe, expect, it, vi } from "vitest";
-import { MPlotViewer } from "./viewer.js";
-import type { MPlotDocument } from "./types.js";
+import { BFPlotViewer } from "./viewer.js";
+import type { BFPlotDocument } from "./types.js";
 
-const manyPlots = (): MPlotDocument => ({
+const manyPlots = (): BFPlotDocument => ({
   title: "Large study",
   figures: [
     { id: "f1", title: "Overview", axes: ["a1", "a2"], size: [800, 500] },
@@ -15,7 +15,7 @@ const manyPlots = (): MPlotDocument => ({
     { id: "a3", figure_id: "f2", title: "Independent", position: [.1, .1, .8, .8], xlim: [0, 2], ylim: [0, 4] },
   ],
   artists: ["a1", "a2", "a3"].map((axes_id, index) => ({
-    type: "mplot.line", id: `line-${index}`, axes_id, props: {}, data: { x: [0, 1, 2], y: [index, index + 1, index + 2] },
+    type: "bfplot.line", id: `line-${index}`, axes_id, props: {}, data: { x: [0, 1, 2], y: [index, index + 1, index + 2] },
   })),
 });
 
@@ -48,10 +48,10 @@ describe("large plot collections", () => {
     const original = globalThis.IntersectionObserver;
     try {
       globalThis.IntersectionObserver = DeferredIntersectionObserver as unknown as typeof IntersectionObserver;
-      const host = document.createElement("div"), viewer = new MPlotViewer(host, manyPlots());
+      const host = document.createElement("div"), viewer = new BFPlotViewer(host, manyPlots());
       await viewer.render();
-      expect(host.querySelectorAll(".mplot-figure")).toHaveLength(2);
-      expect(host.querySelectorAll(".mplot-page-list [data-figure-id]")).toHaveLength(2);
+      expect(host.querySelectorAll(".bfplot-figure")).toHaveLength(2);
+      expect(host.querySelectorAll(".bfplot-page-list [data-figure-id]")).toHaveLength(2);
       const main = host.querySelector<HTMLElement>('[data-axes-id="a1"]')!;
       const inset = host.querySelector<HTMLElement>('[data-axes-id="a2"]')!;
       expect(main.style.left).toBe("8%");
@@ -66,14 +66,14 @@ describe("large plot collections", () => {
     const original = globalThis.IntersectionObserver;
     try {
       globalThis.IntersectionObserver = DeferredIntersectionObserver as unknown as typeof IntersectionObserver;
-      const host = document.createElement("div"), viewer = new MPlotViewer(host, manyPlots());
+      const host = document.createElement("div"), viewer = new BFPlotViewer(host, manyPlots());
       await viewer.render();
       const axis = host.querySelector<HTMLElement>('[data-axes-id="a3"]')!;
-      expect(axis.classList.contains("mplot-axis--pending")).toBe(true);
+      expect(axis.classList.contains("bfplot-axis--pending")).toBe(true);
       expect(axis.querySelector("svg")).toBeNull();
       host.querySelector<HTMLButtonElement>('[data-figure-id="f2"]')!.click();
       await vi.waitFor(() => expect(axis.querySelector("svg")).not.toBeNull());
-      expect(axis.classList.contains("mplot-axis--pending")).toBe(false);
+      expect(axis.classList.contains("bfplot-axis--pending")).toBe(false);
       viewer.destroy();
     } finally { globalThis.IntersectionObserver = original; }
   });
@@ -83,9 +83,9 @@ describe("large plot collections", () => {
     const original = globalThis.IntersectionObserver;
     try {
       globalThis.IntersectionObserver = DeferredIntersectionObserver as unknown as typeof IntersectionObserver;
-      const host = document.createElement("div"), viewer = new MPlotViewer(host, manyPlots());
+      const host = document.createElement("div"), viewer = new BFPlotViewer(host, manyPlots());
       await viewer.render();
-      const figures = host.querySelectorAll<HTMLElement>(".mplot-figure");
+      const figures = host.querySelectorAll<HTMLElement>(".bfplot-figure");
       expect(figures[0]!.hidden).toBe(false);
       expect(figures[1]!.hidden).toBe(true);
       const secondPage = host.querySelector<HTMLButtonElement>('[data-figure-id="f2"]')!;
@@ -94,7 +94,7 @@ describe("large plot collections", () => {
       expect(figures[0]!.hidden).toBe(true);
       expect(secondPage.getAttribute("aria-current")).toBe("page");
       expect(host.querySelector('[data-axes-id="a3"] svg')).not.toBeNull();
-      expect(host.querySelector<HTMLElement>(".mplot-header")!.classList.contains("mplot-header")).toBe(true);
+      expect(host.querySelector<HTMLElement>(".bfplot-header")!.classList.contains("bfplot-header")).toBe(true);
       viewer.destroy();
     } finally { globalThis.IntersectionObserver = original; }
   });
@@ -104,7 +104,7 @@ describe("large plot collections", () => {
     try {
       globalThis.IntersectionObserver = undefined as unknown as typeof IntersectionObserver;
       globalThis.ResizeObserver = ControlledResizeObserver as unknown as typeof ResizeObserver;
-      const host = document.createElement("div"), viewer = new MPlotViewer(host, manyPlots());
+      const host = document.createElement("div"), viewer = new BFPlotViewer(host, manyPlots());
       await viewer.render();
       const firstAxis = host.querySelector<HTMLElement>('[data-axes-id="a1"]')!;
       const originalPath = firstAxis.querySelector("path")?.getAttribute("d");
@@ -121,7 +121,7 @@ describe("large plot collections", () => {
     const original = globalThis.IntersectionObserver;
     try {
       globalThis.IntersectionObserver = undefined as unknown as typeof IntersectionObserver;
-      const host = document.createElement("div"), viewer = new MPlotViewer(host, manyPlots());
+      const host = document.createElement("div"), viewer = new BFPlotViewer(host, manyPlots());
       await viewer.render();
 
       host.querySelector<HTMLButtonElement>('[data-action="compare"]')!.click();
@@ -129,17 +129,17 @@ describe("large plot collections", () => {
       host.querySelector<HTMLButtonElement>('[data-figure-id="f2"]')!.click();
       await vi.waitFor(() => expect(host.querySelector('[data-artist-id="line-2"]')).not.toBeNull());
       host.querySelector<SVGGElement>('[data-artist-id="line-2"]')!.dispatchEvent(new KeyboardEvent("keydown", { bubbles: true, key: "Enter" }));
-      expect(host.querySelector(".mplot-comparison-status")?.textContent).toContain("2 lines");
+      expect(host.querySelector(".bfplot-comparison-status")?.textContent).toContain("2 lines");
 
-      host.querySelector<HTMLButtonElement>(".mplot-open-comparison")!.click();
-      await vi.waitFor(() => expect(host.querySelector(".mplot-comparison-axis svg")).not.toBeNull());
-      expect(host.querySelectorAll(".mplot-comparison-axis [data-artist-id]")).toHaveLength(2);
+      host.querySelector<HTMLButtonElement>(".bfplot-open-comparison")!.click();
+      await vi.waitFor(() => expect(host.querySelector(".bfplot-comparison-axis svg")).not.toBeNull());
+      expect(host.querySelectorAll(".bfplot-comparison-axis [data-artist-id]")).toHaveLength(2);
       expect(viewer.exportSVG("axis")).toContain('data-artist-id="line-0"');
       expect(viewer.exportSVG("axis")).toContain('data-artist-id="line-2"');
       expect(viewer.model.document.artists.map((artist) => artist.axes_id)).toEqual(["a1", "a2", "a3"]);
 
-      host.querySelector<HTMLButtonElement>(".mplot-comparison-close")!.click();
-      await vi.waitFor(() => expect(host.querySelector(".mplot-comparison-page")).toBeNull());
+      host.querySelector<HTMLButtonElement>(".bfplot-comparison-close")!.click();
+      await vi.waitFor(() => expect(host.querySelector(".bfplot-comparison-page")).toBeNull());
       expect(host.querySelector('[data-page-id="__comparison__"]')).toBeNull();
       viewer.destroy();
     } finally { globalThis.IntersectionObserver = original; }
@@ -152,14 +152,14 @@ describe("large plot collections", () => {
       const incompatible = manyPlots();
       incompatible.axes[2]!.yscale = "log";
       incompatible.axes[2]!.ylim = [1, 10];
-      const host = document.createElement("div"), viewer = new MPlotViewer(host, incompatible);
+      const host = document.createElement("div"), viewer = new BFPlotViewer(host, incompatible);
       await viewer.render();
       host.querySelector<HTMLButtonElement>('[data-action="compare"]')!.click();
       host.querySelector<SVGGElement>('[data-artist-id="line-0"]')!.dispatchEvent(new KeyboardEvent("keydown", { bubbles: true, key: "Enter" }));
       host.querySelector<HTMLButtonElement>('[data-figure-id="f2"]')!.click();
       await vi.waitFor(() => expect(host.querySelector('[data-artist-id="line-2"]')).not.toBeNull());
       host.querySelector<SVGGElement>('[data-artist-id="line-2"]')!.dispatchEvent(new KeyboardEvent("keydown", { bubbles: true, key: "Enter" }));
-      expect(host.querySelector(".mplot-comparison-status")?.textContent).toContain("Cannot compare linear/log");
+      expect(host.querySelector(".bfplot-comparison-status")?.textContent).toContain("Cannot compare linear/log");
       expect(host.querySelector('[data-artist-id="line-2"]')?.getAttribute("aria-pressed")).toBe("false");
       viewer.destroy();
     } finally { globalThis.IntersectionObserver = original; }
@@ -169,7 +169,7 @@ describe("large plot collections", () => {
     const original = globalThis.IntersectionObserver;
     try {
       globalThis.IntersectionObserver = undefined as unknown as typeof IntersectionObserver;
-      const host = document.createElement("div"), viewer = new MPlotViewer(host, manyPlots());
+      const host = document.createElement("div"), viewer = new BFPlotViewer(host, manyPlots());
       await viewer.render();
       const axisSvg = viewer.exportSVG("axis", "a1");
       const figureSvg = viewer.exportSVG("figure", "f1");

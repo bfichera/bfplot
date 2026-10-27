@@ -49,7 +49,7 @@ class Animation:
 
     @property
     def result(self) -> Path | None:
-        """The written result, or ``None`` while recording or inside ``mplot.result()``."""
+        """The written result, or ``None`` while recording or inside ``bfplot.result()``."""
         return self._result
 
     @property

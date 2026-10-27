@@ -54,9 +54,9 @@ if package.exists():
 
 architecture = Path("ARCHITECTURE.md")
 if architecture.exists():
-    match = re.search(r"MPlot ([0-9]+\.[0-9]+\.[0-9]+)", architecture.read_text())
+    match = re.search(r"BFPlot ([0-9]+\.[0-9]+\.[0-9]+)", architecture.read_text())
     if not match:
-        raise SystemExit("ARCHITECTURE.md does not declare an MPlot version")
+        raise SystemExit("ARCHITECTURE.md does not declare a BFPlot version")
     checks.append(("ARCHITECTURE.md", match.group(1)))
 
 bad = [(path, actual) for path, actual in checks if actual != expected]

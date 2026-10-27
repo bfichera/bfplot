@@ -1,4 +1,4 @@
-"""Independent readers for MPlot results, so tests check the on-disk format itself."""
+"""Independent readers for BFPlot results, so tests check the on-disk format itself."""
 
 from __future__ import annotations
 
@@ -19,7 +19,7 @@ def read_objects(path: Path) -> tuple[dict[str, Any], dict[str, bytes]]:
         objects = {item.name: item.read_bytes() for item in path.glob("objects/sha256/*/*")}
         return manifest, objects
     with path.open("rb") as handle:
-        assert handle.read(8) == b"MPLOT\0\x09\x09"
+        assert handle.read(8) == b"BFPLOT\0\0"
         (size,) = struct.unpack("<Q", handle.read(8))
         manifest = tomllib.loads(handle.read(size).decode())
         objects = {}

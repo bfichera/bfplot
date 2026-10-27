@@ -26,12 +26,12 @@ export function plotText(attributes: Record<string, unknown>, text: string, clas
   const x = Number(attributes.x ?? 0), y = Number(attributes.y ?? 0), anchor = String(attributes["text-anchor"] ?? "start");
   const width = Math.max(80, text.length * 11), height = 34;
   const left = anchor === "middle" ? x - width / 2 : anchor === "end" ? x - width : x;
-  const foreign = svg("foreignObject", { ...attributes, x: left, y: y - 24, width, height, class: `${className} mplot-math` });
+  const foreign = svg("foreignObject", { ...attributes, x: left, y: y - 24, width, height, class: `${className} bfplot-math` });
   foreign.removeAttribute("text-anchor");
   foreign.removeAttribute("font-size");
   const container = document.createElement("div");
   container.setAttribute("xmlns", "http://www.w3.org/1999/xhtml");
-  container.className = `mplot-math-content mplot-math-content--${anchor}`;
+  container.className = `bfplot-math-content bfplot-math-content--${anchor}`;
   container.innerHTML = mathHTML(text);
   foreign.append(container);
   return foreign;

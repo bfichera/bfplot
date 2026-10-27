@@ -3,15 +3,15 @@
 :root {
   --md-text-font: "Manrope", system-ui, sans-serif;
   --md-code-font: "DM Mono", ui-monospace, monospace;
-  --mplot-teal: #0f9f92;
-  --mplot-indigo: #6366f1;
-  --mplot-ink: #0b1020;
-  --mplot-muted: #5d6578;
-  --mplot-border: rgba(15, 23, 42, .1);
-  --mplot-shadow: 0 24px 70px rgba(24, 35, 70, .12);
+  --bfplot-teal: #0f9f92;
+  --bfplot-indigo: #6366f1;
+  --bfplot-ink: #0b1020;
+  --bfplot-muted: #5d6578;
+  --bfplot-border: rgba(15, 23, 42, .1);
+  --bfplot-shadow: 0 24px 70px rgba(24, 35, 70, .12);
 }
 
-[data-md-color-scheme="mplot-light"] {
+[data-md-color-scheme="bfplot-light"] {
   --md-primary-fg-color: #0b1020;
   --md-primary-fg-color--light: #27314f;
   --md-primary-fg-color--dark: #050711;
@@ -26,15 +26,15 @@
   --md-accent-fg-color: #5eead4;
   --md-default-bg-color: #0d1220;
   --md-default-bg-color--light: #151b2b;
-  --mplot-muted: #a9b1c5;
-  --mplot-border: rgba(226, 232, 240, .12);
-  --mplot-shadow: 0 24px 70px rgba(0, 0, 0, .32);
+  --bfplot-muted: #a9b1c5;
+  --bfplot-border: rgba(226, 232, 240, .12);
+  --bfplot-shadow: 0 24px 70px rgba(0, 0, 0, .32);
 }
 
 html { scroll-behavior: smooth; }
 body { letter-spacing: -.008em; }
 .md-header { backdrop-filter: blur(14px); background: rgba(11, 16, 32, .94); }
-.md-tabs { background: var(--mplot-ink); }
+.md-tabs { background: var(--bfplot-ink); }
 .md-header__button.md-logo img, .md-header__button.md-logo svg { height: 1.7rem; width: 1.7rem; }
 .md-typeset { font-size: .78rem; line-height: 1.72; }
 .md-typeset h1, .md-typeset h2, .md-typeset h3 { letter-spacing: -.035em; font-weight: 800; }
@@ -44,57 +44,57 @@ body { letter-spacing: -.008em; }
 .md-typeset pre > code { border-radius: .8rem; }
 .md-typeset .admonition, .md-typeset details { border-radius: .75rem; box-shadow: none; }
 .md-typeset .grid.cards > ul > li { border-radius: .85rem; transition: transform .18s ease, box-shadow .18s ease; }
-.md-typeset .grid.cards > ul > li:hover { transform: translateY(-3px); box-shadow: var(--mplot-shadow); }
+.md-typeset .grid.cards > ul > li:hover { transform: translateY(-3px); box-shadow: var(--bfplot-shadow); }
 
-.mplot-announce { font-weight: 600; }
-.mplot-hero { position: relative; overflow: hidden; color: #f8fafc; background: var(--mplot-ink); padding: 5.1rem 1rem 5.6rem; }
-.mplot-hero::before { content: ""; position: absolute; inset: -40% 35% auto -20%; height: 38rem; background: radial-gradient(circle, rgba(20,184,166,.22), transparent 63%); pointer-events: none; }
-.mplot-hero::after { content: ""; position: absolute; right: -12rem; bottom: -18rem; width: 42rem; height: 42rem; border-radius: 50%; background: radial-gradient(circle, rgba(99,102,241,.22), transparent 64%); pointer-events: none; }
-.mplot-hero__inner { display: grid; grid-template-columns: minmax(0,1.05fr) minmax(22rem,.95fr); align-items: center; gap: 4rem; position: relative; z-index: 1; }
-.mplot-pill { display: inline-flex; padding: .42rem .72rem; border: 1px solid rgba(94,234,212,.32); border-radius: 999px; color: #8ef4e5; background: rgba(20,184,166,.09); font-size: .67rem; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; }
-.mplot-hero h1 { max-width: 13ch; margin: 1.2rem 0 1rem; color: white; font-size: clamp(2.5rem,5vw,4.7rem); line-height: .99; letter-spacing: -.065em; }
-.mplot-hero__lead { max-width: 39rem; color: #bdc6da; font-size: clamp(1rem,1.5vw,1.25rem); line-height: 1.65; }
-.mplot-hero__actions { display: flex; flex-wrap: wrap; gap: .7rem; margin-top: 1.8rem; }
-.mplot-hero .md-button { border-color: rgba(255,255,255,.3); color: white; border-radius: .65rem; }
-.mplot-hero .md-button--primary { border-color: #2dd4bf; background: #2dd4bf; color: #071310; }
-.mplot-hero .md-button:hover { border-color: white; background: white; color: #0b1020; }
-.mplot-hero__note { margin-top: 1rem; color: #7f8ba5; font-size: .7rem; }
-.mplot-code-window { overflow: hidden; border: 1px solid rgba(255,255,255,.11); border-radius: 1rem; background: rgba(5,8,17,.84); box-shadow: 0 28px 80px rgba(0,0,0,.32); transform: rotate(1deg); }
-.mplot-code-window__bar { display: flex; align-items: center; gap: .35rem; padding: .72rem .9rem; border-bottom: 1px solid rgba(255,255,255,.08); color: #72809c; font: 500 .62rem var(--md-code-font); }
-.mplot-code-window__bar i { width: .52rem; height: .52rem; border-radius: 50%; background: #ff6b6b; }
-.mplot-code-window__bar i:nth-child(2) { background: #fbbf24; }
-.mplot-code-window__bar i:nth-child(3) { background: #34d399; }
-.mplot-code-window__bar span { margin-left: .4rem; }
-.mplot-code-window pre { margin: 0; padding: 1.45rem; color: #dbe4f5; font: 500 clamp(.69rem,1.25vw,.84rem)/1.85 var(--md-code-font); white-space: pre-wrap; }
-.mplot-code-window .k { color: #c4b5fd; }.mplot-code-window .s { color: #86efac; }.mplot-code-window .call { color: #5eead4; font-weight: 600; }
-.mplot-command { width: 88%; margin: .75rem auto 0; padding: .75rem 1rem; border: 1px solid rgba(94,234,212,.2); border-radius: .65rem; color: #8ef4e5; background: rgba(20,184,166,.08); font: .68rem var(--md-code-font); transform: rotate(-.6deg); }
+.bfplot-announce { font-weight: 600; }
+.bfplot-hero { position: relative; overflow: hidden; color: #f8fafc; background: var(--bfplot-ink); padding: 5.1rem 1rem 5.6rem; }
+.bfplot-hero::before { content: ""; position: absolute; inset: -40% 35% auto -20%; height: 38rem; background: radial-gradient(circle, rgba(20,184,166,.22), transparent 63%); pointer-events: none; }
+.bfplot-hero::after { content: ""; position: absolute; right: -12rem; bottom: -18rem; width: 42rem; height: 42rem; border-radius: 50%; background: radial-gradient(circle, rgba(99,102,241,.22), transparent 64%); pointer-events: none; }
+.bfplot-hero__inner { display: grid; grid-template-columns: minmax(0,1.05fr) minmax(22rem,.95fr); align-items: center; gap: 4rem; position: relative; z-index: 1; }
+.bfplot-pill { display: inline-flex; padding: .42rem .72rem; border: 1px solid rgba(94,234,212,.32); border-radius: 999px; color: #8ef4e5; background: rgba(20,184,166,.09); font-size: .67rem; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; }
+.bfplot-hero h1 { max-width: 13ch; margin: 1.2rem 0 1rem; color: white; font-size: clamp(2.5rem,5vw,4.7rem); line-height: .99; letter-spacing: -.065em; }
+.bfplot-hero__lead { max-width: 39rem; color: #bdc6da; font-size: clamp(1rem,1.5vw,1.25rem); line-height: 1.65; }
+.bfplot-hero__actions { display: flex; flex-wrap: wrap; gap: .7rem; margin-top: 1.8rem; }
+.bfplot-hero .md-button { border-color: rgba(255,255,255,.3); color: white; border-radius: .65rem; }
+.bfplot-hero .md-button--primary { border-color: #2dd4bf; background: #2dd4bf; color: #071310; }
+.bfplot-hero .md-button:hover { border-color: white; background: white; color: #0b1020; }
+.bfplot-hero__note { margin-top: 1rem; color: #7f8ba5; font-size: .7rem; }
+.bfplot-code-window { overflow: hidden; border: 1px solid rgba(255,255,255,.11); border-radius: 1rem; background: rgba(5,8,17,.84); box-shadow: 0 28px 80px rgba(0,0,0,.32); transform: rotate(1deg); }
+.bfplot-code-window__bar { display: flex; align-items: center; gap: .35rem; padding: .72rem .9rem; border-bottom: 1px solid rgba(255,255,255,.08); color: #72809c; font: 500 .62rem var(--md-code-font); }
+.bfplot-code-window__bar i { width: .52rem; height: .52rem; border-radius: 50%; background: #ff6b6b; }
+.bfplot-code-window__bar i:nth-child(2) { background: #fbbf24; }
+.bfplot-code-window__bar i:nth-child(3) { background: #34d399; }
+.bfplot-code-window__bar span { margin-left: .4rem; }
+.bfplot-code-window pre { margin: 0; padding: 1.45rem; color: #dbe4f5; font: 500 clamp(.69rem,1.25vw,.84rem)/1.85 var(--md-code-font); white-space: pre-wrap; }
+.bfplot-code-window .k { color: #c4b5fd; }.bfplot-code-window .s { color: #86efac; }.bfplot-code-window .call { color: #5eead4; font-weight: 600; }
+.bfplot-command { width: 88%; margin: .75rem auto 0; padding: .75rem 1rem; border: 1px solid rgba(94,234,212,.2); border-radius: .65rem; color: #8ef4e5; background: rgba(20,184,166,.08); font: .68rem var(--md-code-font); transform: rotate(-.6deg); }
 
-.mplot-home { max-width: 61rem; margin: 0 auto; }
-.mplot-intro { max-width: 46rem; margin: 0 auto; text-align: center; padding-top: 1.5rem; }
-.mplot-intro .highlight { text-align: left; }
-.mplot-feature-grid { display: grid; grid-template-columns: repeat(4,1fr); gap: .9rem; margin: 3rem 0 4rem; }
-.mplot-feature { padding: 1.25rem; border: 1px solid var(--mplot-border); border-radius: .9rem; background: color-mix(in srgb, var(--md-default-bg-color) 92%, var(--mplot-teal) 8%); }
-.mplot-feature__icon { display: grid; place-items: center; width: 2rem; height: 2rem; border-radius: .55rem; color: #073d38; background: #99f6e4; font: 800 1rem var(--md-code-font); }
-.mplot-feature h3 { margin: .9rem 0 .35rem; font-size: .86rem; }
-.mplot-feature p { margin: 0; color: var(--mplot-muted); font-size: .7rem; line-height: 1.6; }
-.mplot-support-list { display: flex; flex-wrap: wrap; gap: .45rem; margin: 1rem 0; }
-.mplot-support-list span { padding: .4rem .7rem; border: 1px solid var(--mplot-border); border-radius: 999px; color: var(--mplot-muted); font-size: .66rem; font-weight: 600; }
-.mplot-next-grid { display: grid; grid-template-columns: repeat(2,1fr); gap: .8rem; margin: 1rem 0 3rem; }
-.mplot-next-grid a { display: flex; flex-direction: column; padding: 1rem 1.1rem; border: 1px solid var(--mplot-border); border-radius: .8rem; color: var(--md-default-fg-color); transition: border-color .18s ease, transform .18s ease; }
-.mplot-next-grid a:hover { border-color: var(--mplot-teal); transform: translateY(-2px); }
-.mplot-next-grid strong { font-size: .76rem; }.mplot-next-grid span { margin-top: .25rem; color: var(--mplot-muted); font-size: .67rem; }
+.bfplot-home { max-width: 61rem; margin: 0 auto; }
+.bfplot-intro { max-width: 46rem; margin: 0 auto; text-align: center; padding-top: 1.5rem; }
+.bfplot-intro .highlight { text-align: left; }
+.bfplot-feature-grid { display: grid; grid-template-columns: repeat(4,1fr); gap: .9rem; margin: 3rem 0 4rem; }
+.bfplot-feature { padding: 1.25rem; border: 1px solid var(--bfplot-border); border-radius: .9rem; background: color-mix(in srgb, var(--md-default-bg-color) 92%, var(--bfplot-teal) 8%); }
+.bfplot-feature__icon { display: grid; place-items: center; width: 2rem; height: 2rem; border-radius: .55rem; color: #073d38; background: #99f6e4; font: 800 1rem var(--md-code-font); }
+.bfplot-feature h3 { margin: .9rem 0 .35rem; font-size: .86rem; }
+.bfplot-feature p { margin: 0; color: var(--bfplot-muted); font-size: .7rem; line-height: 1.6; }
+.bfplot-support-list { display: flex; flex-wrap: wrap; gap: .45rem; margin: 1rem 0; }
+.bfplot-support-list span { padding: .4rem .7rem; border: 1px solid var(--bfplot-border); border-radius: 999px; color: var(--bfplot-muted); font-size: .66rem; font-weight: 600; }
+.bfplot-next-grid { display: grid; grid-template-columns: repeat(2,1fr); gap: .8rem; margin: 1rem 0 3rem; }
+.bfplot-next-grid a { display: flex; flex-direction: column; padding: 1rem 1.1rem; border: 1px solid var(--bfplot-border); border-radius: .8rem; color: var(--md-default-fg-color); transition: border-color .18s ease, transform .18s ease; }
+.bfplot-next-grid a:hover { border-color: var(--bfplot-teal); transform: translateY(-2px); }
+.bfplot-next-grid strong { font-size: .76rem; }.bfplot-next-grid span { margin-top: .25rem; color: var(--bfplot-muted); font-size: .67rem; }
 
 @media (max-width: 900px) {
-  .mplot-hero { padding-top: 3.5rem; }
-  .mplot-hero__inner { grid-template-columns: 1fr; gap: 2.5rem; }
-  .mplot-hero h1 { max-width: 15ch; }
-  .mplot-hero__code { max-width: 36rem; }
-  .mplot-feature-grid { grid-template-columns: repeat(2,1fr); }
+  .bfplot-hero { padding-top: 3.5rem; }
+  .bfplot-hero__inner { grid-template-columns: 1fr; gap: 2.5rem; }
+  .bfplot-hero h1 { max-width: 15ch; }
+  .bfplot-hero__code { max-width: 36rem; }
+  .bfplot-feature-grid { grid-template-columns: repeat(2,1fr); }
 }
 @media (max-width: 540px) {
-  .mplot-hero { padding: 2.8rem 1rem 3.4rem; }
-  .mplot-hero h1 { font-size: 2.55rem; }
-  .mplot-feature-grid, .mplot-next-grid { grid-template-columns: 1fr; }
-  .mplot-command { width: 94%; }
+  .bfplot-hero { padding: 2.8rem 1rem 3.4rem; }
+  .bfplot-hero h1 { font-size: 2.55rem; }
+  .bfplot-feature-grid, .bfplot-next-grid { grid-template-columns: 1fr; }
+  .bfplot-command { width: 94%; }
 }
 @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } * { transition: none !important; } }

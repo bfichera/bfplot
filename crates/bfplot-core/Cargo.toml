@@ -1,5 +1,5 @@
 [package]
-name = "mplot-core"
+name = "bfplot-core"
 version.workspace = true
 edition.workspace = true
 license.workspace = true

@@ -1,4 +1,4 @@
-//! Read, validate, pack and unpack MPlot results.
+//! Read, validate, pack and unpack BFPlot results.
 //!
 //! A result is a directory (`manifest.toml` plus content-addressed `objects/`) or a
 //! single packed file holding the same manifest and objects.

@@ -117,6 +117,33 @@ dependencies = [
 ]
 
 [[package]]
+name = "bfplot-cli"
+version = "0.9.9"
+dependencies = [
+ "anyhow",
+ "axum",
+ "bfplot-core",
+ "clap",
+ "serde_json",
+ "tempfile",
+ "tokio",
+ "toml",
+]
+
+[[package]]
+name = "bfplot-core"
+version = "0.9.9"
+dependencies = [
+ "hex",
+ "serde",
+ "serde_json",
+ "sha2",
+ "tempfile",
+ "thiserror",
+ "toml",
+]
+
+[[package]]
 name = "bitflags"
 version = "2.13.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -458,33 +485,6 @@ dependencies = [
  "libc",
  "wasi",
  "windows-sys",
-]
-
-[[package]]
-name = "mplot-cli"
-version = "0.9.9"
-dependencies = [
- "anyhow",
- "axum",
- "clap",
- "mplot-core",
- "serde_json",
- "tempfile",
- "tokio",
- "toml",
-]
-
-[[package]]
-name = "mplot-core"
-version = "0.9.9"
-dependencies = [
- "hex",
- "serde",
- "serde_json",
- "sha2",
- "tempfile",
- "thiserror",
- "toml",
 ]
 
 [[package]]

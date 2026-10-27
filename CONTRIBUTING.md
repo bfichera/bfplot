@@ -7,8 +7,8 @@ For a small fix, go ahead. For a new public API, artist type or format change, p
 ## Repository layout
 
 ```text
-src/mplot/       Python API, Matplotlib adapter, MIR and result writer
-crates/          Rust core library and the mplot CLI
+src/bfplot/       Python API, Matplotlib adapter, MIR and result writer
+crates/          Rust core library and the bfplot CLI
 viewer/          Browser viewer (TypeScript); viewer/dist is the committed build
 docs/            Documentation site (MkDocs)
 tests/           Python tests

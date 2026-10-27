@@ -1,6 +1,6 @@
 import { decompress } from "fzstd";
 import { normalizeDocument } from "./normalize.js";
-import type { ArrayReference, ArrayResolver, MPlotDocument } from "./types.js";
+import type { ArrayReference, ArrayResolver, BFPlotDocument } from "./types.js";
 
 export interface LoadOptions extends RequestInit { documentUrl?: string; objectBaseUrl?: string; }
 
@@ -41,7 +41,7 @@ export function createHttpArrayResolver(objectBaseUrl="/objects/sha256", init: R
   };
 }
 
-export async function loadDocument(options: LoadOptions = {}): Promise<MPlotDocument> {
+export async function loadDocument(options: LoadOptions = {}): Promise<BFPlotDocument> {
   const {documentUrl="/document",objectBaseUrl:_,...init}=options;
   const response=await fetch(documentUrl,init);
   if(!response.ok)throw new Error(`Document fetch failed (${response.status})`);

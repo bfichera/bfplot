@@ -5,7 +5,7 @@ import { builtinRenderers, PLOT_TEXT_SIZE, type ArtistRenderer, type RenderConte
 import { createScale, formatTick, type Scale } from "./scales.js";
 import { resolveTheme } from "./theme.js";
 import { TimelinePlayer } from "./timeline.js";
-import type { Artist, ArrayResolver, Axis, Figure, MPlotDocument, ResolvedData, Theme, ThemeName, Viewport } from "./types.js";
+import type { Artist, ArrayResolver, Axis, Figure, BFPlotDocument, ResolvedData, Theme, ThemeName, Viewport } from "./types.js";
 import { cssColor, pairs, SVG_NS, svg } from "./svg.js";
 
 export interface ViewerOptions {
@@ -21,7 +21,7 @@ interface AxisView { axis: Axis; figureId: string; host: HTMLElement; svg: SVGSV
 interface FigureView { figure: Figure; element: HTMLElement; canvas: HTMLElement; axisIds: string[]; plotAxisIds: string[]; }
 type Mode = "pan" | "zoom";
 
-export class MPlotViewer extends EventTarget {
+export class BFPlotViewer extends EventTarget {
   readonly element: HTMLElement;
   readonly model: ViewerModel;
   private options: ViewerOptions;
@@ -50,7 +50,7 @@ export class MPlotViewer extends EventTarget {
   private comparisonElement: HTMLElement | undefined;
   private readonly timeline: TimelinePlayer;
 
-  constructor(target: HTMLElement, document: MPlotDocument, options: ViewerOptions = {}) {
+  constructor(target: HTMLElement, document: BFPlotDocument, options: ViewerOptions = {}) {
     super();
     this.element = target;
     this.options = options;
@@ -58,7 +58,7 @@ export class MPlotViewer extends EventTarget {
     this.model = new ViewerModel(document, options.arrayResolver);
     this.timeline = new TimelinePlayer(document, (nextDocument) => this.renderTimelineDocument(nextDocument));
     Object.entries(builtinRenderers).forEach(([type, renderer]) => this.renderers.set(type, renderer));
-    this.element.classList.add("mplot-viewer");
+    this.element.classList.add("bfplot-viewer");
     this.element.setAttribute("role", "region");
     this.element.setAttribute("aria-label", document.title ?? "Interactive scientific plot collection");
     this.applyTheme();
@@ -87,7 +87,7 @@ export class MPlotViewer extends EventTarget {
     void this.render();
   }
 
-  update(document: MPlotDocument): void {
+  update(document: BFPlotDocument): void {
     this.comparison.clear();
     this.compareMode = false;
     this.activeFigureIdValue = undefined;
@@ -118,7 +118,7 @@ export class MPlotViewer extends EventTarget {
     this.resize?.disconnect();
     this.intersection?.disconnect();
     this.element.replaceChildren();
-    this.element.classList.remove("mplot-viewer");
+    this.element.classList.remove("bfplot-viewer");
   }
 
   async render(): Promise<void> {
@@ -136,12 +136,12 @@ export class MPlotViewer extends EventTarget {
     this.element.replaceChildren();
 
     const shell = document.createElement("div");
-    shell.className = "mplot-shell";
+    shell.className = "bfplot-shell";
     const header = document.createElement("header");
-    header.className = "mplot-header";
+    header.className = "bfplot-header";
     const title = document.createElement("div");
-    title.className = "mplot-title";
-    title.textContent = this.model.document.title ?? "MPlot";
+    title.className = "bfplot-title";
+    title.textContent = this.model.document.title ?? "BFPlot";
     header.append(title);
     if (this.options.toolbar !== false) header.append(this.createToolbar());
     if (
@@ -156,7 +156,7 @@ export class MPlotViewer extends EventTarget {
     const timelineControls = this.timeline.createControls();
     if (timelineControls) header.append(timelineControls);
     const figuresElement = document.createElement("main");
-    figuresElement.className = "mplot-figures";
+    figuresElement.className = "bfplot-figures";
     shell.append(header, figuresElement);
     this.element.append(shell);
 
@@ -199,40 +199,40 @@ export class MPlotViewer extends EventTarget {
 
   private createFigure(figure: Figure, index: number): FigureView {
     const element = document.createElement("section");
-    element.className = "mplot-figure";
-    element.id = `mplot-figure-${safeId(figure.id)}`;
+    element.className = "bfplot-figure";
+    element.id = `bfplot-figure-${safeId(figure.id)}`;
     element.dataset.figureId = figure.id;
     const heading = document.createElement("header");
-    heading.className = "mplot-figure-header";
+    heading.className = "bfplot-figure-header";
     const title = document.createElement("h2");
-    title.className = "mplot-figure-title";
+    title.className = "bfplot-figure-title";
     title.textContent = figure.title ?? figure.name ?? `Figure ${index + 1}`;
     const axisIds = this.figureAxisIds(figure);
     const plotAxisIds = axisIds.filter((axisId) => this.model.document.axes.find((axis) => axis.id === axisId)?.role !== "colorbar");
     const primaryPlotCount = plotAxisIds.filter((axisId) => this.model.document.axes.find((axis) => axis.id === axisId)?.role !== "inset").length;
     const count = document.createElement("span");
-    count.className = "mplot-figure-count";
+    count.className = "bfplot-figure-count";
     count.textContent = `${primaryPlotCount} ${primaryPlotCount === 1 ? "plot" : "plots"}`;
     heading.append(title, count);
     const canvas = document.createElement("div");
-    canvas.className = "mplot-figure-canvas";
+    canvas.className = "bfplot-figure-canvas";
     const [width, height] = figure.size ?? [640, 480];
-    canvas.style.setProperty("--mplot-figure-ratio", String(width / Math.max(1, height)));
+    canvas.style.setProperty("--bfplot-figure-ratio", String(width / Math.max(1, height)));
     element.append(heading, canvas);
     return { figure, element, canvas, axisIds, plotAxisIds };
   }
 
   private createColorbar(axis: Axis): HTMLElement {
     const colorbar = document.createElement("aside");
-    colorbar.className = `mplot-colorbar mplot-colorbar--${axis.colorbar?.orientation ?? "vertical"}`;
+    colorbar.className = `bfplot-colorbar bfplot-colorbar--${axis.colorbar?.orientation ?? "vertical"}`;
     colorbar.dataset.axesId = axis.id;
     colorbar.setAttribute("aria-label", axis.colorbar?.label ? `Colorbar: ${axis.colorbar.label}` : "Colorbar");
     const gradient = document.createElement("div");
-    gradient.className = "mplot-colorbar-gradient";
+    gradient.className = "bfplot-colorbar-gradient";
     const colors = (axis.colorbar?.colors ?? []).map((color) => Array.isArray(color) && color.length >= 3 ? `rgba(${Math.round(Number(color[0]) * 255)}, ${Math.round(Number(color[1]) * 255)}, ${Math.round(Number(color[2]) * 255)}, ${color[3] === undefined ? 1 : Number(color[3])})` : cssColor(color, "")).filter(Boolean);
     gradient.style.background = `linear-gradient(${axis.colorbar?.orientation === "horizontal" ? "to right" : "to top"}, ${colors.length > 1 ? colors.join(", ") : "#440154, #21918c, #fde725"})`;
     const ticks = document.createElement("div");
-    ticks.className = "mplot-colorbar-ticks";
+    ticks.className = "bfplot-colorbar-ticks";
     const originalValues = axis.colorbar?.ticks ?? [], originalLabels = axis.colorbar?.ticklabels ?? [];
     const originalLimits = axis.colorbar?.limits ?? [originalValues[0] ?? 0, originalValues.at(-1) ?? 1];
     const mappable = axis.colorbar?.mappable;
@@ -246,8 +246,8 @@ export class MPlotViewer extends EventTarget {
         // Like Matplotlib, hide ticks beyond the colour range instead of piling them on its ends.
         if (fraction < -1e-6 || fraction > 1 + 1e-6) return;
         const tick = document.createElement("span");
-        tick.className = "mplot-colorbar-tick";
-        tick.style.setProperty("--mplot-colorbar-position", `${Math.max(0, Math.min(1, fraction)) * 100}%`);
+        tick.className = "bfplot-colorbar-tick";
+        tick.style.setProperty("--bfplot-colorbar-position", `${Math.max(0, Math.min(1, fraction)) * 100}%`);
         const displayValue = Math.abs(value) < Math.abs(limits[1] - limits[0]) * 1e-12 ? 0 : Number(value.toPrecision(4));
         tick.textContent = overridden ? formatTick(displayValue, "linear") : originalLabels[index] ?? formatTick(value, "linear");
         ticks.append(tick);
@@ -264,7 +264,7 @@ export class MPlotViewer extends EventTarget {
         return axis.colorbar?.orientation === "horizontal" ? Math.max(0, Math.min(1, (event.clientX - bounds.left) / (bounds.width || 1))) : Math.max(0, Math.min(1, (bounds.bottom - event.clientY) / (bounds.height || 1)));
       };
       const moveBrush = (from: number, to: number) => {
-        if (!brush) { brush = document.createElement("div"); brush.className = "mplot-colorbar-brush"; gradient.append(brush); }
+        if (!brush) { brush = document.createElement("div"); brush.className = "bfplot-colorbar-brush"; gradient.append(brush); }
         const low = Math.min(from, to), size = Math.abs(to - from);
         if (axis.colorbar?.orientation === "horizontal") { brush.style.left = `${low * 100}%`; brush.style.width = `${size * 100}%`; }
         else { brush.style.bottom = `${low * 100}%`; brush.style.height = `${size * 100}%`; }
@@ -296,7 +296,7 @@ export class MPlotViewer extends EventTarget {
     colorbar.append(gradient, ticks);
     if (axis.colorbar?.label) {
       const label = document.createElement("div");
-      label.className = "mplot-colorbar-label";
+      label.className = "bfplot-colorbar-label";
       label.textContent = axis.colorbar.label;
       colorbar.append(label);
     }
@@ -305,19 +305,19 @@ export class MPlotViewer extends EventTarget {
 
   private createAxis(axis: Axis, figureId: string): AxisView {
     const host = document.createElement("article");
-    host.className = `mplot-axis mplot-axis--pending${axis.role === "inset" ? " mplot-axis--inset" : ""}`;
+    host.className = `bfplot-axis bfplot-axis--pending${axis.role === "inset" ? " bfplot-axis--inset" : ""}`;
     host.dataset.axesId = axis.id;
     host.setAttribute("aria-label", axis.title ?? `Plot ${axis.id}`);
     host.onclick = () => { this.activeAxisId = axis.id; this.markActiveAxis(); };
     const placeholder = document.createElement("div");
-    placeholder.className = "mplot-axis-placeholder";
+    placeholder.className = "bfplot-axis-placeholder";
     placeholder.textContent = axis.title ?? "Plot";
     host.append(placeholder);
     const chart = svg("svg", { role: "img", viewBox: "0 0 640 360", "aria-label": axis.title ?? "Scientific plot" });
     const plot = svg("g"), overlay = svg("g");
     chart.append(plot, overlay);
     const readout = document.createElement("output");
-    readout.className = "mplot-coordinates";
+    readout.className = "bfplot-coordinates";
     readout.setAttribute("aria-live", "polite");
     readout.textContent = "x — · y —";
     if (axis.role === "inset") readout.hidden = true;
@@ -348,7 +348,7 @@ export class MPlotViewer extends EventTarget {
     const view = this.views.get(axisId);
     if (!view || view.mounted || (!force && view.figureId !== this.activeFigureIdValue)) return;
     view.mounted = true;
-    view.host.classList.remove("mplot-axis--pending");
+    view.host.classList.remove("bfplot-axis--pending");
     view.host.replaceChildren(view.svg, view.readout);
     if (this.options.interactive !== false) this.bindInteractions(view);
     if (!view.axis.xlim || !view.axis.ylim) await this.model.fitViewport(axisId);
@@ -359,7 +359,7 @@ export class MPlotViewer extends EventTarget {
   private async refitAxis(axisId: string): Promise<void> {
     await this.model.fitViewport(axisId);
     await this.renderAxis(axisId);
-    for (const colorbar of this.element.querySelectorAll<HTMLElement>(`.mplot-colorbar[data-mappable-id]`)) {
+    for (const colorbar of this.element.querySelectorAll<HTMLElement>(`.bfplot-colorbar[data-mappable-id]`)) {
       const mappable = colorbar.dataset.mappableId;
       if (mappable && this.model.document.artists.find((artist) => artist.id === mappable)?.axes_id === axisId) this.refreshColorbar(colorbar);
     }
@@ -377,15 +377,15 @@ export class MPlotViewer extends EventTarget {
 
   private createNavigator(): HTMLElement {
     const navigation = document.createElement("nav");
-    navigation.className = "mplot-navigator";
+    navigation.className = "bfplot-navigator";
     navigation.setAttribute("aria-label", "Figures");
     const label = document.createElement("div");
-    label.className = "mplot-navigator-label";
+    label.className = "bfplot-navigator-label";
     label.textContent = "Figures";
     const previous = document.createElement("button");
-    previous.type = "button"; previous.className = "mplot-page-step"; previous.textContent = "← Previous"; previous.setAttribute("aria-label", "Previous figure");
+    previous.type = "button"; previous.className = "bfplot-page-step"; previous.textContent = "← Previous"; previous.setAttribute("aria-label", "Previous figure");
     const pages = document.createElement("div");
-    pages.className = "mplot-page-list";
+    pages.className = "bfplot-page-list";
     const pageEntries = [
       ...this.model.document.figures.map((figure, index) => ({ id: figure.id, number: String(index + 1).padStart(2, "0"), name: figure.title ?? figure.name ?? `Figure ${index + 1}` })),
       ...(this.comparison.open ? [{ id: this.comparisonPageId, number: "↔", name: "Comparison" }] : []),
@@ -394,17 +394,17 @@ export class MPlotViewer extends EventTarget {
     pageEntries.forEach((page) => {
       const button = document.createElement("button");
       const number = document.createElement("span"), name = document.createElement("span");
-      number.className = "mplot-page-number"; number.textContent = page.number;
-      name.className = "mplot-page-name"; name.textContent = page.name;
-      button.type = "button"; button.className = "mplot-page-button"; button.dataset.pageId = page.id; if (!page.id.startsWith("__")) button.dataset.figureId = page.id; button.append(number, name);
+      number.className = "bfplot-page-number"; number.textContent = page.number;
+      name.className = "bfplot-page-name"; name.textContent = page.name;
+      button.type = "button"; button.className = "bfplot-page-button"; button.dataset.pageId = page.id; if (!page.id.startsWith("__")) button.dataset.figureId = page.id; button.append(number, name);
       button.title = page.name; button.setAttribute("aria-label", `Show ${page.name}`);
       button.onclick = () => void this.showPage(page.id);
       pages.append(button);
     });
     const next = document.createElement("button");
-    next.type = "button"; next.className = "mplot-page-step"; next.textContent = "Next →"; next.setAttribute("aria-label", "Next figure");
+    next.type = "button"; next.className = "bfplot-page-step"; next.textContent = "Next →"; next.setAttribute("aria-label", "Next figure");
     previous.onclick = () => void this.stepFigure(-1); next.onclick = () => void this.stepFigure(1);
-    const steps = document.createElement("div"); steps.className = "mplot-page-steps"; steps.append(previous, next);
+    const steps = document.createElement("div"); steps.className = "bfplot-page-steps"; steps.append(previous, next);
     navigation.append(label, pages, steps);
     queueMicrotask(() => this.updateNavigator());
     return navigation;
@@ -416,7 +416,7 @@ export class MPlotViewer extends EventTarget {
     if (![this.metadataPageId, this.comparisonPageId].includes(pageId) && !this.figures.has(pageId)) return;
     this.activeFigureIdValue = pageId;
     for (const [id, figure] of this.figures) figure.element.hidden = id !== pageId;
-    const metadata = this.element.querySelector<HTMLElement>(".mplot-metadata-page");
+    const metadata = this.element.querySelector<HTMLElement>(".bfplot-metadata-page");
     if (metadata) metadata.hidden = pageId !== this.metadataPageId;
     if (this.comparisonElement) this.comparisonElement.hidden = pageId !== this.comparisonPageId;
     if (pageId === this.comparisonPageId) {
@@ -440,7 +440,7 @@ export class MPlotViewer extends EventTarget {
 
   private updateNavigator(): void {
     const pages = this.pageIds(), index = pages.indexOf(this.activeFigureIdValue ?? "");
-    this.element.querySelectorAll<HTMLButtonElement>(".mplot-page-list [data-page-id]").forEach((button) => button.setAttribute("aria-current", button.dataset.pageId === this.activeFigureIdValue ? "page" : "false"));
+    this.element.querySelectorAll<HTMLButtonElement>(".bfplot-page-list [data-page-id]").forEach((button) => button.setAttribute("aria-current", button.dataset.pageId === this.activeFigureIdValue ? "page" : "false"));
     const previous = this.element.querySelector<HTMLButtonElement>('[aria-label="Previous figure"]'), next = this.element.querySelector<HTMLButtonElement>('[aria-label="Next figure"]');
     if (previous) previous.disabled = index <= 0;
     if (next) next.disabled = index < 0 || index >= pages.length - 1;
@@ -456,24 +456,24 @@ export class MPlotViewer extends EventTarget {
 
   private createComparisonPage(): HTMLElement {
     const page = document.createElement("section");
-    page.className = "mplot-comparison-page";
+    page.className = "bfplot-comparison-page";
     page.dataset.figureId = this.comparisonPageId;
 
     const heading = document.createElement("header");
-    heading.className = "mplot-figure-header";
+    heading.className = "bfplot-figure-header";
     const title = document.createElement("h2");
-    title.className = "mplot-figure-title";
+    title.className = "bfplot-figure-title";
     title.textContent = "Line comparison";
     const close = document.createElement("button");
     close.type = "button";
-    close.className = "mplot-button mplot-comparison-close";
+    close.className = "bfplot-button bfplot-comparison-close";
     close.textContent = "Close comparison";
     close.onclick = () => this.closeComparison();
     heading.append(title, close);
 
     const canvas = document.createElement("div");
-    canvas.className = "mplot-figure-canvas mplot-comparison-canvas";
-    canvas.style.setProperty("--mplot-figure-ratio", "1.6");
+    canvas.className = "bfplot-figure-canvas bfplot-comparison-canvas";
+    canvas.style.setProperty("--bfplot-figure-ratio", "1.6");
     page.append(heading, canvas);
     return page;
   }
@@ -495,14 +495,14 @@ export class MPlotViewer extends EventTarget {
         yscale: sourceAxis.yscale ?? "linear",
       };
       view = this.createAxis(axis, this.comparisonPageId);
-      view.host.classList.add("mplot-comparison-axis");
+      view.host.classList.add("bfplot-comparison-axis");
       view.host.style.inset = "0";
       view.host.style.width = "100%";
       view.host.style.height = "100%";
-      this.comparisonElement.querySelector(".mplot-comparison-canvas")?.append(view.host);
+      this.comparisonElement.querySelector(".bfplot-comparison-canvas")?.append(view.host);
       this.views.set(this.comparisonAxisId, view);
       view.mounted = true;
-      view.host.classList.remove("mplot-axis--pending");
+      view.host.classList.remove("bfplot-axis--pending");
       view.host.replaceChildren(view.svg, view.readout);
       if (this.options.interactive !== false) this.bindInteractions(view);
     }
@@ -523,7 +523,7 @@ export class MPlotViewer extends EventTarget {
   private closeComparison(): void {
     this.comparison.clear();
     this.compareMode = false;
-    this.element.classList.remove("mplot-compare-mode");
+    this.element.classList.remove("bfplot-compare-mode");
     this.views.delete(this.comparisonAxisId);
     this.model.viewports.delete(this.comparisonAxisId);
     this.activeAxisId = undefined;
@@ -533,11 +533,11 @@ export class MPlotViewer extends EventTarget {
 
   private createMetadataPage(): HTMLElement {
     const page = document.createElement("section");
-    page.className = "mplot-metadata-page";
+    page.className = "bfplot-metadata-page";
     const heading = document.createElement("header"), title = document.createElement("h2"), subtitle = document.createElement("span");
-    heading.className = "mplot-figure-header"; title.className = "mplot-figure-title"; title.textContent = "Result metadata"; subtitle.className = "mplot-figure-count"; subtitle.textContent = "provenance and document";
+    heading.className = "bfplot-figure-header"; title.className = "bfplot-figure-title"; title.textContent = "Result metadata"; subtitle.className = "bfplot-figure-count"; subtitle.textContent = "provenance and document";
     heading.append(title, subtitle);
-    const body = document.createElement("div"); body.className = "mplot-metadata-body";
+    const body = document.createElement("div"); body.className = "bfplot-metadata-body";
     body.append(this.metadataTree(this.model.document.metadata ?? {}, "Metadata"));
     page.append(heading, body);
     return page;
@@ -545,7 +545,7 @@ export class MPlotViewer extends EventTarget {
 
   private metadataTree(value: unknown, label: string): HTMLElement {
     const section = document.createElement("section"), heading = document.createElement(label === "Metadata" ? "h3" : "h4");
-    section.className = "mplot-metadata-section"; heading.textContent = label; section.append(heading);
+    section.className = "bfplot-metadata-section"; heading.textContent = label; section.append(heading);
     if (!value || typeof value !== "object") {
       const output = document.createElement("p"); output.textContent = value === null ? "null" : String(value); section.append(output); return section;
     }
@@ -563,7 +563,7 @@ export class MPlotViewer extends EventTarget {
     return section;
   }
 
-  private async renderTimelineDocument(document: MPlotDocument): Promise<void> {
+  private async renderTimelineDocument(document: BFPlotDocument): Promise<void> {
     this.model.document = document;
     for (const [axesId, view] of this.views) {
       const axis = document.axes.find((candidate) => candidate.id === axesId);
@@ -580,29 +580,29 @@ export class MPlotViewer extends EventTarget {
 
   private createToolbar(): HTMLElement {
     const toolbar = document.createElement("nav");
-    toolbar.className = "mplot-toolbar";
+    toolbar.className = "bfplot-toolbar";
     toolbar.setAttribute("aria-label", "Plot tools");
     const actions: Array<[string, string, () => void]> = [["Pan", "pan", () => this.setMode("pan")], ["Zoom", "zoom", () => this.setMode("zoom")], ["Reset", "reset", () => this.reset()], ["Compare lines", "compare", () => this.toggleCompareMode()]];
     for (const [label, name, action] of actions) {
-      const button = document.createElement("button"); button.type = "button"; button.className = "mplot-button"; button.textContent = label; button.dataset.action = name; button.title = label; button.onclick = action;
+      const button = document.createElement("button"); button.type = "button"; button.className = "bfplot-button"; button.textContent = label; button.dataset.action = name; button.title = label; button.onclick = action;
       if (["pan", "zoom"].includes(name)) button.setAttribute("aria-pressed", String(this.mode === name));
       if (name === "compare") button.setAttribute("aria-pressed", String(this.compareMode));
       toolbar.append(button);
     }
     const comparisonStatus = document.createElement("output");
-    comparisonStatus.className = "mplot-comparison-status";
+    comparisonStatus.className = "bfplot-comparison-status";
     comparisonStatus.setAttribute("aria-live", "polite");
     comparisonStatus.textContent = this.comparison.message;
     const openComparison = document.createElement("button");
     openComparison.type = "button";
-    openComparison.className = "mplot-button mplot-open-comparison";
+    openComparison.className = "bfplot-button bfplot-open-comparison";
     openComparison.dataset.action = "open-comparison";
     openComparison.textContent = "Open comparison";
     openComparison.disabled = !this.comparison.active;
     openComparison.onclick = () => void this.openComparison();
     toolbar.append(comparisonStatus, openComparison);
     const select = document.createElement("select");
-    select.className = "mplot-export-scope";
+    select.className = "bfplot-export-scope";
     select.setAttribute("aria-label", "Export scope");
     for (const [value, label] of [["axis", "Current plot"], ["figure", "Current figure"], ["artifact", "Entire result"], ["figures", "Each figure"]] as const) {
       const option = document.createElement("option"); option.value = value; option.textContent = label; option.selected = value === this.exportScope; select.append(option);
@@ -610,7 +610,7 @@ export class MPlotViewer extends EventTarget {
     select.onchange = () => { this.exportScope = select.value as ExportScope | "figures"; };
     toolbar.append(select);
     for (const format of ["SVG", "PNG"] as const) {
-      const button = document.createElement("button"); button.type = "button"; button.className = "mplot-button"; button.textContent = format;
+      const button = document.createElement("button"); button.type = "button"; button.className = "bfplot-button"; button.textContent = format;
       button.onclick = () => void this.downloadExport(format.toLowerCase() as "svg" | "png"); toolbar.append(button);
     }
     return toolbar;
@@ -625,15 +625,15 @@ export class MPlotViewer extends EventTarget {
 
   private toggleCompareMode(): void {
     this.compareMode = !this.compareMode;
-    this.element.classList.toggle("mplot-compare-mode", this.compareMode);
+    this.element.classList.toggle("bfplot-compare-mode", this.compareMode);
     this.element.querySelector<HTMLElement>('[data-action="compare"]')
       ?.setAttribute("aria-pressed", String(this.compareMode));
     this.refreshComparisonControls();
   }
 
   private configureComparisonTarget(group: SVGGElement, artist: Artist): void {
-    group.classList.add("mplot-comparable-line");
-    group.classList.toggle("mplot-line-selected", this.comparison.selectedIds.has(artist.id));
+    group.classList.add("bfplot-comparable-line");
+    group.classList.toggle("bfplot-line-selected", this.comparison.selectedIds.has(artist.id));
     group.setAttribute("role", "button");
     group.setAttribute("tabindex", "0");
     group.setAttribute("aria-pressed", String(this.comparison.selectedIds.has(artist.id)));
@@ -654,16 +654,16 @@ export class MPlotViewer extends EventTarget {
     this.element.querySelectorAll<SVGGElement>("[data-artist-id]")
       .forEach((group) => {
         if (group.dataset.artistId !== artistId) return;
-        group.classList.toggle("mplot-line-selected", result.selected);
+        group.classList.toggle("bfplot-line-selected", result.selected);
         group.setAttribute("aria-pressed", String(result.selected));
       });
     this.refreshComparisonControls();
   }
 
   private refreshComparisonControls(): void {
-    const status = this.element.querySelector<HTMLOutputElement>(".mplot-comparison-status");
+    const status = this.element.querySelector<HTMLOutputElement>(".bfplot-comparison-status");
     if (status) status.textContent = this.comparison.message;
-    const open = this.element.querySelector<HTMLButtonElement>(".mplot-open-comparison");
+    const open = this.element.querySelector<HTMLButtonElement>(".bfplot-open-comparison");
     if (open) open.disabled = !this.comparison.active;
   }
 
@@ -672,7 +672,7 @@ export class MPlotViewer extends EventTarget {
     this.comparison.open = true;
     this.exportScope = "axis";
     this.compareMode = false;
-    this.element.classList.remove("mplot-compare-mode");
+    this.element.classList.remove("bfplot-compare-mode");
     await this.render();
     await this.showPage(this.comparisonPageId);
   }
@@ -717,14 +717,14 @@ export class MPlotViewer extends EventTarget {
     view.y = createScale(view.axis.yscale, viewport.y, [bottom, view.margin.top]);
     const plot = svg("g"), overlay = svg("g"), working = { ...view, plot, overlay };
     this.drawAxes(working);
-    const clipId = `mplot-clip-${safeId(view.axis.id)}`, defs = svg("defs"), clip = svg("clipPath", { id: clipId });
+    const clipId = `bfplot-clip-${safeId(view.axis.id)}`, defs = svg("defs"), clip = svg("clipPath", { id: clipId });
     clip.append(svg("rect", { x: view.margin.left, y: view.margin.top, width: right - view.margin.left, height: bottom - view.margin.top })); defs.append(clip); plot.prepend(defs);
     const artists = axisId === this.comparisonAxisId
       ? this.comparison.artists(this.model.document).filter((artist) => artist.props.visible !== false)
       : this.model.document.artists.filter((artist) => artist.axes_id === axisId && artist.props.visible !== false);
     for (const artist of artists) {
       const group = svg("g", is3d ? { "data-artist-id": artist.id } : { "data-artist-id": artist.id, "clip-path": `url(#${clipId})` });
-      if (artist.type === "mplot.line") this.configureComparisonTarget(group, artist);
+      if (artist.type === "bfplot.line") this.configureComparisonTarget(group, artist);
       plot.append(group);
       const renderer = this.renderers.get(artist.type);
       if (!renderer) { this.drawUnknown(group, artist, working); continue; }
@@ -735,11 +735,11 @@ export class MPlotViewer extends EventTarget {
         const contrast = this.contrastLimits.get(artist.id);
         const effectiveArtist = contrast ? { ...artist, props: { ...artist.props, clim: contrast } } : artist;
         await renderer({ ...working, group, artist: effectiveArtist, data, theme: this.theme, pointBudget: Math.max(500, Math.round(view.width * 4)), project3d: (x, y, z) => this.project3d(view, x, y, z), depth3d: (x, y, z) => this.depth3d(view, x, y, z) } as RenderContext);
-        if (artist.type === "mplot.line" && axisId !== this.comparisonAxisId) {
+        if (artist.type === "bfplot.line" && axisId !== this.comparisonAxisId) {
           const path = group.querySelector("path");
           if (path) {
             const hitTarget = path.cloneNode(false) as SVGPathElement;
-            hitTarget.classList.add("mplot-line-hit");
+            hitTarget.classList.add("bfplot-line-hit");
             hitTarget.removeAttribute("stroke-dasharray");
             hitTarget.setAttribute("stroke", "transparent");
             hitTarget.setAttribute("stroke-width", "14");
@@ -758,24 +758,24 @@ export class MPlotViewer extends EventTarget {
 
   private drawAxes(view: AxisView): void {
     const { left, top, bottom, right } = view.margin, b = view.height - bottom, r = view.width - right;
-    if (view.axis.title) view.plot.append(plotText({ x: (left + r) / 2, y: Math.max(PLOT_TEXT_SIZE, top - 16), "text-anchor": "middle", "font-size": PLOT_TEXT_SIZE }, view.axis.title, "mplot-axis-title"));
+    if (view.axis.title) view.plot.append(plotText({ x: (left + r) / 2, y: Math.max(PLOT_TEXT_SIZE, top - 16), "text-anchor": "middle", "font-size": PLOT_TEXT_SIZE }, view.axis.title, "bfplot-axis-title"));
     if (view.axis.projection === "3d") { this.draw3dAxes(view); return; }
     const xTicks = this.xTickLayout(view);
     for (const [tick, label] of xTicks.ticks) {
       const px = view.x(tick), py = b + PLOT_TEXT_SIZE + 5;
-      view.plot.append(svg("line", { x1: px, x2: px, y1: top, y2: b, class: "mplot-grid-line" }));
+      view.plot.append(svg("line", { x1: px, x2: px, y1: top, y2: b, class: "bfplot-grid-line" }));
       view.plot.append(xTicks.rotated
-        ? plotText({ x: px, y: py - 4, "text-anchor": "end", "font-size": PLOT_TEXT_SIZE, transform: `rotate(${-TICK_ROTATION} ${px} ${b + 6})` }, label, "mplot-tick")
-        : plotText({ x: px, y: py, "text-anchor": "middle", "font-size": PLOT_TEXT_SIZE }, label, "mplot-tick"));
+        ? plotText({ x: px, y: py - 4, "text-anchor": "end", "font-size": PLOT_TEXT_SIZE, transform: `rotate(${-TICK_ROTATION} ${px} ${b + 6})` }, label, "bfplot-tick")
+        : plotText({ x: px, y: py, "text-anchor": "middle", "font-size": PLOT_TEXT_SIZE }, label, "bfplot-tick"));
     }
     const yTicks = this.yTicks(view);
-    for (const { tick, label } of yTicks) { const py = view.y(tick); view.plot.append(svg("line", { x1: left, x2: r, y1: py, y2: py, class: "mplot-grid-line" })); view.plot.append(plotText({ x: left - 9, y: py + PLOT_TEXT_SIZE * .34, "text-anchor": "end", "font-size": PLOT_TEXT_SIZE }, label, "mplot-tick")); }
-    view.plot.append(svg("path", { d: `M${left},${top}H${r}V${b}H${left}Z`, fill: "none", class: "mplot-axis-frame" }));
-    if (view.axis.xlabel && view.height > 180) view.plot.append(plotText({ x: (left + r) / 2, y: b + 46 + xTicks.extra, "text-anchor": "middle", "font-size": PLOT_TEXT_SIZE }, view.axis.xlabel, "mplot-label"));
+    for (const { tick, label } of yTicks) { const py = view.y(tick); view.plot.append(svg("line", { x1: left, x2: r, y1: py, y2: py, class: "bfplot-grid-line" })); view.plot.append(plotText({ x: left - 9, y: py + PLOT_TEXT_SIZE * .34, "text-anchor": "end", "font-size": PLOT_TEXT_SIZE }, label, "bfplot-tick")); }
+    view.plot.append(svg("path", { d: `M${left},${top}H${r}V${b}H${left}Z`, fill: "none", class: "bfplot-axis-frame" }));
+    if (view.axis.xlabel && view.height > 180) view.plot.append(plotText({ x: (left + r) / 2, y: b + 46 + xTicks.extra, "text-anchor": "middle", "font-size": PLOT_TEXT_SIZE }, view.axis.xlabel, "bfplot-label"));
     if (view.axis.ylabel && this.showsYLabel(view)) {
       // Rotated glyphs reach about 11px left of the baseline and 4px right of it.
       const x = Math.max(13, left - 19 - this.yTickWidth(view)), y = (top + b) / 2;
-      view.plot.append(plotText({ x, y, "text-anchor": "middle", "font-size": PLOT_TEXT_SIZE, transform: `rotate(-90 ${x} ${y})` }, view.axis.ylabel, "mplot-label"));
+      view.plot.append(plotText({ x, y, "text-anchor": "middle", "font-size": PLOT_TEXT_SIZE, transform: `rotate(-90 ${x} ${y})` }, view.axis.ylabel, "bfplot-label"));
     }
   }
 
@@ -817,8 +817,8 @@ export class MPlotViewer extends EventTarget {
 
   private dateFormat(view: AxisView, dimension: "x" | "y"): string | undefined { return (view.axis.props?.[`${dimension}axis`] as { date_format?: string } | undefined)?.date_format; }
 
-  private drawUnknown(group: SVGGElement, artist: Artist, view: AxisView, reason = "Renderer not installed"): void { const box = svg("g", { class: "mplot-unknown" }); box.append(svg("rect", { x: view.margin.left + 8, y: view.margin.top + 8, width: Math.min(220, view.width - view.margin.left - 20), height: 40, rx: 2 })); const text = svg("text", { x: view.margin.left + 16, y: view.margin.top + 25 }); text.textContent = `Unknown: ${artist.type}`; const detail = svg("text", { x: view.margin.left + 16, y: view.margin.top + 40 }); detail.textContent = reason; box.append(text, detail); group.append(box); }
-  private drawHitArea(view: AxisView): void { const { left, top, bottom, right } = view.margin; view.overlay.append(svg("rect", { x: left, y: top, width: view.width - right - left, height: view.height - bottom - top, class: "mplot-hit" })); }
+  private drawUnknown(group: SVGGElement, artist: Artist, view: AxisView, reason = "Renderer not installed"): void { const box = svg("g", { class: "bfplot-unknown" }); box.append(svg("rect", { x: view.margin.left + 8, y: view.margin.top + 8, width: Math.min(220, view.width - view.margin.left - 20), height: 40, rx: 2 })); const text = svg("text", { x: view.margin.left + 16, y: view.margin.top + 25 }); text.textContent = `Unknown: ${artist.type}`; const detail = svg("text", { x: view.margin.left + 16, y: view.margin.top + 40 }); detail.textContent = reason; box.append(text, detail); group.append(box); }
+  private drawHitArea(view: AxisView): void { const { left, top, bottom, right } = view.margin; view.overlay.append(svg("rect", { x: left, y: top, width: view.width - right - left, height: view.height - bottom - top, class: "bfplot-hit" })); }
 
   private bindInteractions(view: AxisView): void {
     if (view.axis.projection === "3d") { this.bind3dInteractions(view); return; }
@@ -836,7 +836,7 @@ export class MPlotViewer extends EventTarget {
       }
       start = { ...p, viewport: structuredClone(this.model.viewports.get(view.axis.id)!), xScale: view.x, yScale: view.y };
       view.svg.setPointerCapture(event.pointerId);
-      if (this.mode === "zoom") { brush = svg("rect", { x: p.x, y: p.y, width: 0, height: 0, class: "mplot-brush mplot-brush--zoom" }); view.overlay.append(brush); }
+      if (this.mode === "zoom") { brush = svg("rect", { x: p.x, y: p.y, width: 0, height: 0, class: "bfplot-brush bfplot-brush--zoom" }); view.overlay.append(brush); }
     });
     view.svg.addEventListener("pointermove", (event) => { const p = this.pointer(view, event); this.updateCoordinates(view, p.x, p.y); if (!start) { this.showTooltip(view, p.x, p.y); return; } if (this.mode === "pan") { const next = structuredClone(start.viewport), dx = start.x - p.x, dy = start.y - p.y, bounds = this.plotBounds(view); next.x = [start.xScale.invert(bounds.left + dx), start.xScale.invert(bounds.right + dx)]; next.y = [start.yScale.invert(bounds.bottom + dy), start.yScale.invert(bounds.top + dy)]; this.model.setViewport(view.axis.id, next); } else if (brush) { const bounded = this.boundToPlot(view, p.x, p.y); brush.setAttribute("x", String(Math.min(start.x, bounded.x))); brush.setAttribute("y", String(Math.min(start.y, bounded.y))); brush.setAttribute("width", String(Math.abs(bounded.x - start.x))); brush.setAttribute("height", String(Math.abs(bounded.y - start.y))); } });
     view.svg.addEventListener("pointerup", (event) => finish(event));
@@ -849,7 +849,7 @@ export class MPlotViewer extends EventTarget {
   private bind3dInteractions(view: AxisView): void {
     let start: { x: number; y: number; elev: number; azim: number } | undefined;
     const camera = () => this.camera(view);
-    view.svg.classList.add("mplot-3d-view");
+    view.svg.classList.add("bfplot-3d-view");
     view.svg.addEventListener("pointerdown", (event) => { const p = this.pointer(view, event), current = camera(); start = { ...p, elev: current.elev, azim: current.azim }; view.svg.setPointerCapture(event.pointerId); });
     view.svg.addEventListener("pointermove", (event) => { const p = this.pointer(view, event); this.updateCoordinates(view, p.x, p.y); if (!start) return; const current = camera(); current.azim = start.azim - (p.x - start.x) * .45; current.elev = Math.max(-89, Math.min(89, start.elev + (p.y - start.y) * .45)); void this.renderAxis(view.axis.id); });
     const finish = () => { start = undefined; }; view.svg.addEventListener("pointerup", finish); view.svg.addEventListener("pointercancel", finish);
@@ -868,12 +868,12 @@ export class MPlotViewer extends EventTarget {
   private inPlot(view: AxisView, x: number, y: number): boolean { const bounds = this.plotBounds(view); return x >= bounds.left && x <= bounds.right && y >= bounds.top && y <= bounds.bottom; }
   private boundToPlot(view: AxisView, x: number, y: number): { x: number; y: number } { const bounds = this.plotBounds(view); return { x: Math.max(bounds.left, Math.min(bounds.right, x)), y: Math.max(bounds.top, Math.min(bounds.bottom, y)) }; }
   private updateCoordinates(view: AxisView, px: number, py: number): void { view.readout.textContent = this.inPlot(view, px, py) ? `x = ${formatTick(view.x.invert(px), view.axis.xscale, this.dateFormat(view, "x"))} · y = ${formatTick(view.y.invert(py), view.axis.yscale, this.dateFormat(view, "y"))}` : "x — · y —"; }
-  private clearHover(view: AxisView): void { view.host.querySelector<HTMLElement>(".mplot-tooltip")?.remove(); view.readout.textContent = "x — · y —"; }
+  private clearHover(view: AxisView): void { view.host.querySelector<HTMLElement>(".bfplot-tooltip")?.remove(); view.readout.textContent = "x — · y —"; }
 
   private nearestLine(view: AxisView, px: number, py: number, maximumDistance: number): string | undefined {
     let nearest: { id: string; distance: number } | undefined;
     for (const artist of this.model.document.artists.filter(
-      (candidate) => candidate.axes_id === view.axis.id && candidate.type === "mplot.line" && candidate.props.visible !== false,
+      (candidate) => candidate.axes_id === view.axis.id && candidate.type === "bfplot.line" && candidate.props.visible !== false,
     )) {
       const data = this.resolvedData.get(artist.id) ?? artist.data;
       const points = pairs(data.x, data.y).map(([x, y]) => [view.x(x), view.y(y)] as [number, number]);
@@ -893,7 +893,7 @@ export class MPlotViewer extends EventTarget {
     return nearest?.id;
   }
 
-  private showTooltip(view: AxisView, px: number, py: number): void { let best: { artist: Artist; index: number; x: number; y: number; distance: number } | undefined; for (const artist of this.model.document.artists.filter((item) => item.axes_id === view.axis.id)) { const data = this.resolvedData.get(artist.id) ?? artist.data, values = pairs(data.x, data.y), stride = Math.max(1, Math.floor(values.length / 5000)); for (let offset = 0; offset < values.length; offset += stride) { const [x, y, index] = values[offset]!, distance = Math.hypot(view.x(x) - px, view.y(y) - py); if (distance < 18 && (!best || distance < best.distance)) best = { artist, index, x, y, distance }; } } let tooltip = view.host.querySelector<HTMLElement>(".mplot-tooltip"); if (!best) { tooltip?.remove(); return; } if (!tooltip) { tooltip = document.createElement("div"); tooltip.className = "mplot-tooltip"; view.host.append(tooltip); } tooltip.style.left = `${px / view.width * 100}%`; tooltip.style.top = `${py / view.height * 100}%`; const rawLabel = best.artist.props.label; const label = typeof rawLabel === "string" && rawLabel && !rawLabel.startsWith("_") ? `${rawLabel} · ` : ""; tooltip.textContent = `${label}x = ${formatTick(best.x, view.axis.xscale, this.dateFormat(view, "x"))} · y = ${formatTick(best.y, view.axis.yscale, this.dateFormat(view, "y"))}`; }
+  private showTooltip(view: AxisView, px: number, py: number): void { let best: { artist: Artist; index: number; x: number; y: number; distance: number } | undefined; for (const artist of this.model.document.artists.filter((item) => item.axes_id === view.axis.id)) { const data = this.resolvedData.get(artist.id) ?? artist.data, values = pairs(data.x, data.y), stride = Math.max(1, Math.floor(values.length / 5000)); for (let offset = 0; offset < values.length; offset += stride) { const [x, y, index] = values[offset]!, distance = Math.hypot(view.x(x) - px, view.y(y) - py); if (distance < 18 && (!best || distance < best.distance)) best = { artist, index, x, y, distance }; } } let tooltip = view.host.querySelector<HTMLElement>(".bfplot-tooltip"); if (!best) { tooltip?.remove(); return; } if (!tooltip) { tooltip = document.createElement("div"); tooltip.className = "bfplot-tooltip"; view.host.append(tooltip); } tooltip.style.left = `${px / view.width * 100}%`; tooltip.style.top = `${py / view.height * 100}%`; const rawLabel = best.artist.props.label; const label = typeof rawLabel === "string" && rawLabel && !rawLabel.startsWith("_") ? `${rawLabel} · ` : ""; tooltip.textContent = `${label}x = ${formatTick(best.x, view.axis.xscale, this.dateFormat(view, "x"))} · y = ${formatTick(best.y, view.axis.yscale, this.dateFormat(view, "y"))}`; }
   /** Maps data coordinates into the unit box centred on the origin. */
   private normalize3d(view: AxisView, x: number, y: number, z: number): Point3 {
     const viewport = this.model.viewports.get(view.axis.id)!, zlim = viewport.z ?? [0, 1];
@@ -928,9 +928,9 @@ export class MPlotViewer extends EventTarget {
     for (const dimension of [0, 1, 2]) {
       const [a, b] = [0, 1, 2].filter((other) => other !== dimension) as [number, number];
       const corner = (u: number, v: number): Point3 => { const result: Point3 = [0, 0, 0]; result[dimension] = back[dimension]!; result[a] = u; result[b] = v; return result; };
-      view.plot.append(svg("path", { d: `M${[corner(-.5, -.5), corner(.5, -.5), corner(.5, .5), corner(-.5, .5)].map((c) => project(c).map((n) => n.toFixed(2)).join(",")).join("L")}Z`, class: "mplot-3d-pane" }));
-      for (const { unit } of ticks[a]!) line(corner(unit, -.5), corner(unit, .5), "mplot-grid-line");
-      for (const { unit } of ticks[b]!) line(corner(-.5, unit), corner(.5, unit), "mplot-grid-line");
+      view.plot.append(svg("path", { d: `M${[corner(-.5, -.5), corner(.5, -.5), corner(.5, .5), corner(-.5, .5)].map((c) => project(c).map((n) => n.toFixed(2)).join(",")).join("L")}Z`, class: "bfplot-3d-pane" }));
+      for (const { unit } of ticks[a]!) line(corner(unit, -.5), corner(unit, .5), "bfplot-grid-line");
+      for (const { unit } of ticks[b]!) line(corner(-.5, unit), corner(.5, unit), "bfplot-grid-line");
     }
     const center = project([0, 0, 0]);
     // Edges carrying each axis: x and y run along the floor at the front, z up the outer side.
@@ -947,15 +947,15 @@ export class MPlotViewer extends EventTarget {
       const kept = thinTicks(ticks[index]!.map((tick) => { const p = project(edge(tick.unit)); return { ...tick, position: (p[0] - start[0]) * along[0]! + (p[1] - start[1]) * along[1]!, extent: Math.abs(along[0]!) * labelWidth(tick.label) + Math.abs(along[1]!) * PLOT_TEXT_SIZE }; }), 6);
       for (const { unit, label } of kept) {
         const [x, y] = project(edge(unit));
-        view.plot.append(svg("line", { x1: x, y1: y, x2: x + out[0]! * 5, y2: y + out[1]! * 5, class: "mplot-axis-frame" }));
-        view.plot.append(plotText({ x: x + out[0]! * 10, y: y + out[1]! * 12 + PLOT_TEXT_SIZE * .34, "text-anchor": anchor, "font-size": PLOT_TEXT_SIZE }, label, "mplot-tick"));
+        view.plot.append(svg("line", { x1: x, y1: y, x2: x + out[0]! * 5, y2: y + out[1]! * 5, class: "bfplot-axis-frame" }));
+        view.plot.append(plotText({ x: x + out[0]! * 10, y: y + out[1]! * 12 + PLOT_TEXT_SIZE * .34, "text-anchor": anchor, "font-size": PLOT_TEXT_SIZE }, label, "bfplot-tick"));
       }
       const axisLabel = view.axis[`${dimension}label`];
       const reach = 30 + Math.abs(out[0]!) * Math.max(0, ...kept.map(({ label }) => labelWidth(label)));
-      if (axisLabel) view.plot.append(plotText({ x: middle[0] + out[0]! * reach, y: middle[1] + out[1]! * reach + PLOT_TEXT_SIZE * .34, "text-anchor": anchor, "font-size": PLOT_TEXT_SIZE }, axisLabel, "mplot-label"));
+      if (axisLabel) view.plot.append(plotText({ x: middle[0] + out[0]! * reach, y: middle[1] + out[1]! * reach + PLOT_TEXT_SIZE * .34, "text-anchor": anchor, "font-size": PLOT_TEXT_SIZE }, axisLabel, "bfplot-label"));
     }
   }
-  private markActiveAxis(): void { for (const view of this.views.values()) view.host.classList.toggle("mplot-axis--active", view.axis.id === this.activeAxisId); }
+  private markActiveAxis(): void { for (const view of this.views.values()) view.host.classList.toggle("bfplot-axis--active", view.axis.id === this.activeAxisId); }
 
   exportSVG(scope: ExportScope = "artifact", id?: string): string {
     if (scope === "axis") { const view = this.views.get(id ?? this.activeAxisId ?? ""); return view?.mounted ? serializeSvg(view.svg) : emptySvg(); }
@@ -979,11 +979,11 @@ export class MPlotViewer extends EventTarget {
 
   private async downloadExport(format: "svg" | "png"): Promise<void> {
     const scope = this.exportScope;
-    if (scope === "figures") { for (const [index, figure] of this.model.document.figures.entries()) { await this.mountFigure(figure.id, true); const filename = `mplot-figure-${index + 1}.${format}`; this.download(format === "svg" ? new Blob([this.exportSVG("figure", figure.id)], { type: "image/svg+xml;charset=utf-8" }) : await this.exportPNG(2, "figure", figure.id), filename); } return; }
+    if (scope === "figures") { for (const [index, figure] of this.model.document.figures.entries()) { await this.mountFigure(figure.id, true); const filename = `bfplot-figure-${index + 1}.${format}`; this.download(format === "svg" ? new Blob([this.exportSVG("figure", figure.id)], { type: "image/svg+xml;charset=utf-8" }) : await this.exportPNG(2, "figure", figure.id), filename); } return; }
     if (scope === "figure") { const figureId = this.activeFigureId(); if (figureId) await this.mountFigure(figureId); }
     else if (scope === "artifact") for (const figure of this.model.document.figures) await this.mountFigure(figure.id, true);
     else if (this.activeAxisId) await this.mountAxis(this.activeAxisId);
-    const filename = `mplot-${scope}.${format}`;
+    const filename = `bfplot-${scope}.${format}`;
     this.download(format === "svg" ? new Blob([this.exportSVG(scope)], { type: "image/svg+xml;charset=utf-8" }) : await this.exportPNG(2, scope), filename);
   }
 
@@ -992,7 +992,7 @@ export class MPlotViewer extends EventTarget {
   private download(blob: Blob, filename: string): void { const link = document.createElement("a"), url = URL.createObjectURL(blob); link.href = url; link.download = filename; link.click(); setTimeout(() => URL.revokeObjectURL(url), 0); }
 
   private figureAxisIds(figure: Figure): string[] { return (figure.axes ?? this.model.document.axes.filter((axis) => !axis.figure_id || axis.figure_id === figure.id)).map((axis) => typeof axis === "string" ? axis : axis.id); }
-  private applyTheme(): void { const values: Record<string, string> = { "--mplot-bg": this.theme.background, "--mplot-panel": this.theme.panel, "--mplot-fg": this.theme.foreground, "--mplot-muted": this.theme.muted, "--mplot-grid": this.theme.grid, "--mplot-accent": this.theme.accent, "font-family": this.theme.fontFamily }; for (const [key, value] of Object.entries(values)) this.element.style.setProperty(key, value); }
+  private applyTheme(): void { const values: Record<string, string> = { "--bfplot-bg": this.theme.background, "--bfplot-panel": this.theme.panel, "--bfplot-fg": this.theme.foreground, "--bfplot-muted": this.theme.muted, "--bfplot-grid": this.theme.grid, "--bfplot-accent": this.theme.accent, "font-family": this.theme.fontFamily }; for (const [key, value] of Object.entries(values)) this.element.style.setProperty(key, value); }
 }
 
 function pointSegmentDistance(

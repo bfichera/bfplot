@@ -1,7 +1,7 @@
 {
-  "name": "@mplot/viewer",
+  "name": "@bfplot/viewer",
   "version": "0.9.9",
-  "description": "Dependency-light interactive browser viewer for MPlot artifacts",
+  "description": "Dependency-light interactive browser viewer for BFPlot artifacts",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",

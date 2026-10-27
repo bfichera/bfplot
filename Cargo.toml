@@ -1,7 +1,7 @@
 [workspace]
 members = [
-  "crates/mplot-core",
-  "crates/mplot-cli",
+  "crates/bfplot-core",
+  "crates/bfplot-cli",
 ]
 resolver = "2"
 
@@ -10,7 +10,7 @@ version = "0.9.9"
 edition = "2024"
 license = "Apache-2.0 OR MIT"
 rust-version = "1.88"
-repository = "https://github.com/mplot-dev/mplot"
+repository = "https://github.com/bfplot-dev/bfplot"
 
 [workspace.dependencies]
 anyhow = "1.0"

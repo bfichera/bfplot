@@ -1,8 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
 import { ViewerModel } from "./model.js";
-import type { MPlotDocument } from "./types.js";
+import type { BFPlotDocument } from "./types.js";
 
-const document: MPlotDocument = {
+const document: BFPlotDocument = {
   figures: [{ id: "figure", axes: ["a", "b"] }],
   axes: [{ id: "a", xlim: [0, 10], ylim: [0, 5] }, { id: "b", xlim: [0, 20], ylim: [-1, 1] }],
   artists: [],
@@ -22,9 +22,9 @@ describe("ViewerModel", () => {
     const xref = { object: `sha256:${"b".repeat(64)}` as const, dtype: "f8", shape: [3] };
     const yref = { object: `sha256:${"c".repeat(64)}` as const, dtype: "f8", shape: [3] };
     const resolver = vi.fn(async (reference: typeof xref) => reference.object === xref.object ? new Float64Array([10, 20, 30]) : new Float64Array([-5, 0, 5]));
-    const autoscaleDocument: MPlotDocument = {
+    const autoscaleDocument: BFPlotDocument = {
       figures: [{ id: "figure", axes: ["a"] }], axes: [{ id: "a" }],
-      artists: [{ type: "mplot.line", id: "line", axes_id: "a", props: {}, data: { x: xref, y: yref } }],
+      artists: [{ type: "bfplot.line", id: "line", axes_id: "a", props: {}, data: { x: xref, y: yref } }],
     };
     const model = new ViewerModel(autoscaleDocument, resolver);
     await model.fitViewports();

@@ -1,9 +1,9 @@
-import type { MPlotDocument, TimelineUpdate } from "./types.js";
+import type { BFPlotDocument, TimelineUpdate } from "./types.js";
 
 const PLAYBACK_RATES = [0.25, 0.5, 1, 1.5, 2] as const;
 const TIME_EPSILON = 1e-9;
 
-type DocumentRenderer = (document: MPlotDocument) => Promise<void>;
+type DocumentRenderer = (document: BFPlotDocument) => Promise<void>;
 
 /**
  * Owns deterministic timeline replay and its controls.
@@ -13,7 +13,7 @@ type DocumentRenderer = (document: MPlotDocument) => Promise<void>;
  * frame happened to render previously.
  */
 export class TimelinePlayer {
-  private source: MPlotDocument;
+  private source: BFPlotDocument;
   private time = 0;
   private playing = false;
   private playbackRate = 1;
@@ -23,7 +23,7 @@ export class TimelinePlayer {
   private controls: HTMLElement | undefined;
 
   constructor(
-    document: MPlotDocument,
+    document: BFPlotDocument,
     private readonly renderDocument: DocumentRenderer,
   ) {
     this.source = structuredClone(document);
@@ -33,7 +33,7 @@ export class TimelinePlayer {
     return this.source.timeline !== undefined;
   }
 
-  setDocument(document: MPlotDocument): void {
+  setDocument(document: BFPlotDocument): void {
     this.pause();
     this.source = structuredClone(document);
     this.time = 0;
@@ -45,11 +45,11 @@ export class TimelinePlayer {
     if (!timeline) return undefined;
 
     const controls = document.createElement("section");
-    controls.className = "mplot-timeline";
+    controls.className = "bfplot-timeline";
     controls.setAttribute("aria-label", "Animation timeline");
 
     const play = this.button("Play", "play");
-    play.classList.add("mplot-play");
+    play.classList.add("bfplot-play");
     play.onclick = () => (this.playing ? this.pause() : this.play());
 
     const previous = this.button("← Frame");
@@ -60,7 +60,7 @@ export class TimelinePlayer {
 
     const range = document.createElement("input");
     range.type = "range";
-    range.className = "mplot-timeline-range";
+    range.className = "bfplot-timeline-range";
     range.min = "0";
     range.max = String(timeline.duration);
     range.step = "any";
@@ -74,10 +74,10 @@ export class TimelinePlayer {
     });
 
     const output = document.createElement("output");
-    output.className = "mplot-timeline-time";
+    output.className = "bfplot-timeline-time";
 
     const speed = document.createElement("select");
-    speed.className = "mplot-playback-rate";
+    speed.className = "bfplot-playback-rate";
     speed.setAttribute("aria-label", "Playback speed");
     for (const rate of PLAYBACK_RATES) {
       const option = document.createElement("option");
@@ -111,7 +111,7 @@ export class TimelinePlayer {
   private button(label: string, action?: string): HTMLButtonElement {
     const button = document.createElement("button");
     button.type = "button";
-    button.className = "mplot-button";
+    button.className = "bfplot-button";
     button.textContent = label;
     if (action) button.dataset.action = action;
     return button;
@@ -186,9 +186,9 @@ export class TimelinePlayer {
     const timeline = this.source.timeline;
     if (!timeline || !this.controls) return;
 
-    const play = this.controls.querySelector<HTMLButtonElement>(".mplot-play");
-    const range = this.controls.querySelector<HTMLInputElement>(".mplot-timeline-range");
-    const output = this.controls.querySelector<HTMLOutputElement>(".mplot-timeline-time");
+    const play = this.controls.querySelector<HTMLButtonElement>(".bfplot-play");
+    const range = this.controls.querySelector<HTMLInputElement>(".bfplot-timeline-range");
+    const output = this.controls.querySelector<HTMLOutputElement>(".bfplot-timeline-time");
     if (play) {
       play.textContent = this.playing ? "Pause" : "Play";
       play.setAttribute("aria-pressed", String(this.playing));
@@ -198,7 +198,7 @@ export class TimelinePlayer {
   }
 }
 
-export function applyTimelineUpdate(document: MPlotDocument, update: TimelineUpdate): void {
+export function applyTimelineUpdate(document: BFPlotDocument, update: TimelineUpdate): void {
   const collection =
     update.target_kind === "artist"
       ? document.artists

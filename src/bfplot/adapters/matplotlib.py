@@ -302,7 +302,7 @@ def _extract_container(
         if cap_segments:
             data["cap_segments"] = context.array(np.asarray(cap_segments))
         children = [data_line, *caplines, *barcols]
-        return context.artist("mplot.errorbar", axes_id, props, data), children
+        return context.artist("bfplot.errorbar", axes_id, props, data), children
     if isinstance(container, BarContainer):
         patches = list(container.patches)
         if not patches:
@@ -315,7 +315,7 @@ def _extract_container(
         }
         props = _patch_props(patches[0])
         props["orientation"] = getattr(container, "orientation", None)
-        return context.artist("mplot.histogram", axes_id, props, data), patches
+        return context.artist("bfplot.histogram", axes_id, props, data), patches
     return None, []
 
 
@@ -328,19 +328,19 @@ def _extract_artist(
         if is_3d and hasattr(artist, "get_data_3d"):
             x, y, z = artist.get_data_3d()
             return context.artist(
-                "mplot.line3d",
+                "bfplot.line3d",
                 axes_id,
                 _line_props(artist),
                 {"x": context.array(x), "y": context.array(y), "z": context.array(z)},
             )
         return context.artist(
-            "mplot.line",
+            "bfplot.line",
             axes_id,
             _line_props(artist),
             {"x": context.array(x), "y": context.array(y)},
         )
     if isinstance(artist, PathCollection):
-        type_name = "mplot.scatter"
+        type_name = "bfplot.scatter"
         if is_3d and hasattr(artist, "_offsets3d"):
             x, y, z = artist._offsets3d
             data: dict[str, Any] = {
@@ -348,7 +348,7 @@ def _extract_artist(
                 "y": context.array(y),
                 "z": context.array(z),
             }
-            type_name = "mplot.scatter3d"
+            type_name = "bfplot.scatter3d"
         else:
             offsets = np.asarray(artist.get_offsets())
             data = {"xy": context.array(offsets)}
@@ -360,19 +360,21 @@ def _extract_artist(
             data["values"] = context.array(values)
         return context.artist(type_name, axes_id, _collection_props(artist), data, source=artist)
     if class_name == "FillBetweenPolyCollection":
-        return _extract_paths("mplot.fill_between", artist, axes_id, context)
+        return _extract_paths("bfplot.fill_between", artist, axes_id, context)
     if class_name in {"QuadContourSet", "ContourSet"}:
         return _extract_contour(artist, axes_id, context)
     if is_3d and class_name == "Poly3DCollection":
         faces = _poly3d_faces(artist)
-        return _extract_3d_paths("mplot.surface3d", faces, artist, axes_id, context)
+        return _extract_3d_paths("bfplot.surface3d", faces, artist, axes_id, context)
     if is_3d and isinstance(artist, LineCollection) and hasattr(artist, "_segments3d"):
-        return _extract_3d_paths("mplot.mesh3d", list(artist._segments3d), artist, axes_id, context)
+        return _extract_3d_paths(
+            "bfplot.mesh3d", list(artist._segments3d), artist, axes_id, context
+        )
     if isinstance(artist, PolyCollection):
-        return _extract_paths("mplot.patch", artist, axes_id, context)
+        return _extract_paths("bfplot.patch", artist, axes_id, context)
     if isinstance(artist, LineCollection):
         return context.artist(
-            "mplot.contour",
+            "bfplot.contour",
             axes_id,
             _collection_props(artist),
             {"segments": context.array(np.asarray(artist.get_segments()))},
@@ -389,7 +391,7 @@ def _extract_artist(
             "horizontalalignment": artist.get_horizontalalignment(),
             "verticalalignment": artist.get_verticalalignment(),
         }
-        return context.artist("mplot.text", axes_id, props, data)
+        return context.artist("bfplot.text", axes_id, props, data)
     if isinstance(artist, Patch) and artist.axes is not None:
         data: dict[str, Any] = {}
         if isinstance(artist, Polygon):
@@ -397,7 +399,7 @@ def _extract_artist(
         else:
             data["path"] = context.array(artist.get_path().vertices)
             data["transform"] = _finite(artist.get_patch_transform().get_matrix())
-        return context.artist("mplot.patch", axes_id, _patch_props(artist), data)
+        return context.artist("bfplot.patch", axes_id, _patch_props(artist), data)
     return None
 
 
@@ -524,7 +526,7 @@ def _extract_contour(artist: Any, axes_id: str, context: ExtractionContext) -> d
     props = _collection_props(artist)
     props["cmap"] = artist.cmap.name
     return context.artist(
-        "mplot.contourf" if filled else "mplot.contour", axes_id, props, data, source=artist
+        "bfplot.contourf" if filled else "bfplot.contour", axes_id, props, data, source=artist
     )
 
 
@@ -539,4 +541,4 @@ def _extract_image(image: Any, axes_id: str, context: ExtractionContext) -> dict
         "origin": image.origin,
         "interpolation": image.get_interpolation(),
     }
-    return context.artist("mplot.image", axes_id, props, data, source=image)
+    return context.artist("bfplot.image", axes_id, props, data, source=image)

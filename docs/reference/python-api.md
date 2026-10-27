@@ -1,20 +1,20 @@
 # Python API
 
-Most scripts only need `mplot.savefig()` or `mplot.result()`.
+Most scripts only need `bfplot.savefig()` or `bfplot.result()`.
 
 ## Paths, layouts, and overwriting
 
 These rules apply to every function that writes a result:
 
 - **One output is one result.** It holds all figures saved together, an optional animation, and metadata.
-- **The path is used exactly as given.** No suffix is added or rewritten. If the name does not end in `.mplot`, MPlot warns but still writes exactly that path.
+- **The path is used exactly as given.** No suffix is added or rewritten. If the name does not end in `.bfplot`, BFPlot warns but still writes exactly that path.
 - **`layout="directory"`** (the default) writes a result directory with a readable `manifest.toml`. **`layout="file"`** writes one self-contained packed file. See [Choosing a file type](../guides/file-types.md).
-- **Existing results are replaced.** An MPlot result at the path (either layout, or an empty directory) is replaced only after the new result is fully built. Anything else at the path raises `FileExistsError`, checked when the save starts, before expensive work.
+- **Existing results are replaced.** A BFPlot result at the path (either layout, or an empty directory) is replaced only after the new result is fully built. Anything else at the path raises `FileExistsError`, checked when the save starts, before expensive work.
 
-## `mplot.savefig`
+## `bfplot.savefig`
 
 ```python
-mplot.savefig(
+bfplot.savefig(
     path,
     figure=None,
     *,
@@ -24,7 +24,7 @@ mplot.savefig(
 )
 ```
 
-Save one or more Matplotlib figures as one MPlot result.
+Save one or more Matplotlib figures as one BFPlot result.
 
 | Argument | Meaning |
 | --- | --- |
@@ -37,19 +37,19 @@ Save one or more Matplotlib figures as one MPlot result.
 Returns the output as a `pathlib.Path`.
 
 ```python
-output = mplot.savefig("results/experiment.mplot", fig, name="experiment")
+output = bfplot.savefig("results/experiment.bfplot", fig, name="experiment")
 ```
 
-## `mplot.result`
+## `bfplot.result`
 
 ```python
-mplot.result(path, *, layout="directory", provenance=True)
+bfplot.result(path, *, layout="directory", provenance=True)
 ```
 
-Collect several figures, at most one animation, and metadata into one result. Returns an `mplot.Result`, best used as a context manager:
+Collect several figures, at most one animation, and metadata into one result. Returns a `bfplot.Result`, best used as a context manager:
 
 ```python
-with mplot.result("results/fit.mplot") as result:
+with bfplot.result("results/fit.bfplot") as result:
     result.add(fig_spectrum, name="spectrum")
     result.add(fig_residuals, name="residuals")
     with result.animation(fig_evolution, name="evolution", fps=12) as anim:
@@ -67,7 +67,7 @@ Nothing is written until the `with` block ends. If the block raises, nothing is 
 result.add(figure=None, *, name=None)
 ```
 
-Capture the figure’s state at that moment. Later changes to the figure do not affect what was captured. `figure` and `name` work as in `mplot.savefig()`.
+Capture the figure’s state at that moment. Later changes to the figure do not affect what was captured. `figure` and `name` work as in `bfplot.savefig()`.
 
 ### `Result.animation`
 
@@ -89,10 +89,10 @@ The names of the figures captured so far, in result order.
 
 Names must be non-empty and unique within a result; mistakes raise an error at `add()` time. If you do not give a name, a figure’s Matplotlib label (`plt.figure("spectrum")`) is used when it is unique. The viewer shows the name as the figure heading when the figure has no title. A figure’s title is its `suptitle()`.
 
-## `mplot.animation`
+## `bfplot.animation`
 
 ```python
-mplot.animation(
+bfplot.animation(
     path,
     figure=None,
     *,
@@ -106,16 +106,16 @@ mplot.animation(
 Record changes to existing Matplotlib figures as one animated result:
 
 ```python
-with mplot.animation("results/wave.mplot", fig, fps=30) as recording:
+with bfplot.animation("results/wave.bfplot", fig, fps=30) as recording:
     for phase in phases:
         line.set_ydata(np.sin(x + phase))
         recording.capture()
 ```
 
-## `mplot.save_animation`
+## `bfplot.save_animation`
 
 ```python
-mplot.save_animation(
+bfplot.save_animation(
     path,
     figure,
     frames,
@@ -130,19 +130,19 @@ mplot.save_animation(
 
 Call `update(frame)` for each item in `frames` and capture the resulting figure state. Returns the output path.
 
-## `mplot.translate` and `mplot.compile`
+## `bfplot.translate` and `bfplot.compile`
 
 ```python
-mplot.translate(figure=None, *, metadata=None)
-mplot.compile(mir, path, *, layout="directory")
+bfplot.translate(figure=None, *, metadata=None)
+bfplot.compile(mir, path, *, layout="directory")
 ```
 
-`translate` turns Matplotlib figures into a validated `mplot.MirDocument`, MPlot's intermediate representation. `compile` writes a MIR document as one result at exactly `path`. `savefig` is the two combined. Producers in other languages can write MIR directly; its schema is `src/mplot/mir.schema.json`.
+`translate` turns Matplotlib figures into a validated `bfplot.MirDocument`, BFPlot's intermediate representation. `compile` writes a MIR document as one result at exactly `path`. `savefig` is the two combined. Producers in other languages can write MIR directly; its schema is `src/bfplot/mir.schema.json`.
 
-## `mplot.show`
+## `bfplot.show`
 
 ```python
-mplot.show(
+bfplot.show(
     figure=None,
     *,
     path=None,
@@ -151,14 +151,14 @@ mplot.show(
 )
 ```
 
-Save a result and ask the installed MPlot CLI to open it. If `path` is omitted, MPlot creates a temporary packed file.
+Save a result and ask the installed BFPlot CLI to open it. If `path` is omitted, BFPlot creates a temporary packed file.
 
 ```python
-mplot.show(fig)
+bfplot.show(fig)
 ```
 
 Set `open_browser=False` to create the output without launching the CLI.
 
 ## Additional artist types
 
-MPlot does not load third-party exporters or renderers. To support another Matplotlib artist, send a pull request that implements and tests both sides in MPlot.
+BFPlot does not load third-party exporters or renderers. To support another Matplotlib artist, send a pull request that implements and tests both sides in BFPlot.

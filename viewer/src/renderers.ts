@@ -39,7 +39,7 @@ const scatter: ArtistRenderer = ({ group, artist, data, x, y, theme, pointBudget
   const sizes = numeric(data.sizes ?? artist.props.size), colors = Array.isArray(data.colors) ? data.colors : [], facecolors = artist.props.facecolors as unknown[] | undefined;
   const values = numeric(data.values), mapped = values.length ? scalarColors(values, artist) : [];
   for (const [px, py, index] of sampled(pairs(data.x, data.y), pointBudget)) {
-    const point = svg("circle", { cx: x(px), cy: y(py), r: Math.sqrt(sizes[index] ?? prop(artist, "size", 24)) / 2, fill: mapped[index] ?? cssColor(colors[index] ?? facecolors?.[index] ?? artist.props.color, theme.accent), opacity: prop(artist, "alpha", 0.85), class: "mplot-point", "data-index": index, tabindex: "-1" });
+    const point = svg("circle", { cx: x(px), cy: y(py), r: Math.sqrt(sizes[index] ?? prop(artist, "size", 24)) / 2, fill: mapped[index] ?? cssColor(colors[index] ?? facecolors?.[index] ?? artist.props.color, theme.accent), opacity: prop(artist, "alpha", 0.85), class: "bfplot-point", "data-index": index, tabindex: "-1" });
     group.append(point);
   }
 };
@@ -210,7 +210,7 @@ const contour = (filled: boolean): ArtistRenderer => ({ group, artist, data, x, 
 
 const text: ArtistRenderer = ({ group, artist, data, x, y, theme }) => {
   const px = x(Number(data.x ?? 0)), py = y(Number(data.y ?? 0));
-  group.append(plotText({ x: px, y: py, fill: cssColor(artist.props.color, theme.foreground), "font-size": Math.max(PLOT_TEXT_SIZE, prop(artist, "fontsize", PLOT_TEXT_SIZE)), "font-weight": prop(artist, "fontweight", undefined), "text-anchor": prop(artist, "align", "start"), transform: `rotate(${prop(artist, "rotation", 0)} ${px} ${py})` }, String(data.text ?? artist.props.text ?? ""), "mplot-artist-text"));
+  group.append(plotText({ x: px, y: py, fill: cssColor(artist.props.color, theme.foreground), "font-size": Math.max(PLOT_TEXT_SIZE, prop(artist, "fontsize", PLOT_TEXT_SIZE)), "font-weight": prop(artist, "fontweight", undefined), "text-anchor": prop(artist, "align", "start"), transform: `rotate(${prop(artist, "rotation", 0)} ${px} ${py})` }, String(data.text ?? artist.props.text ?? ""), "bfplot-artist-text"));
 };
 
 const transformedPoints = (value: unknown, transform: unknown): Array<[number, number]> => {
@@ -244,7 +244,7 @@ const line3d: ArtistRenderer = ({ group, artist, data, project3d, theme, pointBu
 const scatter3d: ArtistRenderer = ({ group, artist, data, project3d, depth3d, theme, pointBudget }) => {
   const xs=numeric(data.x),ys=numeric(data.y),zs=numeric(data.z), values=numeric(data.values), mapped=values.length?scalarColors(values,artist):[];
   const depth=(i:number)=>depth3d?depth3d(xs[i]??0,ys[i]??0,zs[i]??0):zs[i]??0, indices=sampled(xs.map((_,i)=>i),pointBudget).sort((a,b)=>depth(a)-depth(b));
-  for(const i of indices){ if(ys[i]===undefined||zs[i]===undefined) continue; const [cx,cy]=project3d(xs[i]!,ys[i]!,zs[i]!); group.append(svg("circle",{cx,cy,r:prop(artist,"size",4),fill:mapped[i]??cssColor(artist.props.color,theme.accent),opacity:prop(artist,"alpha",.85),class:"mplot-point","data-index":i})); }
+  for(const i of indices){ if(ys[i]===undefined||zs[i]===undefined) continue; const [cx,cy]=project3d(xs[i]!,ys[i]!,zs[i]!); group.append(svg("circle",{cx,cy,r:prop(artist,"size",4),fill:mapped[i]??cssColor(artist.props.color,theme.accent),opacity:prop(artist,"alpha",.85),class:"bfplot-point","data-index":i})); }
 };
 
 const surface3d = (filled: boolean): ArtistRenderer => ({ group, artist, data, project3d, depth3d, theme, pointBudget }) => {
@@ -275,8 +275,8 @@ const surface3d = (filled: boolean): ArtistRenderer => ({ group, artist, data, p
 };
 
 export const builtinRenderers: Readonly<Record<string, ArtistRenderer>> = {
-  "mplot.line": line, "mplot.scatter": scatter, "mplot.image": image, "mplot.errorbar": errorbar,
-  "mplot.fill_between": fillBetween, "mplot.histogram": bars(), "mplot.contour": contour(false), "mplot.contourf": contour(true),
-  "mplot.text": text, "mplot.patch": patch, "mplot.line3d": line3d, "mplot.scatter3d": scatter3d,
-  "mplot.surface3d": surface3d(true), "mplot.mesh3d": surface3d(false),
+  "bfplot.line": line, "bfplot.scatter": scatter, "bfplot.image": image, "bfplot.errorbar": errorbar,
+  "bfplot.fill_between": fillBetween, "bfplot.histogram": bars(), "bfplot.contour": contour(false), "bfplot.contourf": contour(true),
+  "bfplot.text": text, "bfplot.patch": patch, "bfplot.line3d": line3d, "bfplot.scatter3d": scatter3d,
+  "bfplot.surface3d": surface3d(true), "bfplot.mesh3d": surface3d(false),
 };

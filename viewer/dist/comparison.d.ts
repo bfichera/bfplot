@@ -1,4 +1,4 @@
-import type { Artist, Axis, MPlotDocument, ScaleType, Viewport } from "./types.js";
+import type { Artist, Axis, BFPlotDocument, ScaleType, Viewport } from "./types.js";
 export interface ComparisonSelectionResult {
     selected: boolean;
     message?: string;
@@ -9,9 +9,9 @@ export declare class LineComparison {
     open: boolean;
     message: string;
     get active(): boolean;
-    toggle(document: MPlotDocument, artistId: string): ComparisonSelectionResult;
-    artists(document: MPlotDocument): Artist[];
-    sourceAxis(document: MPlotDocument): Axis | undefined;
+    toggle(document: BFPlotDocument, artistId: string): ComparisonSelectionResult;
+    artists(document: BFPlotDocument): Artist[];
+    sourceAxis(document: BFPlotDocument): Axis | undefined;
     clear(): void;
 }
 export declare function fitLineViewport(data: Array<Record<string, unknown>>, xscale?: ScaleType, yscale?: ScaleType): Viewport;

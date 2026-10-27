@@ -1,9 +1,9 @@
 # Provenance and metadata
 
-Every result records its creation time in UTC and, when run inside a Git repository, the commit. By default MPlot also records:
+Every result records its creation time in UTC and, when run inside a Git repository, the commit. By default BFPlot also records:
 
 - the Python implementation and version, and the platform;
-- the MPlot, Matplotlib, NumPy and Zstandard versions;
+- the BFPlot, Matplotlib, NumPy and Zstandard versions;
 - the command line, script path and working directory;
 - the current user.
 
@@ -12,17 +12,17 @@ All of it is stored under `[provenance]` in the manifest, where you can read and
 ## Your own values
 
 ```python
-mplot.savefig(
-    "results/calibration.mplot",
+bfplot.savefig(
+    "results/calibration.bfplot",
     fig,
     provenance={"sample": "crystal-17", "laser_power_mw": 12.0},
 )
 ```
 
-or, with [`mplot.result()`](../reference/python-api.md#mplotresult):
+or, with [`bfplot.result()`](../reference/python-api.md#bfplotresult):
 
 ```python
-with mplot.result("results/fit.mplot") as result:
+with bfplot.result("results/fit.bfplot") as result:
     result.add(fig, name="fit")
     result.metadata["chi2"] = chi2
 ```
@@ -32,7 +32,7 @@ Both end up under `[provenance.extra]`. Values are checked when assigned; nested
 ## Less provenance
 
 ```python
-mplot.savefig("plot.mplot", fig, provenance=False)
+bfplot.savefig("plot.bfplot", fig, provenance=False)
 ```
 
 keeps only the creation time and Git commit.
@@ -42,4 +42,4 @@ keeps only the creation time and Git commit.
 
 ## Limits
 
-MPlot records paths, not source code, patches, lockfiles or input data. Reproducing a result still requires keeping those.
+BFPlot records paths, not source code, patches, lockfiles or input data. Reproducing a result still requires keeping those.

@@ -35,10 +35,10 @@ export class TimelinePlayer {
         if (!timeline)
             return undefined;
         const controls = document.createElement("section");
-        controls.className = "mplot-timeline";
+        controls.className = "bfplot-timeline";
         controls.setAttribute("aria-label", "Animation timeline");
         const play = this.button("Play", "play");
-        play.classList.add("mplot-play");
+        play.classList.add("bfplot-play");
         play.onclick = () => (this.playing ? this.pause() : this.play());
         const previous = this.button("← Frame");
         previous.onclick = () => void this.step(-1);
@@ -46,7 +46,7 @@ export class TimelinePlayer {
         next.onclick = () => void this.step(1);
         const range = document.createElement("input");
         range.type = "range";
-        range.className = "mplot-timeline-range";
+        range.className = "bfplot-timeline-range";
         range.min = "0";
         range.max = String(timeline.duration);
         range.step = "any";
@@ -59,9 +59,9 @@ export class TimelinePlayer {
             void this.seek(requestedTime);
         });
         const output = document.createElement("output");
-        output.className = "mplot-timeline-time";
+        output.className = "bfplot-timeline-time";
         const speed = document.createElement("select");
-        speed.className = "mplot-playback-rate";
+        speed.className = "bfplot-playback-rate";
         speed.setAttribute("aria-label", "Playback speed");
         for (const rate of PLAYBACK_RATES) {
             const option = document.createElement("option");
@@ -93,7 +93,7 @@ export class TimelinePlayer {
     button(label, action) {
         const button = document.createElement("button");
         button.type = "button";
-        button.className = "mplot-button";
+        button.className = "bfplot-button";
         button.textContent = label;
         if (action)
             button.dataset.action = action;
@@ -166,9 +166,9 @@ export class TimelinePlayer {
         const timeline = this.source.timeline;
         if (!timeline || !this.controls)
             return;
-        const play = this.controls.querySelector(".mplot-play");
-        const range = this.controls.querySelector(".mplot-timeline-range");
-        const output = this.controls.querySelector(".mplot-timeline-time");
+        const play = this.controls.querySelector(".bfplot-play");
+        const range = this.controls.querySelector(".bfplot-timeline-range");
+        const output = this.controls.querySelector(".bfplot-timeline-time");
         if (play) {
             play.textContent = this.playing ? "Pause" : "Play";
             play.setAttribute("aria-pressed", String(this.playing));

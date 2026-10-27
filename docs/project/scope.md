@@ -1,6 +1,6 @@
-# What MPlot is (and isn't)
+# What BFPlot is (and isn't)
 
-MPlot saves Matplotlib figures as interactive results: plot structure, numerical arrays and provenance, opened in a local browser viewer. It is built for scripts, the command line and version control.
+BFPlot saves Matplotlib figures as interactive results: plot structure, numerical arrays and provenance, opened in a local browser viewer. It is built for scripts, the command line and version control.
 
 It is **not**:
 
@@ -15,5 +15,5 @@ It is **not**:
 2. Data never disappears silently: unsupported artists and corrupt arrays fail visibly.
 3. Files are inspectable: the manifest is TOML and the document is JSON.
 4. Arrays are compressed and content-addressed.
-5. Results never execute code. Exporters and renderers ship with MPlot.
+5. Results never execute code. Exporters and renderers ship with BFPlot.
 6. Results fit into ordinary software projects and Git.

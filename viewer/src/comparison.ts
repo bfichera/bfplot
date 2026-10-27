@@ -1,4 +1,4 @@
-import type { Artist, Axis, MPlotDocument, ScaleType, Viewport } from "./types.js";
+import type { Artist, Axis, BFPlotDocument, ScaleType, Viewport } from "./types.js";
 
 export interface ComparisonSelectionResult {
   selected: boolean;
@@ -25,7 +25,7 @@ export class LineComparison {
     return this.selectedIds.size > 0;
   }
 
-  toggle(document: MPlotDocument, artistId: string): ComparisonSelectionResult {
+  toggle(document: BFPlotDocument, artistId: string): ComparisonSelectionResult {
     if (this.selectedIds.has(artistId)) {
       this.selectedIds.delete(artistId);
       this.message = this.selectedIds.size
@@ -35,7 +35,7 @@ export class LineComparison {
     }
 
     const artist = document.artists.find((candidate) => candidate.id === artistId);
-    if (!artist || artist.type !== "mplot.line") {
+    if (!artist || artist.type !== "bfplot.line") {
       return { selected: false, message: "Only 2D line artists can be compared." };
     }
 
@@ -61,13 +61,13 @@ export class LineComparison {
     return { selected: true };
   }
 
-  artists(document: MPlotDocument): Artist[] {
+  artists(document: BFPlotDocument): Artist[] {
     return document.artists.filter(
-      (artist) => artist.type === "mplot.line" && this.selectedIds.has(artist.id),
+      (artist) => artist.type === "bfplot.line" && this.selectedIds.has(artist.id),
     );
   }
 
-  sourceAxis(document: MPlotDocument): Axis | undefined {
+  sourceAxis(document: BFPlotDocument): Axis | undefined {
     const artist = this.artists(document)[0];
     return artist
       ? document.axes.find((axis) => axis.id === artist.axes_id)

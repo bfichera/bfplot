@@ -1,24 +1,24 @@
-# Using MPlot with Snakemake
+# Using BFPlot with Snakemake
 
 Each rule output is one result. A result directory must be declared with `directory()`:
 
 ```python title="Snakefile"
 rule plot_fit:
     input: "results/{sample}/fit.npz"
-    output: directory("figures/{sample}/fit.mplot")
+    output: directory("figures/{sample}/fit.bfplot")
     script: "scripts/plot_fit.py"
 ```
 
 ```python title="scripts/plot_fit.py"
-import mplot
+import bfplot
 
 ...
 
-with mplot.result(snakemake.output[0]) as result:
+with bfplot.result(snakemake.output[0]) as result:
     result.add(fig, name="fit")
 ```
 
-For a plain file output, drop `directory()` and pass `layout="file"`. MPlot never guesses the layout from the rule.
+For a plain file output, drop `directory()` and pass `layout="file"`. BFPlot never guesses the layout from the rule.
 
 A failed job writes nothing, and reruns replace the previous result.
 
@@ -26,9 +26,9 @@ A failed job writes nothing, and reruns replace the previous result.
 
 ```python title="Snakefile"
 rule verify_fit:
-    input: "figures/{sample}/fit.mplot"
+    input: "figures/{sample}/fit.bfplot"
     output: touch("checks/{sample}/fit.verified")
-    shell: "mplot verify {input}"
+    shell: "bfplot verify {input}"
 ```
 
 ## Reproducible files

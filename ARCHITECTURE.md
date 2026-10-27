@@ -1,6 +1,6 @@
-# MPlot architecture
+# BFPlot architecture
 
-MPlot turns plots into self-contained, content-addressed results that a browser viewer can open.
+BFPlot turns plots into self-contained, content-addressed results that a browser viewer can open.
 
 ## Pipeline
 
@@ -8,16 +8,16 @@ MPlot turns plots into self-contained, content-addressed results that a browser 
 plotting library -> adapter -> MIR -> writer -> result -> Rust CLI -> viewer
 ```
 
-`mplot.savefig()` is `mplot.translate()` followed by `mplot.compile()`.
+`bfplot.savefig()` is `bfplot.translate()` followed by `bfplot.compile()`.
 
 | Part | Location | Responsibility |
 | --- | --- | --- |
-| Adapter | `src/mplot/adapters/matplotlib.py` | Matplotlib figures to MIR. Knows nothing about hashes, compression or files. |
-| MIR | `src/mplot/mir.py`, `src/mplot/mir.schema.json` | The language-neutral document model and its validator. |
-| Writer | `src/mplot/artifact.py` | Validates MIR, encodes buffers, writes and replaces results. Knows nothing about Matplotlib. |
-| Results | `src/mplot/result.py`, `src/mplot/temporal.py` | `mplot.result()` and animation recording. |
-| Core | `crates/mplot-core` | Reads, validates, verifies, packs and unpacks results. |
-| CLI | `crates/mplot-cli` | `verify`, `pack`, `unpack`, `manifest`, `serve`, `view`. |
+| Adapter | `src/bfplot/adapters/matplotlib.py` | Matplotlib figures to MIR. Knows nothing about hashes, compression or files. |
+| MIR | `src/bfplot/mir.py`, `src/bfplot/mir.schema.json` | The language-neutral document model and its validator. |
+| Writer | `src/bfplot/artifact.py` | Validates MIR, encodes buffers, writes and replaces results. Knows nothing about Matplotlib. |
+| Results | `src/bfplot/result.py`, `src/bfplot/temporal.py` | `bfplot.result()` and animation recording. |
+| Core | `crates/bfplot-core` | Reads, validates, verifies, packs and unpacks results. |
+| CLI | `crates/bfplot-cli` | `verify`, `pack`, `unpack`, `manifest`, `serve`, `view`. |
 | Viewer | `viewer/` | Browser UI and renderers. The built copy in `viewer/dist` is committed. |
 
 ## MIR
@@ -44,12 +44,12 @@ A directory result:
 <path>/objects/sha256/<2 hex>/<digest>
 ```
 
-A packed result (`layout="file"`) is one file: the magic `MPLOT\0\x09\x09`, a u64 manifest length, the manifest, a u64 object count, then for each object its 32-byte SHA-256 digest, a u64 length and its bytes. Integers are little-endian and objects are sorted by digest, so packing is deterministic and both layouts convert losslessly.
+A packed result (`layout="file"`) is one file: the magic `BFPLOT\0\0`, a u64 manifest length, the manifest, a u64 object count, then for each object its 32-byte SHA-256 digest, a u64 length and its bytes. Integers are little-endian and objects are sorted by digest, so packing is deterministic and both layouts convert losslessly.
 
 The manifest is TOML:
 
 ```toml
-format = "mplot"
+format = "bfplot"
 document = "sha256:<hex>"
 
 [provenance]
@@ -58,11 +58,11 @@ created_utc = "2026-01-01T00:00:00Z"
 
 Every object is named by the SHA-256 of its exact bytes. The document object is canonical JSON (sorted keys, compact separators, finite numbers). Arrays are little-endian, C-ordered and zstd-compressed, referenced as `{"object": "sha256:<hex>", "dtype": "f8", "shape": [N], "codec": "zstd"}`.
 
-Writing builds the new result in a hidden sibling and swaps it in only when complete. An existing MPlot result (either layout) or an empty directory at the path is replaced; anything else raises `FileExistsError` before any expensive work starts.
+Writing builds the new result in a hidden sibling and swaps it in only when complete. An existing BFPlot result (either layout) or an empty directory at the path is replaced; anything else raises `FileExistsError` before any expensive work starts.
 
 ## Artists
 
-Every artist has `type`, `id`, `axes_id`, `props` and `data`. Types use the `mplot.*` namespace and are implemented in-tree: line, scatter, image, errorbar, fill_between, histogram, contour, contourf, text, patch, line3d, scatter3d, surface3d and mesh3d. The viewer shows a visible placeholder for anything it cannot draw.
+Every artist has `type`, `id`, `axes_id`, `props` and `data`. Types use the `bfplot.*` namespace and are implemented in-tree: line, scatter, image, errorbar, fill_between, histogram, contour, contourf, text, patch, line3d, scatter3d, surface3d and mesh3d. The viewer shows a visible placeholder for anything it cannot draw.
 
 ## Safety
 

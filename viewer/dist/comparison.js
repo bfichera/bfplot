@@ -19,7 +19,7 @@ export class LineComparison {
             return { selected: false };
         }
         const artist = document.artists.find((candidate) => candidate.id === artistId);
-        if (!artist || artist.type !== "mplot.line") {
+        if (!artist || artist.type !== "bfplot.line") {
             return { selected: false, message: "Only 2D line artists can be compared." };
         }
         const axis = document.axes.find((candidate) => candidate.id === artist.axes_id);
@@ -43,7 +43,7 @@ export class LineComparison {
         return { selected: true };
     }
     artists(document) {
-        return document.artists.filter((artist) => artist.type === "mplot.line" && this.selectedIds.has(artist.id));
+        return document.artists.filter((artist) => artist.type === "bfplot.line" && this.selectedIds.has(artist.id));
     }
     sourceAxis(document) {
         const artist = this.artists(document)[0];

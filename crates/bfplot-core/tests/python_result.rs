@@ -1,6 +1,6 @@
 use std::fs;
 
-use mplot_core::{
+use bfplot_core::{
     Document, ObjectStore, load_artifact, pack_artifact, verify_artifact, verify_packed,
 };
 use tempfile::tempdir;
@@ -10,7 +10,7 @@ const PYTHON_DOCUMENT: &str = include_str!("fixtures/python-document.json");
 #[test]
 fn verifies_python_shaped_result_end_to_end() {
     let directory = tempdir().unwrap();
-    let result = directory.path().join("fit.mplot");
+    let result = directory.path().join("fit.bfplot");
     let store = ObjectStore::for_result_dir(&result);
 
     // Stands in for the zstd bytes written by Python: verification checks identity only.
@@ -35,7 +35,7 @@ fn verifies_python_shaped_result_end_to_end() {
     let document_id = store.put_json(&document).unwrap();
     fs::write(
         result.join("manifest.toml"),
-        format!("format = \"mplot\"\ndocument = \"{document_id}\"\n\n[provenance]\ncreated_utc = \"2026-01-01T00:00:00Z\"\n"),
+        format!("format = \"bfplot\"\ndocument = \"{document_id}\"\n\n[provenance]\ncreated_utc = \"2026-01-01T00:00:00Z\"\n"),
     )
     .unwrap();
 
@@ -46,7 +46,7 @@ fn verifies_python_shaped_result_end_to_end() {
         "2026-01-01T00:00:00Z"
     );
 
-    let packed = directory.path().join("fit.packed.mplot");
+    let packed = directory.path().join("fit.packed.bfplot");
     pack_artifact(&result, &packed).unwrap();
     assert_eq!(verify_packed(&packed).unwrap().object_count, 2);
 }

@@ -72,7 +72,7 @@ pub struct Manifest {
 impl Manifest {
     pub fn new(document: ObjectId) -> Self {
         Self {
-            format: "mplot".into(),
+            format: "bfplot".into(),
             document,
             provenance: BTreeMap::new(),
         }
@@ -162,23 +162,23 @@ const fn default_true() -> bool {
 }
 
 const ARTIST_TYPES: &[&str] = &[
-    "mplot.line",
-    "mplot.scatter",
-    "mplot.image",
-    "mplot.errorbar",
-    "mplot.fill_between",
-    "mplot.histogram",
-    "mplot.contour",
-    "mplot.contourf",
-    "mplot.text",
-    "mplot.patch",
-    "mplot.line3d",
-    "mplot.scatter3d",
-    "mplot.surface3d",
-    "mplot.mesh3d",
+    "bfplot.line",
+    "bfplot.scatter",
+    "bfplot.image",
+    "bfplot.errorbar",
+    "bfplot.fill_between",
+    "bfplot.histogram",
+    "bfplot.contour",
+    "bfplot.contourf",
+    "bfplot.text",
+    "bfplot.patch",
+    "bfplot.line3d",
+    "bfplot.scatter3d",
+    "bfplot.surface3d",
+    "bfplot.mesh3d",
 ];
 
-/// Fields a timeline update may replace, by target kind (mirrors `mplot.mir.ANIMATABLE`).
+/// Fields a timeline update may replace, by target kind (mirrors `bfplot.mir.ANIMATABLE`).
 fn animatable(kind: &str) -> Option<&'static [&'static str]> {
     match kind {
         "figure" => Some(&["title", "size_inches", "dpi", "facecolor"]),
@@ -339,7 +339,7 @@ mod tests {
     fn document(name: Value, artist_axes: &str, x: Value) -> Document {
         serde_json::from_value(json!({
             "figures": [{"id": "figure", "name": name, "axes": [{"id": "axes", "artists": [
-                {"type": "mplot.line", "id": "line", "axes_id": artist_axes, "data": {"x": x}}
+                {"type": "bfplot.line", "id": "line", "axes_id": artist_axes, "data": {"x": x}}
             ]}]}]
         }))
         .unwrap()

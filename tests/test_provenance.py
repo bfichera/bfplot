@@ -4,7 +4,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-from mplot.provenance import processing_metadata
+from bfplot.provenance import processing_metadata
 
 
 def git(directory: Path, *arguments: str) -> str:
@@ -21,8 +21,8 @@ def test_processing_metadata_records_script_repository_commit(tmp_path, monkeypa
     repository = tmp_path / "repository"
     repository.mkdir()
     git(repository, "init")
-    git(repository, "config", "user.email", "mplot@example.test")
-    git(repository, "config", "user.name", "MPlot Test")
+    git(repository, "config", "user.email", "bfplot@example.test")
+    git(repository, "config", "user.name", "BFPlot Test")
     script = repository / "analysis.py"
     script.write_text("print('plot')\n")
     git(repository, "add", "analysis.py")

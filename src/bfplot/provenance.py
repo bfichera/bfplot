@@ -55,11 +55,11 @@ def processing_metadata() -> dict[str, str]:
 def collect_provenance(*, extra: dict[str, Any] | None = None) -> dict[str, Any]:
     """Collect reproducibility metadata without reading source file contents."""
     packages: dict[str, str] = {}
-    for package in ("mplot", "matplotlib", "numpy", "zstandard"):
+    for package in ("bfplot", "matplotlib", "numpy", "zstandard"):
         try:
             packages[package] = version(package)
         except PackageNotFoundError:
-            if package == "mplot":
+            if package == "bfplot":
                 packages[package] = "0.9.9"
     result: dict[str, Any] = {
         **processing_metadata(),

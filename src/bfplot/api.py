@@ -39,7 +39,7 @@ def compile(
     *,
     layout: Layout = "directory",
 ) -> Path:
-    """Compile validated MIR into one content-addressed MPlot result at exactly ``path``."""
+    """Compile validated MIR into one content-addressed BFPlot result at exactly ``path``."""
     if not isinstance(document, MirDocument):
         raise TypeError("document must be a MirDocument")
     output = Path(path)
@@ -56,7 +56,7 @@ def animation(
     provenance: bool | dict[str, Any] = True,
     loop: bool = True,
 ) -> Animation:
-    """Record mutable Matplotlib figures into one temporal MPlot result."""
+    """Record mutable Matplotlib figures into one temporal BFPlot result."""
     output = Path(path)
     layout = prepare_destination(output, layout)
     metadata = provenance_metadata(provenance)
@@ -104,11 +104,11 @@ def savefig(
     layout: Layout = "directory",
     provenance: bool | dict[str, Any] = True,
 ) -> Path:
-    """Save Matplotlib figures as one MPlot result at exactly ``path``.
+    """Save Matplotlib figures as one BFPlot result at exactly ``path``.
 
     The default ``layout="directory"`` writes a self-contained result directory whose
     numerical objects are ignored by Git. ``layout="file"`` writes one packed file. An
-    existing MPlot result at ``path`` is replaced. Passing ``provenance=False`` omits
+    existing BFPlot result at ``path`` is replaced. Passing ``provenance=False`` omits
     environment details but still records creation time and the Git commit.
     """
     output = Result(path, layout=layout, provenance=provenance, _stacklevel=2)
@@ -123,15 +123,15 @@ def show(
     open_browser: bool = True,
     layout: Layout = "directory",
 ) -> Path:
-    """Save a result and open it with ``mplot view`` (a temporary packed file by default)."""
+    """Save a result and open it with ``bfplot view`` (a temporary packed file by default)."""
     if path is None:
-        path = Path(tempfile.mkdtemp(prefix="mplot-show-")) / "figure.mplot"
+        path = Path(tempfile.mkdtemp(prefix="bfplot-show-")) / "figure.bfplot"
         layout = "file"
     output = savefig(path, figure, layout=layout)
     if open_browser:
-        executable = shutil.which("mplot")
+        executable = shutil.which("bfplot")
         if executable is None:
-            raise RuntimeError("the mplot CLI is not installed; use open_browser=False")
+            raise RuntimeError("the bfplot CLI is not installed; use open_browser=False")
         subprocess.Popen([executable, "view", str(output)], start_new_session=True)
     return output
 

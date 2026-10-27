@@ -121,10 +121,10 @@ pub fn verify_artifact(path: &Path) -> Result<VerificationReport> {
 
 pub(crate) fn validate(manifest: &Manifest, document: &Document) -> Result<()> {
     let mut issues = validate_document(document);
-    if manifest.format != "mplot" {
+    if manifest.format != "bfplot" {
         issues.insert(
             0,
-            format!("format: expected \"mplot\", got {:?}", manifest.format),
+            format!("format: expected \"bfplot\", got {:?}", manifest.format),
         );
     }
     if issues.is_empty() {
@@ -173,7 +173,7 @@ mod tests {
 
     #[test]
     fn locates_directory_and_manifest_paths() {
-        let result = Path::new("out/fit.mplot");
+        let result = Path::new("out/fit.bfplot");
         for path in [result.to_path_buf(), result.join("manifest.toml")] {
             let (manifest, store) = locate_artifact(&path);
             assert_eq!(manifest, result.join("manifest.toml"));

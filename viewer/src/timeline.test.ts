@@ -1,14 +1,14 @@
 // @vitest-environment jsdom
 import { describe, expect, it } from "vitest";
 import { applyTimelineUpdate, TimelinePlayer } from "./timeline.js";
-import type { MPlotDocument } from "./types.js";
+import type { BFPlotDocument } from "./types.js";
 
-const animatedDocument = (): MPlotDocument => ({
+const animatedDocument = (): BFPlotDocument => ({
   figures: [{ id: "figure", axes: ["axes"] }],
   axes: [{ id: "axes" }],
   artists: [
     {
-      type: "mplot.line",
+      type: "bfplot.line",
      
       id: "line",
       axes_id: "axes",
@@ -38,14 +38,14 @@ const animatedDocument = (): MPlotDocument => ({
 
 describe("TimelinePlayer", () => {
   it("seeks from the immutable initial document", async () => {
-    const rendered: MPlotDocument[] = [];
+    const rendered: BFPlotDocument[] = [];
     const player = new TimelinePlayer(animatedDocument(), async (document) => {
       rendered.push(document);
     });
     const controls = player.createControls()!;
     document.body.append(controls);
 
-    const range = controls.querySelector<HTMLInputElement>(".mplot-timeline-range")!;
+    const range = controls.querySelector<HTMLInputElement>(".bfplot-timeline-range")!;
     range.value = "0.5";
     range.dispatchEvent(new Event("input"));
     await new Promise((resolve) => setTimeout(resolve, 0));

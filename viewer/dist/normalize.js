@@ -65,7 +65,7 @@ function normalizeAxis(rawValue, figureId) {
 function normalizeArtist(rawValue, axesId) {
     const raw = record(rawValue);
     return {
-        type: text(raw.type, "mplot.unknown"), id: text(raw.id),
+        type: text(raw.type, "bfplot.unknown"), id: text(raw.id),
         axes_id: text(raw.axes_id, axesId), props: normalizeProps(raw.props), data: { ...record(raw.data) },
     };
 }
@@ -130,7 +130,7 @@ export function normalizeArtistData(type, source, resolved) {
         data.x = points.map((point) => point[0]);
         data.y = points.map((point) => point[1]);
     }
-    if (type === "mplot.histogram" && data.left !== undefined) {
+    if (type === "bfplot.histogram" && data.left !== undefined) {
         const left = numbers(data.left), bottom = numbers(data.bottom), width = numbers(data.width), height = numbers(data.height);
         data.rects = left.map((x, index) => [x, bottom[index] ?? 0, width[index] ?? 0, height[index] ?? 0]);
     }

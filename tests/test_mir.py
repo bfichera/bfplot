@@ -4,8 +4,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pytest
 
-import mplot
-from mplot.mir import MirBuilder, MirValidationError
+import bfplot
+from bfplot.mir import MirBuilder, MirValidationError
 
 
 def test_mir_buffers_are_owned_immutable_copies() -> None:
@@ -23,7 +23,7 @@ def test_mir_buffers_are_owned_immutable_copies() -> None:
                             {
                                 "id": "artist-0",
                                 "axes_id": "axes-0",
-                                "type": "mplot.line",
+                                "type": "bfplot.line",
                                 "props": {},
                                 "data": {"x": reference},
                             }
@@ -46,7 +46,7 @@ def test_matplotlib_translation_produces_local_typed_buffers() -> None:
     image = axes.imshow(np.arange(9).reshape(3, 3), cmap="magma")
     figure.colorbar(image, ax=axes, label="intensity")
 
-    mir = mplot.translate(figure, metadata={"created_utc": "2026-01-01T00:00:00Z"})
+    mir = bfplot.translate(figure, metadata={"created_utc": "2026-01-01T00:00:00Z"})
 
     assert mir.metadata["created_utc"] == "2026-01-01T00:00:00Z"
     assert mir.buffers
@@ -60,7 +60,7 @@ def test_matplotlib_translation_produces_local_typed_buffers() -> None:
     colorbar = next(
         axis for axis in mir.document["figures"][0]["axes"] if axis.get("role") == "colorbar"
     )
-    extracted = next(artist for artist in plot["artists"] if artist["type"] == "mplot.image")
+    extracted = next(artist for artist in plot["artists"] if artist["type"] == "bfplot.image")
     assert set(extracted["data"]["values"]) == {"$buffer"}
     assert colorbar["colorbar"]["mappable"] == extracted["id"]
 
@@ -70,7 +70,7 @@ def test_3d_scatter_translation_has_no_orphaned_buffers() -> None:
     axes = figure.add_subplot(projection="3d")
     axes.scatter([0, 1], [1, 2], [2, 3], c=[0, 1])
 
-    mir = mplot.translate(figure)
+    mir = bfplot.translate(figure)
 
     referenced = set()
     for artist in mir.document["figures"][0]["axes"][0]["artists"]:
@@ -93,7 +93,7 @@ def test_mir_validation_rejects_dangling_buffers_and_references() -> None:
                             {
                                 "id": "artist-0",
                                 "axes_id": "wrong-axes",
-                                "type": "mplot.line",
+                                "type": "bfplot.line",
                                 "props": {},
                                 "data": {"x": {"$buffer": "missing"}},
                             }

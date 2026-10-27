@@ -1,4 +1,4 @@
-"""Write a MIR document as one self-contained MPlot result.
+"""Write a MIR document as one self-contained BFPlot result.
 
 A result is either a directory::
 
@@ -29,8 +29,8 @@ from .mir import MirDocument
 from .provenance import processing_metadata
 
 Layout = Literal["directory", "file"]
-PACKED_MAGIC = b"MPLOT\0\x09\x09"
-MANIFEST_PREFIX = b'format = "mplot"'
+PACKED_MAGIC = b"BFPLOT\0\0"
+MANIFEST_PREFIX = b'format = "bfplot"'
 
 
 def canonical_json(value: Any) -> bytes:
@@ -103,7 +103,7 @@ def _toml_table(name: str, table: dict[str, Any], lines: list[str]) -> None:
 
 
 def manifest_bytes(document: str, provenance: dict[str, Any]) -> bytes:
-    lines = ['format = "mplot"', f'document = "{document}"']
+    lines = ['format = "bfplot"', f'document = "{document}"']
     _toml_table("provenance", provenance, lines)
     return ("\n".join(lines) + "\n").encode("utf-8")
 
@@ -120,7 +120,7 @@ def _starts_with(path: Path, prefix: bytes) -> bool:
 
 
 def is_result(path: Path) -> bool:
-    """Whether ``path`` is an MPlot result (or an empty directory) that may be replaced."""
+    """Whether ``path`` is a BFPlot result (or an empty directory) that may be replaced."""
     if path.is_dir() and not path.is_symlink():
         manifest = path / "manifest.toml"
         return _starts_with(manifest, MANIFEST_PREFIX) or not any(path.iterdir())
@@ -129,22 +129,22 @@ def is_result(path: Path) -> bool:
 
 def _check_destination(path: Path) -> None:
     if os.path.lexists(path) and not is_result(path):
-        raise FileExistsError(f"{path} exists and is not an MPlot result; refusing to replace it")
+        raise FileExistsError(f"{path} exists and is not a BFPlot result; refusing to replace it")
 
 
 def prepare_destination(path: Path, layout: Any, *, stacklevel: int = 2) -> Layout:
     """Check an output path and layout before any expensive work is done."""
     if layout not in ("directory", "file"):
         raise ValueError("layout must be one of 'directory', 'file'")
-    if not path.name.endswith(".mplot"):
+    if not path.name.endswith(".bfplot"):
         warnings.warn(
-            f"MPlot output {str(path)!r} does not end in '.mplot'; writing it exactly as given",
+            f"BFPlot output {str(path)!r} does not end in '.bfplot'; writing it exactly as given",
             stacklevel=stacklevel + 1,
         )
     _check_destination(path)
     path.parent.mkdir(parents=True, exist_ok=True)
     if not os.access(path.parent, os.W_OK | os.X_OK):
-        raise PermissionError(f"cannot write MPlot output into {path.parent}")
+        raise PermissionError(f"cannot write BFPlot output into {path.parent}")
     return layout
 
 

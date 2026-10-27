@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { fitLineViewport, LineComparison } from "./comparison.js";
-import type { MPlotDocument } from "./types.js";
+import type { BFPlotDocument } from "./types.js";
 
-const document: MPlotDocument = {
+const document: BFPlotDocument = {
   figures: [{ id: "f1", axes: ["a1"] }, { id: "f2", axes: ["a2", "a3"] }],
   axes: [
     { id: "a1", xscale: "linear", yscale: "linear" },
@@ -10,10 +10,10 @@ const document: MPlotDocument = {
     { id: "a3", xscale: "linear", yscale: "log" },
   ],
   artists: [
-    { type: "mplot.line", id: "one", axes_id: "a1", props: {}, data: {} },
-    { type: "mplot.line", id: "two", axes_id: "a2", props: {}, data: {} },
-    { type: "mplot.line", id: "log", axes_id: "a3", props: {}, data: {} },
-    { type: "mplot.scatter", id: "dots", axes_id: "a1", props: {}, data: {} },
+    { type: "bfplot.line", id: "one", axes_id: "a1", props: {}, data: {} },
+    { type: "bfplot.line", id: "two", axes_id: "a2", props: {}, data: {} },
+    { type: "bfplot.line", id: "log", axes_id: "a3", props: {}, data: {} },
+    { type: "bfplot.scatter", id: "dots", axes_id: "a1", props: {}, data: {} },
   ],
 };
 

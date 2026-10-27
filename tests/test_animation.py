@@ -4,14 +4,14 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pytest
 
-import mplot
+import bfplot
 from helpers import read_result
 
 
 def test_animation_exposes_defensive_initial_mir(tmp_path):
     figure, axes = plt.subplots()
     axes.plot([0, 1], [0, 1])
-    recording = mplot.animation(tmp_path / "initial.mplot", figure, provenance=False)
+    recording = bfplot.animation(tmp_path / "initial.bfplot", figure, provenance=False)
 
     initial = recording.initial_mir
     initial.document["figures"].clear()
@@ -25,8 +25,8 @@ def test_animation_records_semantic_buffer_updates(tmp_path):
     x = np.linspace(0, 1, 5)
     (line,) = axes.plot(x, x)
 
-    with mplot.animation(
-        tmp_path / "wave.mplot", figure, fps=10, layout="file", provenance=False, loop=False
+    with bfplot.animation(
+        tmp_path / "wave.bfplot", figure, fps=10, layout="file", provenance=False, loop=False
     ) as recording:
         line.set_ydata(x**2)
         recording.capture()
@@ -54,7 +54,7 @@ def test_animation_records_semantic_buffer_updates(tmp_path):
 def test_empty_animation_is_valid_and_has_zero_duration(tmp_path):
     figure, axes = plt.subplots()
     axes.plot([0, 1], [0, 1])
-    recording = mplot.animation(tmp_path / "still.mplot", figure, layout="file", provenance=False)
+    recording = bfplot.animation(tmp_path / "still.bfplot", figure, layout="file", provenance=False)
     output = recording.close()
     _, document = read_result(output)
     assert document["timeline"]["duration"] == 0
@@ -64,7 +64,7 @@ def test_empty_animation_is_valid_and_has_zero_duration(tmp_path):
 def test_animation_rejects_structural_changes_and_bad_times(tmp_path):
     figure, axes = plt.subplots()
     (line,) = axes.plot([0, 1], [0, 1])
-    recording = mplot.animation(tmp_path / "invalid.mplot", figure, fps=2)
+    recording = bfplot.animation(tmp_path / "invalid.bfplot", figure, fps=2)
     line.set_ydata([1, 0])
     recording.capture(time=0.5)
     with pytest.raises(ValueError, match="strictly increasing"):
@@ -77,8 +77,8 @@ def test_animation_rejects_structural_changes_and_bad_times(tmp_path):
 def test_animation_records_property_and_axes_updates(tmp_path):
     figure, axes = plt.subplots()
     (line,) = axes.plot([0, 1], [0, 1], color="red")
-    recording = mplot.animation(
-        tmp_path / "properties.mplot", figure, fps=2, layout="file", provenance=False
+    recording = bfplot.animation(
+        tmp_path / "properties.bfplot", figure, fps=2, layout="file", provenance=False
     )
     line.set_color("blue")
     axes.set_title("Updated")
@@ -104,8 +104,8 @@ def test_save_animation_convenience_api(tmp_path):
     x = np.linspace(0, 1, 4)
     (line,) = axes.plot(x, x)
 
-    output = mplot.save_animation(
-        tmp_path / "convenience.mplot",
+    output = bfplot.save_animation(
+        tmp_path / "convenience.bfplot",
         figure,
         [2, 3],
         lambda power: line.set_ydata(x**power),

@@ -6,19 +6,19 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pytest
 
-import mplot
+import bfplot
+from bfplot.mir import MirBuilder
 from helpers import read_array, read_result
-from mplot.mir import MirBuilder
 
 
 def test_compile_resolves_all_mir_buffers_and_preserves_metadata(tmp_path) -> None:
     figure, axes = plt.subplots()
     axes.plot([0, 1], [2, 3])
-    mir = mplot.translate(
+    mir = bfplot.translate(
         figure, metadata={"created_utc": "2026-01-01T00:00:00Z", "producer": "test"}
     )
 
-    output = mplot.compile(mir, tmp_path / "compiled.mplot")
+    output = bfplot.compile(mir, tmp_path / "compiled.bfplot")
     manifest, document = read_result(output)
 
     assert manifest["provenance"] == {
@@ -34,10 +34,10 @@ def test_compile_resolves_all_mir_buffers_and_preserves_metadata(tmp_path) -> No
 def test_compile_adds_missing_baseline_git_metadata(tmp_path) -> None:
     figure, axes = plt.subplots()
     axes.plot([0, 1], [2, 3])
-    mir = mplot.translate(figure)
+    mir = bfplot.translate(figure)
     del mir.metadata["git_commit"]
 
-    output = mplot.compile(mir, tmp_path / "compiled.mplot")
+    output = bfplot.compile(mir, tmp_path / "compiled.bfplot")
     manifest, _ = read_result(output)
 
     assert len(manifest["provenance"]["git_commit"]) == 40
@@ -52,8 +52,8 @@ def test_explicit_translate_compile_matches_savefig_artifact_document(
     scatter = axes.scatter(x, x**2, c=x, cmap="viridis")
     figure.colorbar(scatter, ax=axes, label="value")
 
-    explicit = mplot.compile(mplot.translate(figure), tmp_path / "explicit.mplot")
-    composed = mplot.savefig(tmp_path / "composed.mplot", figure, provenance=False)
+    explicit = bfplot.compile(bfplot.translate(figure), tmp_path / "explicit.bfplot")
+    composed = bfplot.savefig(tmp_path / "composed.bfplot", figure, provenance=False)
     explicit_manifest, explicit_document = read_result(explicit)
     composed_manifest, composed_document = read_result(composed)
 
@@ -66,11 +66,11 @@ def test_compile_stores_arrays_little_endian_and_rejects_non_numeric_buffers(tmp
     builder = MirBuilder(metadata={"created_utc": "2026-01-01T00:00:00Z"})
     original = np.arange(12, dtype=">f8").reshape(3, 4)
     data = {"values": builder.buffer(original)}
-    artist = {"id": "artist-0", "axes_id": "axes-0", "type": "mplot.image", "props": {}}
+    artist = {"id": "artist-0", "axes_id": "axes-0", "type": "bfplot.image", "props": {}}
     axes = {"id": "axes-0", "artists": [{**artist, "data": data}]}
     mir = builder.build({"figures": [{"id": "figure-0", "axes": [axes]}]})
 
-    output = mplot.compile(mir, tmp_path / "array.mplot")
+    output = bfplot.compile(mir, tmp_path / "array.bfplot")
     _, document = read_result(output)
     reference = document["figures"][0]["axes"][0]["artists"][0]["data"]["values"]
 

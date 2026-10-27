@@ -15,14 +15,14 @@ use axum::{
     response::{IntoResponse, Response},
     routing::get,
 };
-use clap::{Parser, Subcommand};
-use mplot_core::{
+use bfplot_core::{
     Document, Manifest, ObjectStore, load_artifact, locate_artifact, pack_artifact,
     read_packed_manifest, unpack_artifact, verify_artifact, verify_packed,
 };
+use clap::{Parser, Subcommand};
 
 #[derive(Parser)]
-#[command(version, about = "Verify, pack, unpack and view MPlot results")]
+#[command(version, about = "Verify, pack, unpack and view BFPlot results")]
 struct Cli {
     #[command(subcommand)]
     command: Command,
@@ -41,7 +41,7 @@ enum Command {
     Verify { artifact: PathBuf },
     /// Print the manifest TOML exactly as stored.
     ///
-    /// Suitable as a Git textconv: `git config diff.mplot.textconv "mplot manifest"`.
+    /// Suitable as a Git textconv: `git config diff.bfplot.textconv "bfplot manifest"`.
     Manifest { artifact: PathBuf },
     /// Serve a result over HTTP (loopback by default).
     Serve {
@@ -133,7 +133,7 @@ fn manifest_bytes(path: &Path) -> anyhow::Result<Vec<u8>> {
 fn is_packed(path: &Path) -> bool {
     let mut magic = [0; 8];
     fs::File::open(path).is_ok_and(|mut file| file.read_exact(&mut magic).is_ok())
-        && &magic == b"MPLOT\0\x09\x09"
+        && &magic == b"BFPLOT\0\0"
 }
 
 #[derive(Clone)]
@@ -166,7 +166,7 @@ async fn serve(
     let viewer_dir = discover_viewer_dir(viewer_dir);
     if viewer_dir.is_none() {
         eprintln!(
-            "warning: viewer assets not found; set --viewer-dir or MPLOT_VIEWER_DIR (the JSON endpoints still work)"
+            "warning: viewer assets not found; set --viewer-dir or BFPLOT_VIEWER_DIR (the JSON endpoints still work)"
         );
     }
     let state = ServeState {
@@ -199,7 +199,7 @@ fn prepare_serve_artifact(path: &Path) -> anyhow::Result<ServeArtifact> {
     let mut path = path.to_path_buf();
     if is_packed(&path) {
         let directory = tempfile::tempdir().context("create a directory to unpack into")?;
-        let result = directory.path().join("result.mplot");
+        let result = directory.path().join("result.bfplot");
         unpack_artifact(&path, &result)?;
         unpacked = Some(Arc::new(directory));
         path = result;
@@ -219,7 +219,7 @@ fn prepare_serve_artifact(path: &Path) -> anyhow::Result<ServeArtifact> {
 async fn index(State(state): State<ServeState>) -> Response {
     let Some(viewer_dir) = state.viewer_dir else {
         return bytes_response(
-            b"<!doctype html><title>MPlot</title><h1>MPlot result</h1><p>Viewer assets are unavailable.</p><ul><li><a href='/manifest'>manifest</a></li><li><a href='/document'>document</a></li></ul>".to_vec(),
+            b"<!doctype html><title>BFPlot</title><h1>BFPlot result</h1><p>Viewer assets are unavailable.</p><ul><li><a href='/manifest'>manifest</a></li><li><a href='/document'>document</a></li></ul>".to_vec(),
             "text/html; charset=utf-8",
         );
     };
@@ -230,7 +230,7 @@ async fn index(State(state): State<ServeState>) -> Response {
         );
     }
     bytes_response(
-        br#"<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>MPlot</title><link rel="stylesheet" href="/viewer/style.css"></head><body><div id="mplot"></div><script type="module">import {createViewer} from '/viewer/index.js'; const document=await fetch('/document').then(r=>r.json()); createViewer('#mplot',document);</script></body></html>"#.to_vec(),
+        br#"<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>BFPlot</title><link rel="stylesheet" href="/viewer/style.css"></head><body><div id="bfplot"></div><script type="module">import {createViewer} from '/viewer/index.js'; const document=await fetch('/document').then(r=>r.json()); createViewer('#bfplot',document);</script></body></html>"#.to_vec(),
         "text/html; charset=utf-8",
     )
 }
@@ -250,7 +250,7 @@ async fn object(State(state): State<ServeState>, AxumPath(digest): AxumPath<Stri
     };
     match state.objects.get(&id) {
         Ok(bytes) => bytes_response(bytes, "application/octet-stream"),
-        Err(mplot_core::Error::ObjectNotFound(_)) => StatusCode::NOT_FOUND.into_response(),
+        Err(bfplot_core::Error::ObjectNotFound(_)) => StatusCode::NOT_FOUND.into_response(),
         Err(_) => StatusCode::UNPROCESSABLE_ENTITY.into_response(),
     }
 }
@@ -304,7 +304,7 @@ fn open_default_browser(url: &str) -> anyhow::Result<()> {
 
 fn discover_viewer_dir(explicit: Option<PathBuf>) -> Option<PathBuf> {
     explicit
-        .or_else(|| std::env::var_os("MPLOT_VIEWER_DIR").map(PathBuf::from))
+        .or_else(|| std::env::var_os("BFPLOT_VIEWER_DIR").map(PathBuf::from))
         .or_else(|| {
             let local = PathBuf::from("viewer/dist");
             viewer_entry_exists(&local).then_some(local)
@@ -415,12 +415,12 @@ fn bytes_response(bytes: Vec<u8>, content_type: &'static str) -> Response {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use bfplot_core::ObjectId;
     use clap::Parser;
-    use mplot_core::ObjectId;
 
     #[test]
     fn serve_defaults_to_loopback() {
-        let cli = Cli::try_parse_from(["mplot", "serve", "plot.mplot"]).unwrap();
+        let cli = Cli::try_parse_from(["bfplot", "serve", "plot.bfplot"]).unwrap();
         let Command::Serve { bind, port, .. } = cli.command else {
             panic!("expected serve command");
         };
@@ -431,7 +431,7 @@ mod tests {
     #[test]
     fn flattens_python_document_for_viewer() {
         let document: Document = serde_json::from_str(include_str!(
-            "../../mplot-core/tests/fixtures/python-document.json"
+            "../../bfplot-core/tests/fixtures/python-document.json"
         ))
         .unwrap();
         let mut manifest = Manifest::new(ObjectId::of(b"document"));
@@ -459,10 +459,10 @@ mod tests {
     #[test]
     fn prepares_directory_and_packed_results_for_the_server() {
         let directory = tempfile::tempdir().unwrap();
-        let result = directory.path().join("fit.mplot");
+        let result = directory.path().join("fit.bfplot");
         let store = ObjectStore::for_result_dir(&result);
         let mut document = Document::default();
-        document.figures.push(mplot_core::Figure {
+        document.figures.push(bfplot_core::Figure {
             id: "figure".into(),
             axes: Vec::new(),
             metadata: [("name".to_string(), serde_json::json!("spectrum"))].into(),
@@ -492,12 +492,12 @@ mod tests {
     #[test]
     fn all_required_commands_parse() {
         for arguments in [
-            vec!["mplot", "pack", "in.mplot", "out-file.mplot"],
-            vec!["mplot", "unpack", "in.mplot", "restored.mplot"],
-            vec!["mplot", "manifest", "in.mplot"],
-            vec!["mplot", "verify", "in.mplot"],
-            vec!["mplot", "view", "in.mplot"],
-            vec!["mplot", "serve", "in.mplot", "--port", "9000"],
+            vec!["bfplot", "pack", "in.bfplot", "out-file.bfplot"],
+            vec!["bfplot", "unpack", "in.bfplot", "restored.bfplot"],
+            vec!["bfplot", "manifest", "in.bfplot"],
+            vec!["bfplot", "verify", "in.bfplot"],
+            vec!["bfplot", "view", "in.bfplot"],
+            vec!["bfplot", "serve", "in.bfplot", "--port", "9000"],
         ] {
             assert!(Cli::try_parse_from(arguments).is_ok());
         }

@@ -53,10 +53,10 @@ class Metadata(dict[str, Any]):
 
 
 class Result:
-    """One MPlot output: named figures, at most one animation, and shared metadata.
+    """One BFPlot output: named figures, at most one animation, and shared metadata.
 
     Figures are captured when they are added. Nothing is written until the result
-    closes, and a result whose ``with`` block raises writes nothing. An existing MPlot
+    closes, and a result whose ``with`` block raises writes nothing. An existing BFPlot
     result at the same path is replaced; any other existing file or directory is
     reported when the result is created, before the script does expensive work.
     """

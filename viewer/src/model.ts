@@ -1,5 +1,5 @@
 import { isArrayReference, normalizeArtistData } from "./normalize.js";
-import type { ArrayResolver, Axis, Artist, MPlotDocument, ResolvedData, Viewport } from "./types.js";
+import type { ArrayResolver, Axis, Artist, BFPlotDocument, ResolvedData, Viewport } from "./types.js";
 const cloneViewport = (value: Viewport): Viewport => ({ x: [...value.x], y: [...value.y], ...(value.z ? { z: [...value.z] } : {}) } as Viewport);
 const numbers = (value: unknown): number[] => Array.isArray(value) || ArrayBuffer.isView(value) ? Array.from(value as ArrayLike<unknown>, Number).filter(Number.isFinite) : [];
 const pointValues = (value: unknown, dimension: 0 | 1 | 2): number[] => {
@@ -29,7 +29,7 @@ function dataValues(data: ResolvedData, dimension: "x" | "y" | "z"): number[] {
 }
 
 export class ViewerModel extends EventTarget {
-  document: MPlotDocument;
+  document: BFPlotDocument;
   readonly viewports = new Map<string, Viewport>();
   private resolver: ArrayResolver | undefined;
   private readonly dataCache = new Map<string, Promise<unknown>>();
@@ -37,14 +37,14 @@ export class ViewerModel extends EventTarget {
   private readonly resolutionQueue: Array<() => void> = [];
   private readonly resolutionLimit = 6;
 
-  constructor(document: MPlotDocument, resolver?: ArrayResolver) {
+  constructor(document: BFPlotDocument, resolver?: ArrayResolver) {
     super();
     this.document = document;
     this.resolver = resolver;
     this.resetViewports();
   }
 
-  setDocument(document: MPlotDocument): void {
+  setDocument(document: BFPlotDocument): void {
     this.document = document;
     const valid = new Set(document.axes.map((axis) => axis.id));
     for (const key of this.viewports.keys()) if (!valid.has(key)) this.viewports.delete(key);

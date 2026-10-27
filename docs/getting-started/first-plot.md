@@ -1,11 +1,11 @@
-# Your first MPlot
+# Your first BFPlot
 
 ## Save a figure
 
 ```python title="analysis.py"
 import matplotlib.pyplot as plt
 import numpy as np
-import mplot
+import bfplot
 
 x = np.linspace(0, 2 * np.pi, 2_000)
 y = np.sin(x)
@@ -16,30 +16,30 @@ ax.fill_between(x, y - 0.1, y + 0.1, alpha=0.2, label="uncertainty")
 ax.set(xlabel="time (s)", ylabel="voltage (V)", title="Sine wave")
 ax.legend()
 
-output = mplot.savefig("results/sine_wave.mplot", fig)
+output = bfplot.savefig("results/sine_wave.bfplot", fig)
 print(f"Saved {output}")
 ```
 
 ```console
 $ python analysis.py
-Saved results/sine_wave.mplot
+Saved results/sine_wave.bfplot
 ```
 
 ## Open it
 
 ```console
-$ mplot view results/sine_wave.mplot
+$ bfplot view results/sine_wave.bfplot
 ```
 
 This starts a local server, bound to your own machine, and opens the viewer in your browser.
 
 ## Add context
 
-MPlot records [provenance](../guides/provenance.md) automatically. Add the details only you know:
+BFPlot records [provenance](../guides/provenance.md) automatically. Add the details only you know:
 
 ```python
-mplot.savefig(
-    "results/sine_wave.mplot",
+bfplot.savefig(
+    "results/sine_wave.bfplot",
     fig,
     provenance={"sample": "crystal-17", "temperature_kelvin": 83.5},
 )
@@ -49,18 +49,18 @@ mplot.savefig(
 
 ## Which figures are saved?
 
-Pass the figure explicitly. Without one, MPlot saves every open figure as one result:
+Pass the figure explicitly. Without one, BFPlot saves every open figure as one result:
 
 ```python
-mplot.savefig("all_my_figures.mplot")
+bfplot.savefig("all_my_figures.bfplot")
 ```
 
-To save several figures with names, use [`mplot.result()`](../reference/python-api.md#mplotresult).
+To save several figures with names, use [`bfplot.result()`](../reference/python-api.md#bfplotresult).
 
 ## One file instead of a directory
 
 ```python
-mplot.savefig("sine_wave.mplot", fig, layout="file")
+bfplot.savefig("sine_wave.bfplot", fig, layout="file")
 ```
 
 See [Choosing a file type](../guides/file-types.md).

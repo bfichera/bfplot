@@ -1,14 +1,14 @@
-import type { ArrayResolver, Axis, Artist, MPlotDocument, ResolvedData, Viewport } from "./types.js";
+import type { ArrayResolver, Axis, Artist, BFPlotDocument, ResolvedData, Viewport } from "./types.js";
 export declare class ViewerModel extends EventTarget {
-    document: MPlotDocument;
+    document: BFPlotDocument;
     readonly viewports: Map<string, Viewport>;
     private resolver;
     private readonly dataCache;
     private activeResolutions;
     private readonly resolutionQueue;
     private readonly resolutionLimit;
-    constructor(document: MPlotDocument, resolver?: ArrayResolver);
-    setDocument(document: MPlotDocument): void;
+    constructor(document: BFPlotDocument, resolver?: ArrayResolver);
+    setDocument(document: BFPlotDocument): void;
     setResolver(resolver?: ArrayResolver): void;
     resetViewports(clear?: boolean): void;
     fitViewports(clear?: boolean, axisIds?: Iterable<string>): Promise<void>;

@@ -7,20 +7,20 @@ from helpers import read_result
 
 EXAMPLES = Path(__file__).parent.parent / "examples"
 SUPPORTED = {
-    "mplot.contour",
-    "mplot.contourf",
-    "mplot.errorbar",
-    "mplot.fill_between",
-    "mplot.histogram",
-    "mplot.image",
-    "mplot.line",
-    "mplot.line3d",
-    "mplot.mesh3d",
-    "mplot.patch",
-    "mplot.scatter",
-    "mplot.scatter3d",
-    "mplot.surface3d",
-    "mplot.text",
+    "bfplot.contour",
+    "bfplot.contourf",
+    "bfplot.errorbar",
+    "bfplot.fill_between",
+    "bfplot.histogram",
+    "bfplot.image",
+    "bfplot.line",
+    "bfplot.line3d",
+    "bfplot.mesh3d",
+    "bfplot.patch",
+    "bfplot.scatter",
+    "bfplot.scatter3d",
+    "bfplot.surface3d",
+    "bfplot.text",
 }
 
 
@@ -34,8 +34,8 @@ def load_example(name: str):
 def test_gallery_covers_every_supported_artist_in_both_layouts(tmp_path):
     gallery = load_example("gallery")
 
-    directory = gallery.write_gallery(tmp_path / "gallery.mplot")
-    packed = gallery.write_gallery(tmp_path / "packed.mplot", packed=True)
+    directory = gallery.write_gallery(tmp_path / "gallery.bfplot")
+    packed = gallery.write_gallery(tmp_path / "packed.bfplot", packed=True)
 
     assert directory.is_dir() and packed.is_file()
     manifest, document = read_result(directory)

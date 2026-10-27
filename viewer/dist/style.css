@@ -23,27 +23,27 @@
 }
 
 :host,
-.mplot-viewer {
-  --mplot-bg: #ffffff;
-  --mplot-panel: #ffffff;
-  --mplot-fg: #181713;
-  --mplot-muted: #68655d;
-  --mplot-grid: #dddcd7;
-  --mplot-accent: #7b191c;
+.bfplot-viewer {
+  --bfplot-bg: #ffffff;
+  --bfplot-panel: #ffffff;
+  --bfplot-fg: #181713;
+  --bfplot-muted: #68655d;
+  --bfplot-grid: #dddcd7;
+  --bfplot-accent: #7b191c;
   display: block;
   box-sizing: border-box;
   min-height: 100dvh;
   overflow-x: clip;
-  color: var(--mplot-fg);
-  background: var(--mplot-bg);
+  color: var(--bfplot-fg);
+  background: var(--bfplot-bg);
   font-family: "CMU Serif", "Latin Modern Roman", "Computer Modern", serif;
   font-variant-numeric: lining-nums tabular-nums;
   -webkit-font-smoothing: antialiased;
 }
 
-.mplot-viewer * { box-sizing: border-box; }
+.bfplot-viewer * { box-sizing: border-box; }
 
-.mplot-shell {
+.bfplot-shell {
   display: grid;
   grid-template-columns: 224px minmax(0, 1fr);
   min-height: 100dvh;
@@ -51,7 +51,7 @@
   margin: 0 auto;
 }
 
-.mplot-header {
+.bfplot-header {
   position: sticky;
   top: 0;
   z-index: 20;
@@ -66,7 +66,7 @@
   background: #fff;
 }
 
-.mplot-title {
+.bfplot-title {
   padding-bottom: 20px;
   border-bottom: 1px solid #27251f;
   font-size: 21px;
@@ -75,7 +75,7 @@
   letter-spacing: .005em;
 }
 
-.mplot-toolbar {
+.bfplot-toolbar {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 4px 8px;
@@ -85,37 +85,37 @@
   border-top: 1px solid #deddd7;
 }
 
-.mplot-button,
-.mplot-page-step {
+.bfplot-button,
+.bfplot-page-step {
   appearance: none;
   border: 0;
   border-radius: 0;
   background: transparent;
-  color: var(--mplot-muted);
+  color: var(--bfplot-muted);
   cursor: pointer;
   font: 400 12px/1.25 "CMU Serif", serif;
   text-align: left;
 }
 
-.mplot-button { padding: 5px 2px; }
-.mplot-button:disabled { cursor: default; opacity: .45; }
-.mplot-button:hover:not(:disabled), .mplot-page-step:hover:not(:disabled) { color: var(--mplot-accent); }
-.mplot-button[aria-pressed=true] { color: var(--mplot-accent); font-weight: 700; }
-.mplot-button[aria-pressed=true]::before { content: "· "; }
-.mplot-button:focus-visible, .mplot-page-button:focus-visible, .mplot-page-step:focus-visible, .mplot-export-scope:focus-visible { outline: 1px solid var(--mplot-accent); outline-offset: 2px; }
+.bfplot-button { padding: 5px 2px; }
+.bfplot-button:disabled { cursor: default; opacity: .45; }
+.bfplot-button:hover:not(:disabled), .bfplot-page-step:hover:not(:disabled) { color: var(--bfplot-accent); }
+.bfplot-button[aria-pressed=true] { color: var(--bfplot-accent); font-weight: 700; }
+.bfplot-button[aria-pressed=true]::before { content: "· "; }
+.bfplot-button:focus-visible, .bfplot-page-button:focus-visible, .bfplot-page-step:focus-visible, .bfplot-export-scope:focus-visible { outline: 1px solid var(--bfplot-accent); outline-offset: 2px; }
 
-.mplot-comparison-status {
+.bfplot-comparison-status {
   display: none;
   grid-column: 1 / -1;
   min-height: 26px;
-  color: var(--mplot-muted);
+  color: var(--bfplot-muted);
   font: italic 10px/1.3 "CMU Serif", serif;
 }
-.mplot-open-comparison { display: none; grid-column: 1 / -1; }
-.mplot-compare-mode .mplot-comparison-status,
-.mplot-compare-mode .mplot-open-comparison { display: block; }
+.bfplot-open-comparison { display: none; grid-column: 1 / -1; }
+.bfplot-compare-mode .bfplot-comparison-status,
+.bfplot-compare-mode .bfplot-open-comparison { display: block; }
 
-.mplot-export-scope {
+.bfplot-export-scope {
   grid-column: 1 / -1;
   width: 100%;
   margin: 5px 0 2px;
@@ -123,12 +123,12 @@
   border-bottom: 1px solid #aaa79e;
   border-radius: 0;
   background: transparent;
-  color: var(--mplot-muted);
+  color: var(--bfplot-muted);
   padding: 5px 0;
   font: 400 11px "CMU Serif", serif;
 }
 
-.mplot-timeline {
+.bfplot-timeline {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 5px 8px;
@@ -136,12 +136,12 @@
   padding-top: 14px;
   border-top: 1px solid #deddd7;
 }
-.mplot-timeline-range { grid-column: 1 / -1; width: 100%; accent-color: var(--mplot-accent); }
-.mplot-timeline-time { color: var(--mplot-muted); font-size: 10px; font-style: italic; }
-.mplot-playback-rate { border: 0; border-bottom: 1px solid #aaa79e; background: transparent; color: var(--mplot-muted); font: 10px "CMU Serif", serif; }
-.mplot-header:has(.mplot-timeline) .mplot-toolbar { margin-top: 0; }
+.bfplot-timeline-range { grid-column: 1 / -1; width: 100%; accent-color: var(--bfplot-accent); }
+.bfplot-timeline-time { color: var(--bfplot-muted); font-size: 10px; font-style: italic; }
+.bfplot-playback-rate { border: 0; border-bottom: 1px solid #aaa79e; background: transparent; color: var(--bfplot-muted); font: 10px "CMU Serif", serif; }
+.bfplot-header:has(.bfplot-timeline) .bfplot-toolbar { margin-top: 0; }
 
-.mplot-navigator {
+.bfplot-navigator {
   display: flex;
   min-height: 0;
   flex-direction: column;
@@ -149,15 +149,15 @@
   order: 2;
 }
 
-.mplot-navigator-label {
-  color: var(--mplot-muted);
+.bfplot-navigator-label {
+  color: var(--bfplot-muted);
   font-size: 10px;
   letter-spacing: .16em;
   text-transform: uppercase;
 }
 
-.mplot-page-list { display: grid; gap: 1px; }
-.mplot-page-button {
+.bfplot-page-list { display: grid; gap: 1px; }
+.bfplot-page-button {
   appearance: none;
   display: grid;
   grid-template-columns: 24px minmax(0, 1fr);
@@ -167,28 +167,28 @@
   border-left: 1px solid transparent;
   border-radius: 0;
   background: transparent;
-  color: var(--mplot-muted);
+  color: var(--bfplot-muted);
   cursor: pointer;
   padding: 6px 0 6px 10px;
   font: 400 12px/1.15 "CMU Serif", serif;
   text-align: left;
 }
-.mplot-page-number { color: #99958c; font-size: 10px; letter-spacing: .04em; }
-.mplot-page-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.mplot-page-button:hover { color: var(--mplot-accent); }
-.mplot-page-button[aria-current=page] { border-left-color: var(--mplot-accent); color: var(--mplot-fg); font-weight: 700; }
-.mplot-page-button[aria-current=page] .mplot-page-number { color: var(--mplot-accent); }
-.mplot-page-steps { display: flex; justify-content: space-between; padding: 8px 0 0 10px; }
-.mplot-page-step { padding: 3px 0; font-size: 10px; }
-.mplot-page-step:disabled { visibility: hidden; }
+.bfplot-page-number { color: #99958c; font-size: 10px; letter-spacing: .04em; }
+.bfplot-page-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bfplot-page-button:hover { color: var(--bfplot-accent); }
+.bfplot-page-button[aria-current=page] { border-left-color: var(--bfplot-accent); color: var(--bfplot-fg); font-weight: 700; }
+.bfplot-page-button[aria-current=page] .bfplot-page-number { color: var(--bfplot-accent); }
+.bfplot-page-steps { display: flex; justify-content: space-between; padding: 8px 0 0 10px; }
+.bfplot-page-step { padding: 3px 0; font-size: 10px; }
+.bfplot-page-step:disabled { visibility: hidden; }
 
-.mplot-figures {
+.bfplot-figures {
   min-width: 0;
   padding: 46px clamp(30px, 5vw, 88px) 70px;
   background: #fff;
 }
 
-.mplot-figure {
+.bfplot-figure {
   position: relative;
   overflow: visible;
   width: min(100%, 1320px);
@@ -196,7 +196,7 @@
   background: transparent;
 }
 
-.mplot-figure-header {
+.bfplot-figure-header {
   position: relative;
   display: flex;
   align-items: baseline;
@@ -207,7 +207,7 @@
   border-bottom: 1px solid #27251f;
 }
 
-.mplot-figure-title {
+.bfplot-figure-title {
   margin: 0;
   font-size: 18px;
   font-weight: 500;
@@ -215,104 +215,104 @@
   text-align: center;
 }
 
-.mplot-figure-count { position: absolute; right: 0; color: var(--mplot-muted); font-size: 10px; font-style: italic; }
-.mplot-figure-canvas { position: relative; width: 100%; aspect-ratio: var(--mplot-figure-ratio, 1.333); min-height: 320px; }
+.bfplot-figure-count { position: absolute; right: 0; color: var(--bfplot-muted); font-size: 10px; font-style: italic; }
+.bfplot-figure-canvas { position: relative; width: 100%; aspect-ratio: var(--bfplot-figure-ratio, 1.333); min-height: 320px; }
 
-.mplot-axis { position: absolute; min-width: 0; min-height: 0; padding: 0; border: 0; touch-action: none; }
-.mplot-comparison-close { position: absolute; right: 0; }
-.mplot-comparison-page[hidden] { display: none; }
-.mplot-comparison-axis { position: absolute; }
-.mplot-compare-mode .mplot-hit { pointer-events: none; }
-.mplot-comparable-line { pointer-events: none; }
-.mplot-compare-mode .mplot-comparable-line { cursor: pointer; pointer-events: all; }
-.mplot-line-hit { pointer-events: none; }
-.mplot-compare-mode .mplot-line-hit { pointer-events: stroke; }
-.mplot-comparable-line:focus-visible { outline: none; }
-.mplot-compare-mode .mplot-comparable-line:hover path:not(.mplot-line-hit),
-.mplot-comparable-line:focus-visible path:not(.mplot-line-hit) { filter: drop-shadow(0 0 2px var(--mplot-accent)); }
-.mplot-comparable-line.mplot-line-selected path:not(.mplot-line-hit) {
-  filter: drop-shadow(0 0 2px var(--mplot-accent));
-  stroke-width: calc(var(--mplot-selected-width, 1px) + 2px);
+.bfplot-axis { position: absolute; min-width: 0; min-height: 0; padding: 0; border: 0; touch-action: none; }
+.bfplot-comparison-close { position: absolute; right: 0; }
+.bfplot-comparison-page[hidden] { display: none; }
+.bfplot-comparison-axis { position: absolute; }
+.bfplot-compare-mode .bfplot-hit { pointer-events: none; }
+.bfplot-comparable-line { pointer-events: none; }
+.bfplot-compare-mode .bfplot-comparable-line { cursor: pointer; pointer-events: all; }
+.bfplot-line-hit { pointer-events: none; }
+.bfplot-compare-mode .bfplot-line-hit { pointer-events: stroke; }
+.bfplot-comparable-line:focus-visible { outline: none; }
+.bfplot-compare-mode .bfplot-comparable-line:hover path:not(.bfplot-line-hit),
+.bfplot-comparable-line:focus-visible path:not(.bfplot-line-hit) { filter: drop-shadow(0 0 2px var(--bfplot-accent)); }
+.bfplot-comparable-line.bfplot-line-selected path:not(.bfplot-line-hit) {
+  filter: drop-shadow(0 0 2px var(--bfplot-accent));
+  stroke-width: calc(var(--bfplot-selected-width, 1px) + 2px);
 }
-.mplot-axis--inset { z-index: 2; overflow: hidden; background: #fff; }
-.mplot-axis--pending { display: grid; place-items: center; background: #fafaf8; }
-.mplot-axis-placeholder { color: var(--mplot-muted); font-size: 12px; font-style: italic; }
+.bfplot-axis--inset { z-index: 2; overflow: hidden; background: #fff; }
+.bfplot-axis--pending { display: grid; place-items: center; background: #fafaf8; }
+.bfplot-axis-placeholder { color: var(--bfplot-muted); font-size: 12px; font-style: italic; }
 
-.mplot-colorbar { position: absolute; display: grid; color: var(--mplot-fg); font: 15px "CMU Serif", serif; }
-.mplot-colorbar[tabindex] { outline: none; }
-.mplot-colorbar[tabindex]:focus-visible .mplot-colorbar-gradient { outline: 1px solid var(--mplot-accent); outline-offset: 2px; }
-.mplot-colorbar--vertical { grid-template-columns: minmax(8px, 1fr) auto auto; gap: 5px; }
-.mplot-colorbar--horizontal { grid-template-rows: minmax(8px, 1fr) auto auto; gap: 4px; }
-.mplot-colorbar-gradient { position: relative; min-width: 8px; min-height: 8px; border: .75px solid #25241f; touch-action: none; }
-.mplot-colorbar-brush { position: absolute; z-index: 2; inset-inline: 0; border: 1px dashed var(--mplot-accent); background: color-mix(in srgb, var(--mplot-accent) 18%, transparent); pointer-events: none; }
-.mplot-colorbar--horizontal .mplot-colorbar-brush { inset-block: 0; inset-inline: auto; }
-.mplot-colorbar-ticks { position: relative; min-width: 54px; min-height: 100%; }
-.mplot-colorbar--horizontal .mplot-colorbar-ticks { min-width: 100%; min-height: 16px; }
-.mplot-colorbar-tick { position: absolute; white-space: nowrap; }
-.mplot-colorbar--vertical .mplot-colorbar-tick { left: 0; bottom: var(--mplot-colorbar-position); transform: translateY(50%); }
-.mplot-colorbar--horizontal .mplot-colorbar-tick { top: 0; left: var(--mplot-colorbar-position); transform: translateX(-50%); }
-.mplot-colorbar-label { align-self: center; white-space: nowrap; font-style: italic; }
-.mplot-colorbar--vertical .mplot-colorbar-label { writing-mode: vertical-rl; transform: rotate(180deg); }
+.bfplot-colorbar { position: absolute; display: grid; color: var(--bfplot-fg); font: 15px "CMU Serif", serif; }
+.bfplot-colorbar[tabindex] { outline: none; }
+.bfplot-colorbar[tabindex]:focus-visible .bfplot-colorbar-gradient { outline: 1px solid var(--bfplot-accent); outline-offset: 2px; }
+.bfplot-colorbar--vertical { grid-template-columns: minmax(8px, 1fr) auto auto; gap: 5px; }
+.bfplot-colorbar--horizontal { grid-template-rows: minmax(8px, 1fr) auto auto; gap: 4px; }
+.bfplot-colorbar-gradient { position: relative; min-width: 8px; min-height: 8px; border: .75px solid #25241f; touch-action: none; }
+.bfplot-colorbar-brush { position: absolute; z-index: 2; inset-inline: 0; border: 1px dashed var(--bfplot-accent); background: color-mix(in srgb, var(--bfplot-accent) 18%, transparent); pointer-events: none; }
+.bfplot-colorbar--horizontal .bfplot-colorbar-brush { inset-block: 0; inset-inline: auto; }
+.bfplot-colorbar-ticks { position: relative; min-width: 54px; min-height: 100%; }
+.bfplot-colorbar--horizontal .bfplot-colorbar-ticks { min-width: 100%; min-height: 16px; }
+.bfplot-colorbar-tick { position: absolute; white-space: nowrap; }
+.bfplot-colorbar--vertical .bfplot-colorbar-tick { left: 0; bottom: var(--bfplot-colorbar-position); transform: translateY(50%); }
+.bfplot-colorbar--horizontal .bfplot-colorbar-tick { top: 0; left: var(--bfplot-colorbar-position); transform: translateX(-50%); }
+.bfplot-colorbar-label { align-self: center; white-space: nowrap; font-style: italic; }
+.bfplot-colorbar--vertical .bfplot-colorbar-label { writing-mode: vertical-rl; transform: rotate(180deg); }
 
-.mplot-axis svg { display: block; width: 100%; height: 100%; min-height: 0; overflow: visible; user-select: none; shape-rendering: geometricPrecision; text-rendering: geometricPrecision; font-family: "CMU Serif", serif; }
-.mplot-grid-line { stroke: var(--mplot-grid); stroke-width: .65; stroke-dasharray: none; vector-effect: non-scaling-stroke; }
-.mplot-axis-frame { stroke: var(--mplot-fg); stroke-width: .8; vector-effect: non-scaling-stroke; }
-.mplot-tick, .mplot-label, .mplot-axis-title { fill: var(--mplot-fg); font-size: 15px; }
-.mplot-label { font-style: italic; }
-.mplot-axis-title { font-weight: 700; }
-.mplot-hit { fill: transparent; cursor: crosshair; }
-.mplot-3d-view .mplot-hit { cursor: grab; }
-.mplot-3d-view .mplot-hit:active { cursor: grabbing; }
-.mplot-math { overflow: visible; color: var(--mplot-fg); }
+.bfplot-axis svg { display: block; width: 100%; height: 100%; min-height: 0; overflow: visible; user-select: none; shape-rendering: geometricPrecision; text-rendering: geometricPrecision; font-family: "CMU Serif", serif; }
+.bfplot-grid-line { stroke: var(--bfplot-grid); stroke-width: .65; stroke-dasharray: none; vector-effect: non-scaling-stroke; }
+.bfplot-axis-frame { stroke: var(--bfplot-fg); stroke-width: .8; vector-effect: non-scaling-stroke; }
+.bfplot-tick, .bfplot-label, .bfplot-axis-title { fill: var(--bfplot-fg); font-size: 15px; }
+.bfplot-label { font-style: italic; }
+.bfplot-axis-title { font-weight: 700; }
+.bfplot-hit { fill: transparent; cursor: crosshair; }
+.bfplot-3d-view .bfplot-hit { cursor: grab; }
+.bfplot-3d-view .bfplot-hit:active { cursor: grabbing; }
+.bfplot-math { overflow: visible; color: var(--bfplot-fg); }
 /* A 34px line box puts the baseline about 24px down, where an SVG <text> at the same y would sit. */
-.mplot-math-content { display: block; height: 100%; font: 15px/34px "CMU Serif", serif; white-space: pre; }
-.mplot-math-content--middle { text-align: center; }
-.mplot-math-content--end { text-align: right; }
-.mplot-math math { font-family: "CMU Serif", serif; font-size: 1em; }
+.bfplot-math-content { display: block; height: 100%; font: 15px/34px "CMU Serif", serif; white-space: pre; }
+.bfplot-math-content--middle { text-align: center; }
+.bfplot-math-content--end { text-align: right; }
+.bfplot-math math { font-family: "CMU Serif", serif; font-size: 1em; }
 
-.mplot-tooltip { position: absolute; z-index: 4; padding: 5px 7px; border: 1px solid #aaa79e; border-radius: 0; background: #fffffff2; box-shadow: 0 3px 12px #0001; font: 11px "CMU Serif", serif; white-space: nowrap; pointer-events: none; transform: translate(8px, -100%); }
-.mplot-coordinates { position: absolute; left: 22px; bottom: 9px; z-index: 3; min-width: 160px; color: var(--mplot-muted); font: 10px "CMU Serif", serif; font-style: italic; pointer-events: none; }
-.mplot-brush { fill: color-mix(in srgb, var(--mplot-accent) 8%, transparent); stroke: var(--mplot-accent); stroke-width: 1; stroke-dasharray: 4 3; vector-effect: non-scaling-stroke; }
-.mplot-unknown { stroke: var(--mplot-muted); fill: #fafaf8; }
-.mplot-unknown text { fill: var(--mplot-muted); font-size: 12px; }
-.mplot-status { position: absolute; right: 14px; bottom: 9px; color: var(--mplot-muted); font: 10px "CMU Serif", serif; pointer-events: none; }
-.mplot-error { padding: 24px; color: #8b1d21; }
-.mplot-metadata-page { width: min(100%, 1100px); margin: 0 auto; color: var(--mplot-fg); }
-.mplot-metadata-page[hidden] { display: none; }
-.mplot-metadata-body { padding: 10px clamp(8px, 3vw, 44px) 50px; font: 15px/1.5 "CMU Serif", serif; }
-.mplot-metadata-section { margin: 0 0 28px; }
-.mplot-metadata-section .mplot-metadata-section { margin: 22px 0 0; padding-top: 16px; border-top: 1px solid #deddd7; }
-.mplot-metadata-section h3, .mplot-metadata-section h4 { margin: 0 0 10px; font-weight: 700; }
-.mplot-metadata-section h3 { font-size: 17px; }
-.mplot-metadata-section h4 { font-size: 15px; text-transform: capitalize; }
-.mplot-metadata-page dl { display: grid; grid-template-columns: minmax(130px, .65fr) minmax(0, 1.8fr); gap: 7px 24px; margin: 0; }
-.mplot-metadata-page dt { color: var(--mplot-muted); overflow-wrap: anywhere; }
-.mplot-metadata-page dd { margin: 0; overflow-wrap: anywhere; }
-.mplot-point { transition: opacity .12s; }
-.mplot-hidden { display: none !important; }
+.bfplot-tooltip { position: absolute; z-index: 4; padding: 5px 7px; border: 1px solid #aaa79e; border-radius: 0; background: #fffffff2; box-shadow: 0 3px 12px #0001; font: 11px "CMU Serif", serif; white-space: nowrap; pointer-events: none; transform: translate(8px, -100%); }
+.bfplot-coordinates { position: absolute; left: 22px; bottom: 9px; z-index: 3; min-width: 160px; color: var(--bfplot-muted); font: 10px "CMU Serif", serif; font-style: italic; pointer-events: none; }
+.bfplot-brush { fill: color-mix(in srgb, var(--bfplot-accent) 8%, transparent); stroke: var(--bfplot-accent); stroke-width: 1; stroke-dasharray: 4 3; vector-effect: non-scaling-stroke; }
+.bfplot-unknown { stroke: var(--bfplot-muted); fill: #fafaf8; }
+.bfplot-unknown text { fill: var(--bfplot-muted); font-size: 12px; }
+.bfplot-status { position: absolute; right: 14px; bottom: 9px; color: var(--bfplot-muted); font: 10px "CMU Serif", serif; pointer-events: none; }
+.bfplot-error { padding: 24px; color: #8b1d21; }
+.bfplot-metadata-page { width: min(100%, 1100px); margin: 0 auto; color: var(--bfplot-fg); }
+.bfplot-metadata-page[hidden] { display: none; }
+.bfplot-metadata-body { padding: 10px clamp(8px, 3vw, 44px) 50px; font: 15px/1.5 "CMU Serif", serif; }
+.bfplot-metadata-section { margin: 0 0 28px; }
+.bfplot-metadata-section .bfplot-metadata-section { margin: 22px 0 0; padding-top: 16px; border-top: 1px solid #deddd7; }
+.bfplot-metadata-section h3, .bfplot-metadata-section h4 { margin: 0 0 10px; font-weight: 700; }
+.bfplot-metadata-section h3 { font-size: 17px; }
+.bfplot-metadata-section h4 { font-size: 15px; text-transform: capitalize; }
+.bfplot-metadata-page dl { display: grid; grid-template-columns: minmax(130px, .65fr) minmax(0, 1.8fr); gap: 7px 24px; margin: 0; }
+.bfplot-metadata-page dt { color: var(--bfplot-muted); overflow-wrap: anywhere; }
+.bfplot-metadata-page dd { margin: 0; overflow-wrap: anywhere; }
+.bfplot-point { transition: opacity .12s; }
+.bfplot-hidden { display: none !important; }
 
 @media (max-width: 820px) {
-  .mplot-shell { display: block; }
-  .mplot-header { position: sticky; height: auto; padding: 15px 18px 12px; border-right: 0; border-bottom: 1px solid #deddd7; gap: 12px; }
-  .mplot-title { padding-bottom: 10px; font-size: 18px; }
-  .mplot-navigator { overflow: hidden; }
-  .mplot-navigator-label, .mplot-page-name, .mplot-page-steps { display: none; }
-  .mplot-page-list { display: flex; overflow-x: auto; gap: 12px; }
-  .mplot-page-button { display: block; width: auto; flex: none; border-left: 0; border-bottom: 1px solid transparent; padding: 4px 1px; }
-  .mplot-page-button[aria-current=page] { border-bottom-color: var(--mplot-accent); }
-  .mplot-toolbar { display: flex; order: 3; margin-top: 0; padding-top: 9px; overflow-x: auto; border-top: 1px solid #deddd7; }
-  .mplot-button { flex: none; }
-  .mplot-export-scope { width: auto; min-width: 112px; margin: 0 8px; }
-  .mplot-figures { padding: 28px 14px 40px; }
-  .mplot-figure-header { margin: 0 8px 14px; }
-  .mplot-figure-canvas { min-height: 280px; }
+  .bfplot-shell { display: block; }
+  .bfplot-header { position: sticky; height: auto; padding: 15px 18px 12px; border-right: 0; border-bottom: 1px solid #deddd7; gap: 12px; }
+  .bfplot-title { padding-bottom: 10px; font-size: 18px; }
+  .bfplot-navigator { overflow: hidden; }
+  .bfplot-navigator-label, .bfplot-page-name, .bfplot-page-steps { display: none; }
+  .bfplot-page-list { display: flex; overflow-x: auto; gap: 12px; }
+  .bfplot-page-button { display: block; width: auto; flex: none; border-left: 0; border-bottom: 1px solid transparent; padding: 4px 1px; }
+  .bfplot-page-button[aria-current=page] { border-bottom-color: var(--bfplot-accent); }
+  .bfplot-toolbar { display: flex; order: 3; margin-top: 0; padding-top: 9px; overflow-x: auto; border-top: 1px solid #deddd7; }
+  .bfplot-button { flex: none; }
+  .bfplot-export-scope { width: auto; min-width: 112px; margin: 0 8px; }
+  .bfplot-figures { padding: 28px 14px 40px; }
+  .bfplot-figure-header { margin: 0 8px 14px; }
+  .bfplot-figure-canvas { min-height: 280px; }
 }
 
 @media print {
-  .mplot-header, .mplot-toolbar, .mplot-status, .mplot-navigator { display: none; }
-  .mplot-shell { display: block; }
-  .mplot-figures { padding: 0; }
-  .mplot-figure { break-inside: avoid; }
-  .mplot-figure[hidden] { display: block; }
+  .bfplot-header, .bfplot-toolbar, .bfplot-status, .bfplot-navigator { display: none; }
+  .bfplot-shell { display: block; }
+  .bfplot-figures { padding: 0; }
+  .bfplot-figure { break-inside: avoid; }
+  .bfplot-figure[hidden] { display: block; }
 }
-.mplot-3d-pane { fill: #f2f2f0; stroke: var(--mplot-grid); stroke-width: .65; vector-effect: non-scaling-stroke; }
+.bfplot-3d-pane { fill: #f2f2f0; stroke: var(--bfplot-grid); stroke-width: .65; vector-effect: non-scaling-stroke; }

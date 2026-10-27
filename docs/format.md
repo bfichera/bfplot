@@ -1,17 +1,17 @@
 # File format
 
-You do not need this page to use MPlot. It explains what MPlot writes to disk. The [architecture page](project/architecture.md) is the precise reference.
+You do not need this page to use BFPlot. It explains what BFPlot writes to disk. The [architecture page](project/architecture.md) is the precise reference.
 
 ## A result
 
 ```python
-mplot.savefig("experiment.mplot", fig)
+bfplot.savefig("experiment.bfplot", fig)
 ```
 
 creates one result directory:
 
 ```text
-experiment.mplot/
+experiment.bfplot/
 ├── manifest.toml
 ├── .gitignore                ← "/objects/"
 └── objects/sha256/ab/abcdef…
@@ -22,7 +22,7 @@ Every object is named by the SHA-256 hash of its bytes. Objects belong to this r
 ## The manifest
 
 ```toml
-format = "mplot"
+format = "bfplot"
 document = "sha256:0123456789abcdef…"
 
 [provenance]
@@ -41,7 +41,7 @@ Every artist has:
 
 | Field | Meaning |
 | --- | --- |
-| `type` | The kind of artist, such as `mplot.line`. |
+| `type` | The kind of artist, such as `bfplot.line`. |
 | `id` | Its identifier in the document. |
 | `axes_id` | The axes it belongs to. |
 | `props` | Colors, line widths, labels and other styling. |
@@ -59,10 +59,10 @@ That means: fetch the object, check its hash, decompress it with Zstandard and r
 
 ## Hashes
 
-`mplot verify` checks the manifest, the document and the hash of every object:
+`bfplot verify` checks the manifest, the document and the hash of every object:
 
 ```console
-$ mplot verify experiment.mplot
+$ bfplot verify experiment.bfplot
 verified 12 objects (22907 bytes)
 ```
 
@@ -71,18 +71,18 @@ A hash proves the bytes have not changed. It does not prove who made them; use a
 ## Packed files
 
 ```python
-mplot.savefig("experiment.mplot", fig, layout="file")
+bfplot.savefig("experiment.bfplot", fig, layout="file")
 ```
 
 writes the same manifest and objects into one file. Packing does not change any object or hash, and with `SOURCE_DATE_EPOCH` set the file is byte-for-byte reproducible.
 
 ```console
-$ mplot pack experiment.mplot shared/experiment.mplot
-$ mplot unpack shared/experiment.mplot restored/experiment.mplot
+$ bfplot pack experiment.bfplot shared/experiment.bfplot
+$ bfplot unpack shared/experiment.bfplot restored/experiment.bfplot
 ```
 
 ## Safety
 
 Results contain data, never code, and cannot load extra renderers. Treat files from strangers as untrusted input anyway; see the [security policy](project/security.md).
 
-MPlot is pre-1.0, so the format may still change before 1.0.
+BFPlot is pre-1.0, so the format may still change before 1.0.

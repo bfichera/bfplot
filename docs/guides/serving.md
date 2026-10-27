@@ -1,15 +1,15 @@
 # Serving plots
 
 ```console
-$ mplot view result.mplot
+$ bfplot view result.bfplot
 ```
 
-starts a local server and opens the viewer in your browser. `mplot serve` does the same without opening a browser. Both accept a result directory or a packed file.
+starts a local server and opens the viewer in your browser. `bfplot serve` does the same without opening a browser. Both accept a result directory or a packed file.
 
 The server listens on `127.0.0.1:8080`. Use `--port` to pick another port:
 
 ```console
-$ mplot serve result.mplot --port 9000
+$ bfplot serve result.bfplot --port 9000
 ```
 
 ## Viewer assets
@@ -17,8 +17,8 @@ $ mplot serve result.mplot --port 9000
 Outside the repository, tell the CLI where the built viewer is:
 
 ```console
-$ mplot view result.mplot --viewer-dir /path/to/mplot/viewer/dist
-$ export MPLOT_VIEWER_DIR=/path/to/mplot/viewer/dist
+$ bfplot view result.bfplot --viewer-dir /path/to/bfplot/viewer/dist
+$ export BFPLOT_VIEWER_DIR=/path/to/bfplot/viewer/dist
 ```
 
 ## Remote access
@@ -26,7 +26,7 @@ $ export MPLOT_VIEWER_DIR=/path/to/mplot/viewer/dist
 Binding to another address is an explicit choice:
 
 ```console
-$ mplot serve result.mplot --bind 0.0.0.0
+$ bfplot serve result.bfplot --bind 0.0.0.0
 ```
 
 !!! danger

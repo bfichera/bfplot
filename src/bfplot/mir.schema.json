@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://mplot.dev/schema/mir.schema.json",
-  "title": "MPlot Intermediate Representation",
+  "$id": "https://bfplot.dev/schema/mir.schema.json",
+  "title": "BFPlot Intermediate Representation",
   "type": "object",
   "required": ["metadata", "document", "buffers"],
   "additionalProperties": false,

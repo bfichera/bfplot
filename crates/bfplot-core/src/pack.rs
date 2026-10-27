@@ -18,8 +18,8 @@ use crate::{
     verify_artifact,
 };
 
-const MAGIC: &[u8; 8] = b"MPLOT\0\x09\x09";
-const MANIFEST_PREFIX: &[u8] = b"format = \"mplot\"";
+const MAGIC: &[u8; 8] = b"BFPLOT\0\0";
+const MANIFEST_PREFIX: &[u8] = b"format = \"bfplot\"";
 type Objects = BTreeMap<ObjectId, Vec<u8>>;
 
 /// Pack a result directory into one file at `output`.
@@ -54,7 +54,7 @@ pub fn pack_artifact(source: &Path, output: &Path) -> Result<VerificationReport>
 
 /// Unpack a packed file into a result directory at `destination`.
 ///
-/// An existing MPlot result at `destination` is replaced; anything else is left untouched.
+/// An existing BFPlot result at `destination` is replaced; anything else is left untouched.
 pub fn unpack_artifact(packed: &Path, destination: &Path) -> Result<VerificationReport> {
     let (manifest, objects) = read_pack(packed)?;
     parse_manifest(&manifest)?;
@@ -185,7 +185,7 @@ fn install(staging: &Path, destination: &Path) -> Result<()> {
     Ok(())
 }
 
-/// Only nothing, an empty directory or an existing MPlot result may be replaced.
+/// Only nothing, an empty directory or an existing BFPlot result may be replaced.
 fn ensure_replaceable(destination: &Path) -> Result<()> {
     let metadata = match fs::symlink_metadata(destination) {
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(()),
@@ -205,7 +205,7 @@ fn ensure_replaceable(destination: &Path) -> Result<()> {
         destination,
         std::io::Error::new(
             std::io::ErrorKind::AlreadyExists,
-            "destination exists and is not an MPlot result",
+            "destination exists and is not a BFPlot result",
         ),
     ))
 }
@@ -261,7 +261,7 @@ mod tests {
     #[test]
     fn pack_round_trip_is_deterministic() {
         let dir = tempdir().unwrap();
-        let source = dir.path().join("fit.mplot");
+        let source = dir.path().join("fit.bfplot");
         let manifest = write_result(&source);
         let packed = dir.path().join("fit.packed");
         pack_artifact(&source, &packed).unwrap();
@@ -271,7 +271,7 @@ mod tests {
         assert_eq!(read_packed_manifest(&packed).unwrap(), manifest);
         assert_eq!(verify_packed(&packed).unwrap().object_count, 1);
 
-        let restored = dir.path().join("restored/fit.mplot");
+        let restored = dir.path().join("restored/fit.bfplot");
         unpack_artifact(&packed, &restored).unwrap();
         assert_eq!(fs::read(restored.join("manifest.toml")).unwrap(), manifest);
         assert_eq!(
@@ -289,7 +289,7 @@ mod tests {
     #[test]
     fn rejects_corrupt_packs() {
         let dir = tempdir().unwrap();
-        let source = dir.path().join("fit.mplot");
+        let source = dir.path().join("fit.bfplot");
         write_result(&source);
         let packed = dir.path().join("fit.packed");
         pack_artifact(&source, &packed).unwrap();
@@ -311,22 +311,22 @@ mod tests {
     #[test]
     fn unpack_replaces_existing_results() {
         let dir = tempdir().unwrap();
-        let source = dir.path().join("fit.mplot");
+        let source = dir.path().join("fit.bfplot");
         write_result(&source);
         let packed = dir.path().join("fit.packed");
         pack_artifact(&source, &packed).unwrap();
-        let destination = dir.path().join("restored.mplot");
+        let destination = dir.path().join("restored.bfplot");
         fs::create_dir(&destination).unwrap();
         fs::write(
             destination.join("manifest.toml"),
-            "format = \"mplot\"\nstale = true\n",
+            "format = \"bfplot\"\nstale = true\n",
         )
         .unwrap();
         fs::write(destination.join("stale.bin"), b"old").unwrap();
         unpack_artifact(&packed, &destination).unwrap();
         assert!(!destination.join("stale.bin").exists());
         unpack_artifact(&packed, &destination).unwrap();
-        let was_packed = dir.path().join("was-packed.mplot");
+        let was_packed = dir.path().join("was-packed.bfplot");
         fs::copy(&packed, &was_packed).unwrap();
         unpack_artifact(&packed, &was_packed).unwrap();
         assert!(was_packed.is_dir());
@@ -336,7 +336,7 @@ mod tests {
     #[test]
     fn refuses_to_replace_other_files() {
         let dir = tempdir().unwrap();
-        let source = dir.path().join("fit.mplot");
+        let source = dir.path().join("fit.bfplot");
         write_result(&source);
         let packed = dir.path().join("fit.packed");
         pack_artifact(&source, &packed).unwrap();
@@ -354,7 +354,7 @@ mod tests {
         assert_eq!(fs::read(&file).unwrap(), b"plain");
         assert_eq!(fs::read_dir(dir.path()).unwrap().count(), 4);
 
-        let empty = dir.path().join("empty.mplot");
+        let empty = dir.path().join("empty.bfplot");
         fs::create_dir(&empty).unwrap();
         pack_artifact(&source, &empty).unwrap();
         assert!(empty.is_file());

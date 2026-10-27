@@ -1,17 +1,17 @@
 # Example gallery
 
-`examples/gallery.py` in the repository builds seven Matplotlib figures that cover everything MPlot can save, and writes them as one result. Use it to see what the viewer can do, or as a starting point for your own scripts.
+`examples/gallery.py` in the repository builds seven Matplotlib figures that cover everything BFPlot can save, and writes them as one result. Use it to see what the viewer can do, or as a starting point for your own scripts.
 
 ```console
 $ python examples/gallery.py
-Wrote gallery.mplot. Open it with: mplot view gallery.mplot
-$ mplot view gallery.mplot
+Wrote gallery.bfplot. Open it with: bfplot view gallery.bfplot
+$ bfplot view gallery.bfplot
 ```
 
 Pass a path to write somewhere else, and `--packed` for a [single packed file](file-types.md) instead of a directory:
 
 ```console
-$ python examples/gallery.py shared/gallery.mplot --packed
+$ python examples/gallery.py shared/gallery.bfplot --packed
 ```
 
 ## What's in it
@@ -34,7 +34,7 @@ Each figure is built by its own function, from one seeded random generator, so t
 
 `write_gallery()` shows the main parts of the Python API in one place:
 
-- [`mplot.result()`](../reference/python-api.md) collects every figure into one output, and adds `example` and `seed` to the [provenance](provenance.md).
+- [`bfplot.result()`](../reference/python-api.md) collects every figure into one output, and adds `example` and `seed` to the [provenance](provenance.md).
 - `result.animation()` records the first two figures as an animation. Each `capture()` saves the figures as they are at that moment.
 - `result.add()` adds the other five figures as static plots.
 

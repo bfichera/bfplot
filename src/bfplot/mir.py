@@ -1,7 +1,7 @@
-"""MPlot Intermediate Representation: semantic plot records plus typed buffers.
+"""BFPlot Intermediate Representation: semantic plot records plus typed buffers.
 
-MIR is the boundary between plotting-library adapters and the MPlot writer. Any
-producer that builds a valid ``MirDocument`` can be compiled into an MPlot result.
+MIR is the boundary between plotting-library adapters and the BFPlot writer. Any
+producer that builds a valid ``MirDocument`` can be compiled into a BFPlot result.
 """
 
 from __future__ import annotations

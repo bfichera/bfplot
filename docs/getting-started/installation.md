@@ -1,21 +1,21 @@
 # Installation
 
-MPlot 0.9.9 is installed from a source checkout. You need Python 3.10+, a Rust toolchain and a modern browser.
+BFPlot 0.9.9 is installed from a source checkout. You need Python 3.10+, a Rust toolchain and a modern browser.
 
 ```console
-$ git clone https://github.com/mplot-dev/mplot.git
-$ cd mplot
+$ git clone https://github.com/bfplot-dev/bfplot.git
+$ cd bfplot
 $ python -m pip install -e .
-$ cargo install --path crates/mplot-cli
+$ cargo install --path crates/bfplot-cli
 ```
 
 Check both parts:
 
 ```console
-$ python -c "import mplot; print(mplot.__version__)"
+$ python -c "import bfplot; print(bfplot.__version__)"
 0.9.9
-$ mplot --version
-mplot-cli 0.9.9
+$ bfplot --version
+bfplot-cli 0.9.9
 ```
 
 ## The viewer
@@ -23,10 +23,10 @@ mplot-cli 0.9.9
 The built viewer is in `viewer/dist`, and the CLI finds it when run from the repository. Elsewhere, point it there:
 
 ```console
-$ mplot view my_plot.mplot --viewer-dir /path/to/mplot/viewer/dist
-$ export MPLOT_VIEWER_DIR=/path/to/mplot/viewer/dist
+$ bfplot view my_plot.bfplot --viewer-dir /path/to/bfplot/viewer/dist
+$ export BFPLOT_VIEWER_DIR=/path/to/bfplot/viewer/dist
 ```
 
-## Working on MPlot
+## Working on BFPlot
 
 See [How to contribute](../project/contributing.md).

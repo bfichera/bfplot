@@ -1,5 +1,5 @@
 import { ViewerModel } from "./model.js";
-import type { ArrayResolver, MPlotDocument, Theme, ThemeName } from "./types.js";
+import type { ArrayResolver, BFPlotDocument, Theme, ThemeName } from "./types.js";
 export interface ViewerOptions {
     theme?: ThemeName | Partial<Theme>;
     arrayResolver?: ArrayResolver;
@@ -7,7 +7,7 @@ export interface ViewerOptions {
     toolbar?: boolean;
 }
 export type ExportScope = "axis" | "figure" | "artifact";
-export declare class MPlotViewer extends EventTarget {
+export declare class BFPlotViewer extends EventTarget {
     readonly element: HTMLElement;
     readonly model: ViewerModel;
     private options;
@@ -35,8 +35,8 @@ export declare class MPlotViewer extends EventTarget {
     private compareMode;
     private comparisonElement;
     private readonly timeline;
-    constructor(target: HTMLElement, document: MPlotDocument, options?: ViewerOptions);
-    update(document: MPlotDocument): void;
+    constructor(target: HTMLElement, document: BFPlotDocument, options?: ViewerOptions);
+    update(document: BFPlotDocument): void;
     setTheme(theme: ThemeName | Partial<Theme>): void;
     reset(axisId?: string): void;
     destroy(): void;

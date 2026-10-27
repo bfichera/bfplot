@@ -77,7 +77,7 @@ export interface Timeline {
   frames: TimelineFrame[];
 }
 
-export interface MPlotDocument {
+export interface BFPlotDocument {
   title?: string;
   figures: Figure[];
   axes: Axis[];

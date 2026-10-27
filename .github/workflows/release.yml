@@ -37,7 +37,7 @@ jobs:
         run: ./scripts/release.sh "${GITHUB_REF_NAME#v}"
       - uses: actions/upload-artifact@v4
         with:
-          name: mplot-${{ github.ref_name }}
+          name: bfplot-${{ github.ref_name }}
           path: release-dist/*
           if-no-files-found: error
           retention-days: 14

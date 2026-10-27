@@ -1,11 +1,11 @@
-"""MPlot example gallery.
+"""BFPlot example gallery.
 
-Builds seven Matplotlib figures that cover what MPlot can save, and writes them
+Builds seven Matplotlib figures that cover what BFPlot can save, and writes them
 as one result: the first two figures are animated, the other five are static.
 
-    python examples/gallery.py                    # writes gallery.mplot/
-    python examples/gallery.py out.mplot --packed  # one packed file instead
-    mplot view gallery.mplot
+    python examples/gallery.py                    # writes gallery.bfplot/
+    python examples/gallery.py out.bfplot --packed  # one packed file instead
+    bfplot view gallery.bfplot
 
 The output is deterministic: the data come from a fixed seed, and with
 SOURCE_DATE_EPOCH set the provenance timestamp is fixed too.
@@ -25,7 +25,7 @@ import matplotlib.pyplot as plt  # noqa: E402
 import numpy as np  # noqa: E402
 from matplotlib.patches import Circle, Polygon, Rectangle  # noqa: E402
 
-import mplot  # noqa: E402
+import bfplot  # noqa: E402
 
 SEED = 20261026
 NAMES = [
@@ -314,7 +314,7 @@ def write_gallery(path: str | Path, *, packed: bool = False) -> Path:
         image = figures[1].axes[0].images[0]
         initial = np.asarray(image.get_array()).copy()
 
-        with mplot.result(path, layout="file" if packed else "directory") as result:
+        with bfplot.result(path, layout="file" if packed else "directory") as result:
             result.metadata.update(example="gallery", seed=SEED)
             # The sine wave travels and the raster image scrolls sideways.
             with result.animation(figures[:2], name=NAMES[:2], fps=4) as recording:
@@ -332,12 +332,12 @@ def write_gallery(path: str | Path, *, packed: bool = False) -> Path:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Write the MPlot example gallery.")
-    parser.add_argument("output", nargs="?", default="gallery.mplot", help="default: %(default)s")
+    parser = argparse.ArgumentParser(description="Write the BFPlot example gallery.")
+    parser.add_argument("output", nargs="?", default="gallery.bfplot", help="default: %(default)s")
     parser.add_argument("--packed", action="store_true", help="write one packed file")
     args = parser.parse_args()
     output = write_gallery(args.output, packed=args.packed)
-    print(f"Wrote {output}. Open it with: mplot view {output}")
+    print(f"Wrote {output}. Open it with: bfplot view {output}")
 
 
 if __name__ == "__main__":

@@ -1,5 +1,5 @@
-import type { MPlotDocument, TimelineUpdate } from "./types.js";
-type DocumentRenderer = (document: MPlotDocument) => Promise<void>;
+import type { BFPlotDocument, TimelineUpdate } from "./types.js";
+type DocumentRenderer = (document: BFPlotDocument) => Promise<void>;
 /**
  * Owns deterministic timeline replay and its controls.
  *
@@ -17,9 +17,9 @@ export declare class TimelinePlayer {
     private playbackOrigin;
     private animationFrame;
     private controls;
-    constructor(document: MPlotDocument, renderDocument: DocumentRenderer);
+    constructor(document: BFPlotDocument, renderDocument: DocumentRenderer);
     get available(): boolean;
-    setDocument(document: MPlotDocument): void;
+    setDocument(document: BFPlotDocument): void;
     createControls(): HTMLElement | undefined;
     pause(): void;
     private button;
@@ -28,5 +28,5 @@ export declare class TimelinePlayer {
     private step;
     private refreshControls;
 }
-export declare function applyTimelineUpdate(document: MPlotDocument, update: TimelineUpdate): void;
+export declare function applyTimelineUpdate(document: BFPlotDocument, update: TimelineUpdate): void;
 export {};
