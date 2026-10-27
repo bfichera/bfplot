@@ -58,6 +58,7 @@ function normalizeAxis(rawValue, figureId) {
             ...(source.view && typeof source.view === "object" ? { view: source.view } : {}),
             xaxis: { ticks: list(source.xticks ?? x.ticks).map(Number), ticklabels: list(source.xticklabels ?? x.ticklabels).map(String), provided: Object.keys(x).length > 0 || source.xticks !== undefined, date_epoch: text(source.xdate_epoch ?? x.date_epoch), date_format: text(source.xdate_format ?? x.date_format) },
             yaxis: { ticks: list(source.yticks ?? y.ticks).map(Number), ticklabels: list(source.yticklabels ?? y.ticklabels).map(String), provided: Object.keys(y).length > 0 || source.yticks !== undefined, date_epoch: text(source.ydate_epoch ?? y.date_epoch), date_format: text(source.ydate_format ?? y.date_format) },
+            ...(projection === "3d" ? { zaxis: { ticks: list(source.zticks ?? z.ticks).map(Number), ticklabels: list(source.zticklabels ?? z.ticklabels).map(String), provided: Object.keys(z).length > 0 || source.zticks !== undefined } } : {}),
         },
     };
 }

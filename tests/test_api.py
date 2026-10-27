@@ -163,6 +163,38 @@ def test_savefig_preserves_true_3d_surface_and_wire_geometry(tmp_path):
     assert len(read_array(output, wire["data"]["path_lengths"])) > 1
 
 
+def test_surface_faces_drop_matplotlib_padding_vertices(tmp_path):
+    figure = plt.figure()
+    axes = figure.add_subplot(projection="3d")
+    values = np.linspace(0, 6, 7)
+    x, y = np.meshgrid(values, values)
+    # A stride that does not divide the grid gives faces of unequal length.
+    axes.plot_surface(x, y, x * y, rstride=4, cstride=4)
+
+    output = mplot.savefig(tmp_path / "surface.mplot", figure, provenance=False)
+    _, document = read_result(output)
+    surface = document["figures"][0]["axes"][0]["artists"][0]
+    vertices = read_array(output, surface["data"]["vertices"])
+    lengths = read_array(output, surface["data"]["path_lengths"])
+    assert len(set(lengths.tolist())) > 1
+    offsets = np.concatenate([[0], np.cumsum(lengths)])
+    for start, end in zip(offsets[:-1], offsets[1:], strict=True):
+        face = vertices[start:end]
+        assert np.ptp(face[:, 0]) <= 4 and np.ptp(face[:, 1]) <= 4
+
+
+def test_savefig_records_the_suptitle_as_the_figure_title(tmp_path):
+    figure, axes = plt.subplots()
+    axes.plot([0, 1], [0, 1])
+    figure.suptitle("Overview")
+    untitled, _ = plt.subplots()
+
+    output = mplot.savefig(tmp_path / "titled.mplot", [figure, untitled], provenance=False)
+    _, document = read_result(output)
+    assert document["figures"][0]["title"] == "Overview"
+    assert "title" not in document["figures"][1]
+
+
 def test_savefig_preserves_large_multi_figure_collections(tmp_path):
     figures = []
     for figure_index in range(10):

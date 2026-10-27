@@ -11,6 +11,8 @@ export interface RenderContext {
     theme: Theme;
     pointBudget: number;
     project3d(x: number, y: number, z: number): [number, number];
+    /** Distance toward the viewer; larger values are nearer. */
+    depth3d?(x: number, y: number, z: number): number;
 }
 export type ArtistRenderer = (context: RenderContext) => void | Promise<void>;
 export declare const PLOT_TEXT_SIZE = 15;

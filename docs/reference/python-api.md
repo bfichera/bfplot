@@ -87,7 +87,7 @@ The names of the figures captured so far, in result order.
 
 ### Figure names
 
-Names must be non-empty and unique within a result; mistakes raise an error at `add()` time. If you do not give a name, a figure’s Matplotlib label (`plt.figure("spectrum")`) is used when it is unique. The viewer shows the name as the figure heading when the figure has no title.
+Names must be non-empty and unique within a result; mistakes raise an error at `add()` time. If you do not give a name, a figure’s Matplotlib label (`plt.figure("spectrum")`) is used when it is unique. The viewer shows the name as the figure heading when the figure has no title. A figure’s title is its `suptitle()`.
 
 ## `mplot.animation`
 

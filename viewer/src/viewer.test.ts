@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, expect, it } from "vitest";
-import { MPlotViewer } from "./viewer.js";
+import { labelWidth, MPlotViewer, thinTicks } from "./viewer.js";
 import type { MPlotDocument } from "./types.js";
 
 const pointer = (type: string, init: PointerEventInit): Event => {
@@ -62,9 +62,10 @@ describe("MPlotViewer", () => {
   it("renders named figure navigation in the left rail", async () => {
     const host = window.document.createElement("div");
     window.document.body.append(host);
-    const viewer = new MPlotViewer(host, { ...document, figures: [{ id: "f", title: "Results", axes: ["a"] }, { id: "g", title: "Appendix", axes: [] }] });
+    const viewer = new MPlotViewer(host, { ...document, figures: [{ id: "f", title: "Results", name: "results", axes: ["a"] }, { id: "g", title: "Appendix", axes: [] }] });
     await viewer.render();
     expect(Array.from(host.querySelectorAll(".mplot-page-name"), (element) => element.textContent)).toEqual(["Results", "Appendix", "Metadata"]);
+    expect(host.querySelector(".mplot-figure-title")?.textContent).toBe("Results");
     expect(host.querySelector(".mplot-page-button[aria-current=page] .mplot-page-number")?.textContent).toBe("01");
     viewer.destroy();
   });
@@ -267,6 +268,43 @@ describe("MPlotViewer", () => {
     viewer.destroy();
   });
 
+  it("hides colorbar ticks outside the colour range", async () => {
+    const host = window.document.createElement("div");
+    window.document.body.append(host);
+    const viewer = new MPlotViewer(host, {
+      ...document,
+      figures: [{ id: "f", axes: ["a", "c"] }],
+      axes: [...document.axes, { id: "c", figure_id: "f", role: "colorbar", position: [.82, .1, .03, .8], colorbar: { orientation: "vertical", limits: [.1, 4.8], ticks: [0, 1, 2, 3, 4, 5], ticklabels: ["0", "1", "2", "3", "4", "5"], colors: ["#000000", "#ffffff"] } }],
+    });
+    await viewer.render();
+    expect(Array.from(host.querySelectorAll(".mplot-colorbar-tick"), (tick) => tick.textContent)).toEqual(["1", "2", "3", "4"]);
+    viewer.destroy();
+  });
+
+  it("rotates crowded category labels instead of overlapping them", async () => {
+    const host = window.document.createElement("div");
+    window.document.body.append(host);
+    const labels = ["alpha centauri", "beta pictoris", "gamma draconis", "delta scuti", "epsilon eridani", "zeta reticuli", "eta carinae", "theta orionis"];
+    const viewer = new MPlotViewer(host, { ...document, axes: [{ ...document.axes[0]!, xlim: [-.5, 7.5], props: { xaxis: { ticks: labels.map((_, index) => index), ticklabels: labels, provided: true } } }] });
+    await viewer.render();
+    const ticks = Array.from(host.querySelectorAll(".mplot-tick")).filter((tick) => labels.includes(tick.textContent ?? ""));
+    expect(ticks).toHaveLength(labels.length);
+    expect(ticks.every((tick) => tick.getAttribute("transform")?.startsWith("rotate(-30"))).toBe(true);
+    viewer.destroy();
+  });
+
+  it("draws 3D panes and edge ticks without clipping the artists", async () => {
+    const host = window.document.createElement("div");
+    window.document.body.append(host);
+    const viewer = new MPlotViewer(host, { ...document, axes: [{ ...document.axes[0]!, projection: "3d", zlim: [0, 2], zlabel: "height", props: { view: { elev: 30, azim: -60 } } }], artists: [{ type: "mplot.line3d", id: "line3d", axes_id: "a", props: {}, data: { x: [0, 1], y: [0, 1], z: [0, 2] } }] });
+    await viewer.render();
+    expect(host.querySelectorAll(".mplot-3d-pane")).toHaveLength(3);
+    expect(host.querySelector('[data-artist-id="line3d"]')?.hasAttribute("clip-path")).toBe(false);
+    expect(Array.from(host.querySelectorAll(".mplot-label"), (label) => label.textContent)).toEqual(expect.arrayContaining(["time", "value", "height"]));
+    expect(host.querySelectorAll(".mplot-tick").length).toBeGreaterThan(6);
+    viewer.destroy();
+  });
+
   it("rotates 3D plots by dragging", async () => {
     const host = window.document.createElement("div");
     window.document.body.append(host);
@@ -313,4 +351,24 @@ describe("MPlotViewer", () => {
     viewer.destroy();
   });
 
+});
+
+describe("tick layout", () => {
+  const ticks = (values: number[], spacing: number, extent: number) => values.map((tick, index) => ({ tick, position: index * spacing, extent }));
+
+  it("keeps every tick when the labels fit", () => {
+    expect(thinTicks(ticks([0, 1, 2, 3], 50, 20), 8).map(({ tick }) => tick)).toEqual([0, 1, 2, 3]);
+  });
+
+  it("thins crowded ticks to a round step that keeps zero", () => {
+    const values = [-1, -.75, -.5, -.25, 0, .25, .5, .75, 1];
+    expect(thinTicks(ticks(values, 20, 30), 8).map(({ tick }) => tick)).toEqual([-1, -.5, 0, .5, 1]);
+    expect(thinTicks(ticks(values, 14, 30), 8).map(({ tick }) => tick)).toEqual([-1, 0, 1]);
+  });
+
+  it("estimates label widths for plain text and TeX scripts", () => {
+    expect(labelWidth("100")).toBeCloseTo(labelWidth("abc"));
+    expect(labelWidth("$10^{3}$")).toBeGreaterThan(labelWidth("10"));
+    expect(labelWidth("$10^{3}$")).toBeLessThan(labelWidth("1000"));
+  });
 });

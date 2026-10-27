@@ -120,6 +120,9 @@ def _extract_figure(figure: Any, figure_id: str, context: ExtractionContext) -> 
         "facecolor": _color(figure.get_facecolor()),
         "axes": [],
     }
+    suptitle = getattr(figure, "_suptitle", None)
+    if suptitle is not None and suptitle.get_text():
+        result["title"] = suptitle.get_text()
     axes_entries: list[tuple[Any, Any | None]] = []
     for axes in figure.axes:
         axes_entries.append((axes, None))
@@ -454,6 +457,10 @@ def _extract_paths(
 def _poly3d_faces(artist: Any) -> list[np.ndarray]:
     faces = getattr(artist, "_faces", None)
     if isinstance(faces, np.ndarray) and faces.ndim == 3 and faces.shape[-1] == 3:
+        # Matplotlib pads faces to a common length; the padding vertices are garbage.
+        invalid = getattr(artist, "_invalid_vertices", None)
+        if isinstance(invalid, np.ndarray) and invalid.shape == faces.shape[:2]:
+            return [face[~mask] for face, mask in zip(faces, invalid, strict=True)]
         return [face for face in faces]
     vector = getattr(artist, "_vec", None)
     slices = getattr(artist, "_segslices", None)

@@ -1,5 +1,5 @@
 import { fitLineViewport, LineComparison } from "./comparison.js";
-import { plotText } from "./math.js";
+import { hasMath, plotText } from "./math.js";
 import { ViewerModel } from "./model.js";
 import { builtinRenderers, PLOT_TEXT_SIZE, type ArtistRenderer, type RenderContext } from "./renderers.js";
 import { createScale, formatTick, type Scale } from "./scales.js";
@@ -242,9 +242,11 @@ export class MPlotViewer extends EventTarget {
       const values = overridden ? Array.from({ length: 5 }, (_, index) => limits[0] + (limits[1] - limits[0]) * index / 4) : originalValues;
       ticks.replaceChildren();
       values.forEach((value, index) => {
+        const fraction = (value - limits[0]) / (limits[1] - limits[0] || 1);
+        // Like Matplotlib, hide ticks beyond the colour range instead of piling them on its ends.
+        if (fraction < -1e-6 || fraction > 1 + 1e-6) return;
         const tick = document.createElement("span");
         tick.className = "mplot-colorbar-tick";
-        const fraction = (value - limits[0]) / (limits[1] - limits[0] || 1);
         tick.style.setProperty("--mplot-colorbar-position", `${Math.max(0, Math.min(1, fraction)) * 100}%`);
         const displayValue = Math.abs(value) < Math.abs(limits[1] - limits[0]) * 1e-12 ? 0 : Number(value.toPrecision(4));
         tick.textContent = overridden ? formatTick(displayValue, "linear") : originalLabels[index] ?? formatTick(value, "linear");
@@ -700,10 +702,18 @@ export class MPlotViewer extends EventTarget {
     this.axisTokens.set(axisId, token);
     view.width = Math.max(180, view.host.clientWidth || 640);
     view.height = Math.max(150, view.host.clientHeight || 360);
-    view.margin = view.axis.role === "inset" ? insetMargins(view.axis, view.width, view.height) : compactMargins(view.width, view.height);
+    const is3d = view.axis.projection === "3d";
+    view.margin = view.axis.role === "inset" ? insetMargins(view.axis, view.width, view.height) : is3d ? margins3d(view.width, view.height) : compactMargins(view.width, view.height);
     const viewport = this.model.viewports.get(axisId) ?? this.model.defaultViewport(view.axis);
-    const right = view.width - view.margin.right, bottom = view.height - view.margin.bottom;
+    const right = view.width - view.margin.right;
+    if (!is3d && view.axis.role !== "inset") {
+      // Make room for the widest y tick label, plus the y label beside it.
+      view.y = createScale(view.axis.yscale, viewport.y, [view.height - view.margin.bottom, view.margin.top]);
+      view.margin.left = Math.max(view.margin.left, Math.ceil(this.yTickWidth(view) + (this.showsYLabel(view) ? 34 : 14)));
+    }
     view.x = createScale(view.axis.xscale, viewport.x, [view.margin.left, right]);
+    if (!is3d) view.margin.bottom += this.xTickLayout(view).extra;
+    const bottom = view.height - view.margin.bottom;
     view.y = createScale(view.axis.yscale, viewport.y, [bottom, view.margin.top]);
     const plot = svg("g"), overlay = svg("g"), working = { ...view, plot, overlay };
     this.drawAxes(working);
@@ -713,7 +723,7 @@ export class MPlotViewer extends EventTarget {
       ? this.comparison.artists(this.model.document).filter((artist) => artist.props.visible !== false)
       : this.model.document.artists.filter((artist) => artist.axes_id === axisId && artist.props.visible !== false);
     for (const artist of artists) {
-      const group = svg("g", { "data-artist-id": artist.id, "clip-path": `url(#${clipId})` });
+      const group = svg("g", is3d ? { "data-artist-id": artist.id } : { "data-artist-id": artist.id, "clip-path": `url(#${clipId})` });
       if (artist.type === "mplot.line") this.configureComparisonTarget(group, artist);
       plot.append(group);
       const renderer = this.renderers.get(artist.type);
@@ -724,7 +734,7 @@ export class MPlotViewer extends EventTarget {
         this.resolvedData.set(artist.id, data);
         const contrast = this.contrastLimits.get(artist.id);
         const effectiveArtist = contrast ? { ...artist, props: { ...artist.props, clim: contrast } } : artist;
-        await renderer({ ...working, group, artist: effectiveArtist, data, theme: this.theme, pointBudget: Math.max(500, Math.round(view.width * 4)), project3d: (x, y, z) => this.project3d(view, x, y, z) } as RenderContext);
+        await renderer({ ...working, group, artist: effectiveArtist, data, theme: this.theme, pointBudget: Math.max(500, Math.round(view.width * 4)), project3d: (x, y, z) => this.project3d(view, x, y, z), depth3d: (x, y, z) => this.depth3d(view, x, y, z) } as RenderContext);
         if (artist.type === "mplot.line" && axisId !== this.comparisonAxisId) {
           const path = group.querySelector("path");
           if (path) {
@@ -748,22 +758,55 @@ export class MPlotViewer extends EventTarget {
 
   private drawAxes(view: AxisView): void {
     const { left, top, bottom, right } = view.margin, b = view.height - bottom, r = view.width - right;
-    const tickCount = Math.max(3, Math.floor((r - left) / 110));
-    for (const [tick, label] of this.axisTicks(view, "x", tickCount)) { const px = view.x(tick); view.plot.append(svg("line", { x1: px, x2: px, y1: top, y2: b, class: "mplot-grid-line" })); view.plot.append(plotText({ x: px, y: b + PLOT_TEXT_SIZE + 5, "text-anchor": "middle", "font-size": PLOT_TEXT_SIZE }, label, "mplot-tick")); }
-    for (const [tick, label] of this.axisTicks(view, "y", Math.max(3, Math.floor((b - top) / 80)))) { const py = view.y(tick); view.plot.append(svg("line", { x1: left, x2: r, y1: py, y2: py, class: "mplot-grid-line" })); view.plot.append(plotText({ x: left - 9, y: py + PLOT_TEXT_SIZE * .34, "text-anchor": "end", "font-size": PLOT_TEXT_SIZE }, label, "mplot-tick")); }
-    view.plot.append(svg("path", { d: `M${left},${top}H${r}V${b}H${left}Z`, fill: "none", class: "mplot-axis-frame" }));
     if (view.axis.title) view.plot.append(plotText({ x: (left + r) / 2, y: Math.max(PLOT_TEXT_SIZE, top - 16), "text-anchor": "middle", "font-size": PLOT_TEXT_SIZE }, view.axis.title, "mplot-axis-title"));
-    if (view.axis.xlabel && view.height > 180) view.plot.append(plotText({ x: (left + r) / 2, y: b + 46, "text-anchor": "middle", "font-size": PLOT_TEXT_SIZE }, view.axis.xlabel, "mplot-label"));
-    if (view.axis.ylabel && view.width > 230) view.plot.append(plotText({ x: 18, y: (top + b) / 2, "text-anchor": "middle", "font-size": PLOT_TEXT_SIZE, transform: `rotate(-90 18 ${(top + b) / 2})` }, view.axis.ylabel, "mplot-label"));
+    if (view.axis.projection === "3d") { this.draw3dAxes(view); return; }
+    const xTicks = this.xTickLayout(view);
+    for (const [tick, label] of xTicks.ticks) {
+      const px = view.x(tick), py = b + PLOT_TEXT_SIZE + 5;
+      view.plot.append(svg("line", { x1: px, x2: px, y1: top, y2: b, class: "mplot-grid-line" }));
+      view.plot.append(xTicks.rotated
+        ? plotText({ x: px, y: py - 4, "text-anchor": "end", "font-size": PLOT_TEXT_SIZE, transform: `rotate(${-TICK_ROTATION} ${px} ${b + 6})` }, label, "mplot-tick")
+        : plotText({ x: px, y: py, "text-anchor": "middle", "font-size": PLOT_TEXT_SIZE }, label, "mplot-tick"));
+    }
+    const yTicks = this.yTicks(view);
+    for (const { tick, label } of yTicks) { const py = view.y(tick); view.plot.append(svg("line", { x1: left, x2: r, y1: py, y2: py, class: "mplot-grid-line" })); view.plot.append(plotText({ x: left - 9, y: py + PLOT_TEXT_SIZE * .34, "text-anchor": "end", "font-size": PLOT_TEXT_SIZE }, label, "mplot-tick")); }
+    view.plot.append(svg("path", { d: `M${left},${top}H${r}V${b}H${left}Z`, fill: "none", class: "mplot-axis-frame" }));
+    if (view.axis.xlabel && view.height > 180) view.plot.append(plotText({ x: (left + r) / 2, y: b + 46 + xTicks.extra, "text-anchor": "middle", "font-size": PLOT_TEXT_SIZE }, view.axis.xlabel, "mplot-label"));
+    if (view.axis.ylabel && this.showsYLabel(view)) {
+      // Rotated glyphs reach about 11px left of the baseline and 4px right of it.
+      const x = Math.max(13, left - 19 - this.yTickWidth(view)), y = (top + b) / 2;
+      view.plot.append(plotText({ x, y, "text-anchor": "middle", "font-size": PLOT_TEXT_SIZE, transform: `rotate(-90 ${x} ${y})` }, view.axis.ylabel, "mplot-label"));
+    }
   }
 
-  private axisTicks(view: AxisView, dimension: "x" | "y", count: number): Array<[number, string]> {
+  private showsYLabel(view: AxisView): boolean { return Boolean(view.axis.ylabel) && view.width > 230; }
+  private yTicks(view: AxisView): Array<{ tick: number; label: string }> {
+    const candidates = this.axisTicks(view, "y", Math.max(3, Math.floor((view.height - view.margin.bottom - view.margin.top) / 80)));
+    return thinTicks(candidates.map(([tick, label]) => ({ tick, label, position: view.y(tick), extent: PLOT_TEXT_SIZE * (hasMath(label) ? 1.3 : 1) })), 3);
+  }
+  private yTickWidth(view: AxisView): number { return Math.max(0, ...this.yTicks(view).map(({ label }) => labelWidth(label))); }
+
+  /** X ticks that fit side by side; long text labels are rotated rather than dropped where possible. */
+  private xTickLayout(view: AxisView): { ticks: Array<[number, string]>; rotated: boolean; extra: number } {
+    const candidates = this.axisTicks(view, "x", Math.max(3, Math.floor((view.width - view.margin.right - view.margin.left) / 110)));
+    const items = candidates.map(([tick, label]) => ({ tick, label, position: view.x(tick), extent: labelWidth(label) }));
+    const level = thinTicks(items, TICK_GAP);
+    const textual = items.some(({ label }) => /\p{L}/u.test(label)) && !items.some(({ label }) => hasMath(label));
+    if (level.length === items.length || !textual) return { ticks: level.map(({ tick, label }) => [tick, label]), rotated: false, extra: 0 };
+    // Rotated labels only need their baselines to be a line height apart.
+    const angle = TICK_ROTATION * Math.PI / 180;
+    const rotated = thinTicks(items.map((item) => ({ ...item, extent: PLOT_TEXT_SIZE / Math.sin(angle) })), 0);
+    const height = Math.max(...rotated.map(({ label }) => labelWidth(label) * Math.sin(angle) + PLOT_TEXT_SIZE * Math.cos(angle)));
+    return { ticks: rotated.map(({ tick, label }) => [tick, label]), rotated: true, extra: Math.max(0, Math.ceil(height - PLOT_TEXT_SIZE)) };
+  }
+
+  private axisTicks(view: AxisView, dimension: "x" | "y" | "z", count: number): Array<[number, string]> {
     const metadata = view.axis.props?.[`${dimension}axis`] as { ticks?: number[]; ticklabels?: string[]; provided?: boolean; date_format?: string } | undefined;
-    const scaleType = dimension === "x" ? view.axis.xscale : view.axis.yscale;
-    const scale = dimension === "x" ? view.x : view.y;
+    const viewport = this.model.viewports.get(view.axis.id), domain = viewport?.[dimension];
+    const scaleType = dimension === "x" ? view.axis.xscale : dimension === "y" ? view.axis.yscale : "linear";
+    const scale = dimension === "x" ? view.x : dimension === "y" ? view.y : createScale("linear", domain ?? [0, 1], [0, 1]);
     if (metadata?.provided && metadata.ticks?.length === 0) return [];
     if (metadata?.ticks?.length && metadata.ticklabels?.some((label) => label)) {
-      const viewport = this.model.viewports.get(view.axis.id), domain = dimension === "x" ? viewport?.x : viewport?.y;
       const lower = Math.min(...domain ?? [-Infinity, Infinity]), upper = Math.max(...domain ?? [-Infinity, Infinity]);
       return metadata.ticks.map((tick, index) => [tick, metadata.ticklabels?.[index] || formatTick(tick, scaleType, metadata.date_format)] as [number, string]).filter(([tick]) => tick >= lower && tick <= upper);
     }
@@ -851,20 +894,66 @@ export class MPlotViewer extends EventTarget {
   }
 
   private showTooltip(view: AxisView, px: number, py: number): void { let best: { artist: Artist; index: number; x: number; y: number; distance: number } | undefined; for (const artist of this.model.document.artists.filter((item) => item.axes_id === view.axis.id)) { const data = this.resolvedData.get(artist.id) ?? artist.data, values = pairs(data.x, data.y), stride = Math.max(1, Math.floor(values.length / 5000)); for (let offset = 0; offset < values.length; offset += stride) { const [x, y, index] = values[offset]!, distance = Math.hypot(view.x(x) - px, view.y(y) - py); if (distance < 18 && (!best || distance < best.distance)) best = { artist, index, x, y, distance }; } } let tooltip = view.host.querySelector<HTMLElement>(".mplot-tooltip"); if (!best) { tooltip?.remove(); return; } if (!tooltip) { tooltip = document.createElement("div"); tooltip.className = "mplot-tooltip"; view.host.append(tooltip); } tooltip.style.left = `${px / view.width * 100}%`; tooltip.style.top = `${py / view.height * 100}%`; const rawLabel = best.artist.props.label; const label = typeof rawLabel === "string" && rawLabel && !rawLabel.startsWith("_") ? `${rawLabel} · ` : ""; tooltip.textContent = `${label}x = ${formatTick(best.x, view.axis.xscale, this.dateFormat(view, "x"))} · y = ${formatTick(best.y, view.axis.yscale, this.dateFormat(view, "y"))}`; }
-  private project3d(view: AxisView, x: number, y: number, z: number): [number, number] {
+  /** Maps data coordinates into the unit box centred on the origin. */
+  private normalize3d(view: AxisView, x: number, y: number, z: number): Point3 {
     const viewport = this.model.viewports.get(view.axis.id)!, zlim = viewport.z ?? [0, 1];
     const normalize = (value: number, limits: [number, number]) => (value - limits[0]) / (limits[1] - limits[0] || 1) - 0.5;
-    const xn = normalize(x, viewport.x), yn = normalize(y, viewport.y), zn = normalize(z, zlim);
-    const camera = this.camera(view);
-    const azimuth = camera.azim * Math.PI / 180, elevation = camera.elev * Math.PI / 180, roll = camera.roll * Math.PI / 180;
-    const horizontal = -Math.sin(azimuth) * xn + Math.cos(azimuth) * yn;
-    const depth = Math.cos(azimuth) * xn + Math.sin(azimuth) * yn;
-    const vertical = Math.cos(elevation) * zn - Math.sin(elevation) * depth;
-    const rolledX = Math.cos(roll) * horizontal - Math.sin(roll) * vertical;
-    const rolledY = Math.sin(roll) * horizontal + Math.cos(roll) * vertical;
+    return [normalize(x, viewport.x), normalize(y, viewport.y), normalize(z, zlim)];
+  }
+  private project3d(view: AxisView, x: number, y: number, z: number): [number, number] { return this.projectUnit(view, this.normalize3d(view, x, y, z)); }
+  private depth3d(view: AxisView, x: number, y: number, z: number): number { return unitDepth(this.camera(view), this.normalize3d(view, x, y, z)); }
+  private projectUnit(view: AxisView, point: Point3): [number, number] {
+    const camera = this.camera(view), [horizontal, vertical] = unitScreen(camera, point);
     const left = view.margin.left, right = view.width - view.margin.right, top = view.margin.top, bottom = view.height - view.margin.bottom;
-    const scale = Math.min(right - left, bottom - top) * 0.82 * camera.zoom;
-    return [(left + right) / 2 + rolledX * scale, (top + bottom) / 2 - rolledY * scale];
+    // Fit the box as seen from the document's own view, so the size stays put while rotating.
+    const settings = view.axis.props?.view as { elev?: number; azim?: number; roll?: number } | undefined;
+    const initial = { elev: settings?.elev ?? 30, azim: settings?.azim ?? -60, roll: settings?.roll ?? 0 };
+    const corners = BOX_CORNERS.map((corner) => unitScreen(initial, corner));
+    const halfWidth = Math.max(...corners.map(([h]) => Math.abs(h))), halfHeight = Math.max(...corners.map(([, v]) => Math.abs(v)));
+    const scale = Math.min((right - left) / 2 / halfWidth, (bottom - top) / 2 / halfHeight) * 0.9 * camera.zoom;
+    return [(left + right) / 2 + horizontal * scale, (top + bottom) / 2 - vertical * scale];
+  }
+
+  /** Draws Matplotlib-style back panes with grids, and ticks along the outer edges of the box. */
+  private draw3dAxes(view: AxisView): void {
+    const camera = this.camera(view), project = (point: Point3) => this.projectUnit(view, point);
+    const viewport = this.model.viewports.get(view.axis.id) ?? this.model.defaultViewport(view.axis);
+    const limits = [viewport.x, viewport.y, viewport.z ?? [0, 1]] as const;
+    const dimensions = ["x", "y", "z"] as const;
+    const point = (dimension: number, value: number, others: [number, number]): Point3 => { const result: number[] = [...others]; result.splice(dimension, 0, value); return result as Point3; };
+    // The pane farther from the viewer on each axis.
+    const back = [0, 1, 2].map((dimension) => unitDepth(camera, point(dimension, .5, [0, 0])) < unitDepth(camera, point(dimension, -.5, [0, 0])) ? .5 : -.5);
+    const ticks = dimensions.map((dimension, index) => this.axisTicks(view, dimension, 5).map(([tick, label]) => { const [low, high] = limits[index]!; return { tick, label, unit: (tick - low) / (high - low || 1) - .5 }; }).filter(({ unit }) => unit >= -.5 - 1e-9 && unit <= .5 + 1e-9));
+    const line = (from: Point3, to: Point3, className: string) => { const [x1, y1] = project(from), [x2, y2] = project(to); view.plot.append(svg("line", { x1, y1, x2, y2, class: className })); };
+    for (const dimension of [0, 1, 2]) {
+      const [a, b] = [0, 1, 2].filter((other) => other !== dimension) as [number, number];
+      const corner = (u: number, v: number): Point3 => { const result: Point3 = [0, 0, 0]; result[dimension] = back[dimension]!; result[a] = u; result[b] = v; return result; };
+      view.plot.append(svg("path", { d: `M${[corner(-.5, -.5), corner(.5, -.5), corner(.5, .5), corner(-.5, .5)].map((c) => project(c).map((n) => n.toFixed(2)).join(",")).join("L")}Z`, class: "mplot-3d-pane" }));
+      for (const { unit } of ticks[a]!) line(corner(unit, -.5), corner(unit, .5), "mplot-grid-line");
+      for (const { unit } of ticks[b]!) line(corner(-.5, unit), corner(.5, unit), "mplot-grid-line");
+    }
+    const center = project([0, 0, 0]);
+    // Edges carrying each axis: x and y run along the floor at the front, z up the outer side.
+    const front = back.map((value) => -value);
+    const zCandidates: Array<[number, number]> = [[back[0]!, front[1]!], [front[0]!, back[1]!]];
+    const zEdge = zCandidates.reduce((best, candidate) => project([...candidate, 0])[0] > project([...best, 0])[0] ? candidate : best);
+    const edges: Array<(unit: number) => Point3> = [(unit) => [unit, front[1]!, back[2]!], (unit) => [front[0]!, unit, back[2]!], (unit) => [zEdge[0], zEdge[1], unit]];
+    for (const [index, dimension] of dimensions.entries()) {
+      const edge = edges[index]!, start = project(edge(-.5)), end = project(edge(.5)), middle = project(edge(0));
+      const length = Math.hypot(end[0] - start[0], end[1] - start[1]) || 1, along = [(end[0] - start[0]) / length, (end[1] - start[1]) / length];
+      let out = index === 2 ? [Math.sign(middle[0] - center[0]) || 1, 0] : [middle[0] - center[0], middle[1] - center[1]];
+      const size = Math.hypot(out[0]!, out[1]!) || 1; out = [out[0]! / size, out[1]! / size];
+      const anchor = Math.abs(out[0]!) < .35 ? "middle" : out[0]! > 0 ? "start" : "end";
+      const kept = thinTicks(ticks[index]!.map((tick) => { const p = project(edge(tick.unit)); return { ...tick, position: (p[0] - start[0]) * along[0]! + (p[1] - start[1]) * along[1]!, extent: Math.abs(along[0]!) * labelWidth(tick.label) + Math.abs(along[1]!) * PLOT_TEXT_SIZE }; }), 6);
+      for (const { unit, label } of kept) {
+        const [x, y] = project(edge(unit));
+        view.plot.append(svg("line", { x1: x, y1: y, x2: x + out[0]! * 5, y2: y + out[1]! * 5, class: "mplot-axis-frame" }));
+        view.plot.append(plotText({ x: x + out[0]! * 10, y: y + out[1]! * 12 + PLOT_TEXT_SIZE * .34, "text-anchor": anchor, "font-size": PLOT_TEXT_SIZE }, label, "mplot-tick"));
+      }
+      const axisLabel = view.axis[`${dimension}label`];
+      const reach = 30 + Math.abs(out[0]!) * Math.max(0, ...kept.map(({ label }) => labelWidth(label)));
+      if (axisLabel) view.plot.append(plotText({ x: middle[0] + out[0]! * reach, y: middle[1] + out[1]! * reach + PLOT_TEXT_SIZE * .34, "text-anchor": anchor, "font-size": PLOT_TEXT_SIZE }, axisLabel, "mplot-label"));
+    }
   }
   private markActiveAxis(): void { for (const view of this.views.values()) view.host.classList.toggle("mplot-axis--active", view.axis.id === this.activeAxisId); }
 
@@ -924,6 +1013,56 @@ const safeId = (value: string): string => value.replace(/[^a-zA-Z0-9_-]/g, "-");
 const serializeSvg = (element: SVGSVGElement): string => new XMLSerializer().serializeToString(element);
 const emptySvg = (): string => `<svg xmlns="${SVG_NS}"/>`;
 function inferredPosition(index: number, count: number): [number, number, number, number] { const columns = Math.ceil(Math.sqrt(count)), rows = Math.ceil(count / columns), gap = .04, width = (1 - gap * (columns + 1)) / columns, height = (1 - gap * (rows + 1)) / rows, column = index % columns, row = Math.floor(index / columns); return [gap + column * (width + gap), gap + (rows - row - 1) * (height + gap), width, height]; }
+type Point3 = [number, number, number];
+const BOX_CORNERS: Point3[] = [-.5, .5].flatMap((x) => [-.5, .5].flatMap((y) => [-.5, .5].map((z) => [x, y, z] as Point3)));
+const TICK_GAP = 8, TICK_ROTATION = 30;
+type Camera = { elev: number; azim: number; roll: number };
+function unitScreen(camera: Camera, [x, y, z]: Point3): [number, number] {
+  const azimuth = camera.azim * Math.PI / 180, elevation = camera.elev * Math.PI / 180, roll = camera.roll * Math.PI / 180;
+  const horizontal = -Math.sin(azimuth) * x + Math.cos(azimuth) * y;
+  const depth = Math.cos(azimuth) * x + Math.sin(azimuth) * y;
+  const vertical = Math.cos(elevation) * z - Math.sin(elevation) * depth;
+  return [Math.cos(roll) * horizontal - Math.sin(roll) * vertical, Math.sin(roll) * horizontal + Math.cos(roll) * vertical];
+}
+/** Distance toward the camera; larger values are nearer. */
+function unitDepth(camera: Camera, [x, y, z]: Point3): number {
+  const azimuth = camera.azim * Math.PI / 180, elevation = camera.elev * Math.PI / 180;
+  return Math.cos(elevation) * (Math.cos(azimuth) * x + Math.sin(azimuth) * y) + Math.sin(elevation) * z;
+}
+/** Approximate rendered width of a tick label, including simple TeX such as `$10^{3}$`. */
+export function labelWidth(label: string): number {
+  let scripts = 0;
+  const text = label.replace(/\\math(default|rm|it|bf)/g, "").replaceAll("$", "")
+    .replace(/\\frac\{([^}]*)\}\{([^}]*)\}/g, (_, top: string, bottom: string) => { scripts += Math.max(top.length, bottom.length); return ""; })
+    .replace(/[\^_](\{[^}]*\}|.)/g, (match) => { scripts += match.slice(1).replace(/[{}]/g, "").length; return ""; })
+    .replace(/\\[a-zA-Z]+/g, "m").replace(/[{}]/g, "");
+  return (text.length + scripts * .7) * PLOT_TEXT_SIZE * .55;
+}
+/**
+ * Keeps every n-th tick for the smallest n whose labels do not collide, aligned so that
+ * zero stays when present. `position` and `extent` are in pixels along the axis. For evenly
+ * spaced values a slightly larger stride is preferred when it gives a round step
+ * (1, 2, 2.5 or 5 × 10ⁿ) and still keeps at least three labels.
+ */
+export function thinTicks<T extends { tick: number; position: number; extent: number }>(ticks: T[], gap: number): T[] {
+  const sorted = [...ticks].sort((a, b) => a.position - b.position), zero = sorted.findIndex(({ tick }) => tick === 0);
+  const pick = (stride: number) => { const anchor = zero >= 0 ? zero % stride : 0; return sorted.filter((_, index) => index % stride === anchor); };
+  const fits = (kept: T[]) => kept.every((item, index) => index === 0 || Math.abs(item.position - kept[index - 1]!.position) >= (item.extent + kept[index - 1]!.extent) / 2 + gap);
+  let minimum = sorted.length;
+  for (let stride = 1; stride < sorted.length; stride++) if (fits(pick(stride))) { minimum = stride; break; }
+  const step = sorted.length > 2 ? Math.abs(sorted[1]!.tick - sorted[0]!.tick) : 0;
+  const even = step > 0 && sorted.every((item, index) => index === 0 || Math.abs(Math.abs(item.tick - sorted[index - 1]!.tick) - step) <= step * 1e-6);
+  const round = (value: number) => { const mantissa = value / 10 ** Math.floor(Math.log10(value) + 1e-9); return [1, 2, 2.5, 5, 10].some((nice) => Math.abs(mantissa - nice) < 1e-6); };
+  if (minimum > 1 && even && !round(step * minimum)) {
+    for (let stride = minimum + 1; stride < sorted.length; stride++) {
+      const kept = pick(stride);
+      if (kept.length < 3) break;
+      if (round(step * stride) && fits(kept)) return kept;
+    }
+  }
+  return minimum < sorted.length ? pick(minimum) : sorted.slice(0, 1);
+}
+function margins3d(width: number, height: number): Margins { return width < 300 || height < 210 ? { left: 34, right: 34, top: 34, bottom: 22 } : { left: 48, right: 48, top: 40, bottom: 28 }; }
 function compactMargins(width: number, height: number): Margins { const compact = width < 300 || height < 210; return compact ? { left: 62, right: 14, top: 34, bottom: 56 } : { left: 78, right: 20, top: 40, bottom: 74 }; }
 function insetMargins(axis: Axis, width: number, height: number): Margins {
   const x = axis.props?.xaxis as { ticks?: number[]; provided?: boolean } | undefined, y = axis.props?.yaxis as { ticks?: number[]; provided?: boolean } | undefined;

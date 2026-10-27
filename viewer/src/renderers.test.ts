@@ -77,6 +77,18 @@ describe("artist rendering", () => {
     expect(surface.querySelector("path")?.getAttribute("fill")).toBe("#123456");
     expect(wire.querySelector("path")?.getAttribute("fill")).toBe("none");
   });
+
+  it("draws surface faces back to front and cycles single-entry styles", () => {
+    const near = [[0, 0, 1], [1, 0, 1], [1, 1, 1]], far = [[0, 0, -1], [1, 0, -1], [1, 1, -1]];
+    const surface = svg("g");
+    builtinRenderers["mplot.surface3d"]!({ ...context(surface, "mplot.surface3d", { paths: [near, far] }, { facecolors: ["#111111", "#222222"], edgecolors: ["#0000ff"], linewidths: [1] }), depth3d: (_x: number, _y: number, z: number) => z });
+    const faces = Array.from(surface.querySelectorAll("path"));
+    expect(faces.map((face) => face.getAttribute("fill"))).toEqual(["#222222", "#111111"]);
+    expect(faces.map((face) => face.getAttribute("stroke"))).toEqual(["#0000ff", "#0000ff"]);
+    const wire = svg("g");
+    builtinRenderers["mplot.mesh3d"]!(context(wire, "mplot.mesh3d", { paths: [near, far] }, { edgecolors: ["#1f77b4"] }));
+    expect(Array.from(wire.querySelectorAll("path"), (path) => path.getAttribute("stroke"))).toEqual(["#1f77b4", "#1f77b4"]);
+  });
 });
 
 describe("large data rendering", () => {

@@ -264,9 +264,10 @@
 .mplot-3d-view .mplot-hit { cursor: grab; }
 .mplot-3d-view .mplot-hit:active { cursor: grabbing; }
 .mplot-math { overflow: visible; color: var(--mplot-fg); }
-.mplot-math-content { display: flex; align-items: baseline; height: 100%; font: 15px "CMU Serif", serif; white-space: nowrap; }
-.mplot-math-content--middle { justify-content: center; }
-.mplot-math-content--end { justify-content: flex-end; }
+/* A 34px line box puts the baseline about 24px down, where an SVG <text> at the same y would sit. */
+.mplot-math-content { display: block; height: 100%; font: 15px/34px "CMU Serif", serif; white-space: pre; }
+.mplot-math-content--middle { text-align: center; }
+.mplot-math-content--end { text-align: right; }
 .mplot-math math { font-family: "CMU Serif", serif; font-size: 1em; }
 
 .mplot-tooltip { position: absolute; z-index: 4; padding: 5px 7px; border: 1px solid #aaa79e; border-radius: 0; background: #fffffff2; box-shadow: 0 3px 12px #0001; font: 11px "CMU Serif", serif; white-space: nowrap; pointer-events: none; transform: translate(8px, -100%); }
@@ -314,3 +315,4 @@
   .mplot-figure { break-inside: avoid; }
   .mplot-figure[hidden] { display: block; }
 }
+.mplot-3d-pane { fill: #f2f2f0; stroke: var(--mplot-grid); stroke-width: .65; vector-effect: non-scaling-stroke; }

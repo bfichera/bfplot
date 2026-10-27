@@ -243,8 +243,9 @@ const line3d = ({ group, artist, data, project3d, theme, pointBudget }) => {
     const xs = numeric(data.x), ys = numeric(data.y), zs = numeric(data.z), points = sampled(xs.slice(0, Math.min(xs.length, ys.length, zs.length)).map((v, i) => [v, ys[i], zs[i]]), pointBudget).map(([x, y, z]) => project3d(x, y, z));
     group.append(svg("path", { d: pathFrom(points), fill: "none", stroke: cssColor(artist.props.color, theme.accent), "stroke-width": prop(artist, "linewidth", 1.8) }));
 };
-const scatter3d = ({ group, artist, data, project3d, theme, pointBudget }) => {
-    const xs = numeric(data.x), ys = numeric(data.y), zs = numeric(data.z), values = numeric(data.values), mapped = values.length ? scalarColors(values, artist) : [], indices = sampled(xs.map((_, i) => i), pointBudget).sort((a, b) => (zs[a] ?? 0) - (zs[b] ?? 0));
+const scatter3d = ({ group, artist, data, project3d, depth3d, theme, pointBudget }) => {
+    const xs = numeric(data.x), ys = numeric(data.y), zs = numeric(data.z), values = numeric(data.values), mapped = values.length ? scalarColors(values, artist) : [];
+    const depth = (i) => depth3d ? depth3d(xs[i] ?? 0, ys[i] ?? 0, zs[i] ?? 0) : zs[i] ?? 0, indices = sampled(xs.map((_, i) => i), pointBudget).sort((a, b) => depth(a) - depth(b));
     for (const i of indices) {
         if (ys[i] === undefined || zs[i] === undefined)
             continue;
@@ -252,23 +253,32 @@ const scatter3d = ({ group, artist, data, project3d, theme, pointBudget }) => {
         group.append(svg("circle", { cx, cy, r: prop(artist, "size", 4), fill: mapped[i] ?? cssColor(artist.props.color, theme.accent), opacity: prop(artist, "alpha", .85), class: "mplot-point", "data-index": i }));
     }
 };
-const surface3d = (filled) => ({ group, artist, data, project3d, theme, pointBudget }) => {
+const surface3d = (filled) => ({ group, artist, data, project3d, depth3d, theme, pointBudget }) => {
     const paths = Array.isArray(data.paths) ? data.paths : [], values = numeric(data.values), mapped = values.length ? scalarColors(values, artist) : [], budget = Math.max(1, Math.min(paths.length, pointBudget));
+    const vertices = (raw) => Array.isArray(raw) ? raw.filter((point) => Array.isArray(point) && point.length >= 3).map((point) => [Number(point[0]), Number(point[1]), Number(point[2])]) : [];
+    const faceDepth = (index) => { const face = vertices(paths[index]); return depth3d && face.length ? face.reduce((sum, point) => sum + depth3d(...point), 0) / face.length : 0; };
+    // Painter's algorithm: draw far faces first so nearer ones cover them.
     const indices = sampled(paths.map((_, index) => index), budget);
+    if (filled && depth3d) {
+        const depths = new Map(indices.map((index) => [index, faceDepth(index)]));
+        indices.sort((a, b) => depths.get(a) - depths.get(b));
+    }
+    // Matplotlib cycles per-face style lists, so a single entry applies to every face.
+    const cycled = (values, index) => values?.length ? values[index % values.length] : undefined;
+    const facecolors = artist.props.facecolors, edgecolors = artist.props.edgecolors, linewidths = numeric(artist.props.linewidths);
     for (const index of indices) {
-        const raw = paths[index];
-        if (!Array.isArray(raw))
-            continue;
-        const points = raw.map((point) => Array.isArray(point) && point.length >= 3 ? project3d(Number(point[0]), Number(point[1]), Number(point[2])) : null).filter((point) => point !== null);
+        const points = vertices(paths[index]).map((point) => project3d(...point));
         if (points.length < 2)
             continue;
-        const facecolors = artist.props.facecolors, edgecolors = artist.props.edgecolors;
+        const fill = filled ? mapped[index] ?? cssColor(cycled(facecolors, index) ?? artist.props.facecolor ?? artist.props.color, theme.accent) : "none";
+        const width = cycled(linewidths, index) ?? (filled ? 0.35 : 0.8), seamless = filled && width === 0;
         group.append(svg("path", {
             d: pathFrom(points, filled),
-            fill: filled ? mapped[index] ?? cssColor(facecolors?.[index] ?? artist.props.facecolor ?? artist.props.color, theme.accent) : "none",
-            "fill-opacity": filled ? prop(artist, "alpha", 0.75) : 0,
-            stroke: cssColor(edgecolors?.[index] ?? artist.props.edgecolor ?? artist.props.color, filled ? theme.grid : theme.accent),
-            "stroke-width": numeric(artist.props.linewidths)[index] ?? (filled ? 0.35 : 0.8),
+            fill,
+            "fill-opacity": filled ? prop(artist, "alpha", 1) : 0,
+            // Edgeless faces are stroked in their own colour to hide antialiasing seams.
+            stroke: seamless ? fill : cssColor(cycled(edgecolors, index) ?? artist.props.edgecolor ?? artist.props.color, filled ? theme.grid : theme.accent),
+            "stroke-width": seamless ? 0.6 : width,
             "vector-effect": "non-scaling-stroke",
         }));
     }
