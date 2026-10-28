@@ -1,6 +1,6 @@
 {
   "name": "@bfplot/viewer",
-  "version": "0.9.9",
+  "version": "1.0.0-rc.1",
   "private": true,
   "description": "Dependency-light interactive browser viewer for BFPlot artifacts",
   "type": "module",

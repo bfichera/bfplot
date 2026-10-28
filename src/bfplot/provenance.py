@@ -60,7 +60,7 @@ def collect_provenance(*, extra: dict[str, Any] | None = None) -> dict[str, Any]
             packages[package] = version(package)
         except PackageNotFoundError:
             if package == "bfplot":
-                packages[package] = "0.9.9"
+                packages[package] = "1.0.0rc1"
     result: dict[str, Any] = {
         **processing_metadata(),
         "python": platform.python_version(),

@@ -18,7 +18,7 @@ path = "src/main.rs"
 anyhow.workspace = true
 axum.workspace = true
 clap.workspace = true
-bfplot-core = { version = "0.9.9", path = "../bfplot-core" }
+bfplot-core = { version = "1.0.0-rc.1", path = "../bfplot-core" }
 serde_json.workspace = true
 tempfile.workspace = true
 tokio.workspace = true
