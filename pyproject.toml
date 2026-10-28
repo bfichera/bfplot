@@ -1,5 +1,5 @@
 # The pure-Python `bfplot` writer. The app it opens results with is built from
-# crates/bfplot-cli. Distributed only through https://github.com/bfichera/bfplot.
+# crates/bfplot-cli.
 
 [build-system]
 requires = ["hatchling>=1.27"]

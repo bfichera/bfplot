@@ -1,4 +1,4 @@
-"""Rough text drawings of a MIR document, written into the manifest so commits show the plot.
+"""Rough text drawings of a BFIR document, written into the manifest so commits show the plot.
 
 Lines, markers and outlines are drawn with Braille dots (2x4 per character), images
 and colorbars with an ASCII shade ramp, and axes are placed where their figure bounds
@@ -14,7 +14,7 @@ from typing import Any
 
 import numpy as np
 
-from .mir import MirDocument
+from .bfir import BfirDocument
 
 WIDTH = 72
 SHADES = " .:-=+*#%@"
@@ -25,15 +25,15 @@ _CHUNK = 1 << 21  # rasterized points per batch, to bound memory on dense data
 Project = Callable[..., np.ndarray]
 
 
-def render(mir: MirDocument, width: int = WIDTH) -> list[str]:
-    """Text lines (without comment markers) drawing every figure in ``mir``."""
+def render(bfir: BfirDocument, width: int = WIDTH) -> list[str]:
+    """Text lines (without comment markers) drawing every figure in ``bfir``."""
 
     def array(value: Any) -> np.ndarray:
         if isinstance(value, dict) and "$buffer" in value:
-            return mir.buffers[value["$buffer"]].array
+            return bfir.buffers[value["$buffer"]].array
         return np.asarray(value)
 
-    document = mir.document
+    document = bfir.document
     timeline = document.get("timeline")
     lines: list[str] = []
     for index, figure in enumerate(document.get("figures", [])):

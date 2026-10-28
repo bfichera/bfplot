@@ -221,7 +221,7 @@ const ARTIST_TYPES: &[&str] = &[
     "bfplot.mesh3d",
 ];
 
-/// Fields a timeline update may replace, by target kind (mirrors `bfplot.mir.ANIMATABLE`).
+/// Fields a timeline update may replace, by target kind (mirrors `bfplot.bfir.ANIMATABLE`).
 fn animatable(kind: &str) -> Option<&'static [&'static str]> {
     match kind {
         "figure" => Some(&["title", "size_inches", "dpi", "facecolor"]),

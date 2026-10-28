@@ -10,7 +10,7 @@ from matplotlib.figure import Figure
 
 from .adapters.matplotlib import translate_figures
 from .artifact import Layout, metadata_value, prepare_destination, write_result
-from .mir import MirDocument
+from .bfir import BfirDocument
 from .provenance import collect_provenance, processing_metadata
 from .temporal import Animation, FigureSource
 
@@ -75,7 +75,7 @@ class Result:
         self.layout = prepare_destination(self.path, layout, stacklevel=_stacklevel + 1)
         self.metadata = Metadata()
         self._base_metadata = provenance_metadata(provenance)
-        self._groups: list[MirDocument | Animation] = []
+        self._groups: list[BfirDocument | Animation] = []
         self._names: set[str] = set()
         self._next_figure = 0
         self._next_artist = 0
@@ -88,7 +88,7 @@ class Result:
         """Names of the figures captured so far, in result order."""
         names: list[str] = []
         for group in self._groups:
-            document = group.initial_mir if isinstance(group, Animation) else group
+            document = group.initial_bfir if isinstance(group, Animation) else group
             names.extend(
                 figure["name"] for figure in document.document["figures"] if "name" in figure
             )
@@ -140,7 +140,7 @@ class Result:
         first_figure, first_artist = self._next_figure, self._next_artist
         next_artist = first_artist
 
-        def translator(source: FigureSource, metadata: dict[str, Any]) -> MirDocument:
+        def translator(source: FigureSource, metadata: dict[str, Any]) -> BfirDocument:
             nonlocal next_artist
             document, next_artist = translate_figures(
                 figures_from(source),
@@ -228,13 +228,13 @@ class Result:
         self._names = pending
         return claimed
 
-    def _document(self) -> MirDocument:
+    def _document(self) -> BfirDocument:
         figures: list[dict[str, Any]] = []
         buffers: dict[str, Any] = {}
         metadata = copy.deepcopy(self._base_metadata)
         timeline: dict[str, Any] | None = None
         for group in self._groups:
-            document = group.finalized_mir if isinstance(group, Animation) else group
+            document = group.finalized_bfir if isinstance(group, Animation) else group
             renamed: dict[str, str] = {}
             for buffer_id, buffer in document.buffers.items():
                 renamed[buffer_id] = f"buffer-{len(buffers)}"
@@ -251,7 +251,7 @@ class Result:
         content: dict[str, Any] = {"figures": figures}
         if timeline is not None:
             content["timeline"] = timeline
-        return MirDocument(content, buffers, metadata)
+        return BfirDocument(content, buffers, metadata)
 
 
 def _rename_buffers(value: Any, renamed: dict[str, str]) -> Any:

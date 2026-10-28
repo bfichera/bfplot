@@ -22,7 +22,7 @@ BFPlot is new. Please try it on real plots and tell us what behaves strangely.
 
 ## Installation
 
-BFPlot is distributed only through GitHub. Install the `bfplot` app, which opens results and has the viewer built in, on macOS or Linux:
+Install the `bfplot` app, which opens results and has the viewer built in, on macOS or Linux:
 
 ```console
 $ curl -LsSf https://github.com/bfichera/bfplot/releases/latest/download/install.sh | sh
@@ -79,14 +79,14 @@ Every result records its creation time and, when available, the Git commit that 
 
 ## Other producers
 
-The Matplotlib adapter produces BFPlot's intermediate representation (MIR), and a separate writer turns MIR into a result:
+The Matplotlib adapter produces BFPlot's intermediate representation (BFIR), and a separate writer turns BFIR into a result:
 
 ```python
-mir = bfplot.translate(fig)
-bfplot.compile(mir, "my_plot.bfplot")
+bfir = bfplot.translate(fig)
+bfplot.compile(bfir, "my_plot.bfplot")
 ```
 
-MIR is described by `src/bfplot/mir.schema.json`, so producers for other languages can target it. See [`ARCHITECTURE.md`](ARCHITECTURE.md).
+BFIR is described by `src/bfplot/bfir.schema.json`, so producers for other languages can target it. See [`ARCHITECTURE.md`](ARCHITECTURE.md).
 
 ## Supported plots
 

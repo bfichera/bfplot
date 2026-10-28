@@ -5,12 +5,12 @@ import numpy as np
 import pytest
 
 import bfplot
-from bfplot.mir import MirBuilder, MirValidationError
+from bfplot.bfir import BfirBuilder, BfirValidationError
 
 
-def test_mir_buffers_are_owned_immutable_copies() -> None:
+def test_bfir_buffers_are_owned_immutable_copies() -> None:
     source = np.arange(4, dtype=float)
-    builder = MirBuilder(metadata={"created_utc": "2026-01-01T00:00:00Z"})
+    builder = BfirBuilder(metadata={"created_utc": "2026-01-01T00:00:00Z"})
     reference = builder.buffer(source)
     document = {
         "figures": [
@@ -33,10 +33,10 @@ def test_mir_buffers_are_owned_immutable_copies() -> None:
             }
         ],
     }
-    mir = builder.build(document)
+    bfir = builder.build(document)
     source[:] = -1
 
-    buffer = next(iter(mir.buffers.values())).array
+    buffer = next(iter(bfir.buffers.values())).array
     assert buffer.tolist() == [0, 1, 2, 3]
     assert not buffer.flags.writeable
 
@@ -46,19 +46,19 @@ def test_matplotlib_translation_produces_local_typed_buffers() -> None:
     image = axes.imshow(np.arange(9).reshape(3, 3), cmap="magma")
     figure.colorbar(image, ax=axes, label="intensity")
 
-    mir = bfplot.translate(figure, metadata={"created_utc": "2026-01-01T00:00:00Z"})
+    bfir = bfplot.translate(figure, metadata={"created_utc": "2026-01-01T00:00:00Z"})
 
-    assert mir.metadata["created_utc"] == "2026-01-01T00:00:00Z"
-    assert mir.buffers
+    assert bfir.metadata["created_utc"] == "2026-01-01T00:00:00Z"
+    assert bfir.buffers
     assert all(
         buffer.array.flags.c_contiguous and not buffer.array.flags.writeable
-        for buffer in mir.buffers.values()
+        for buffer in bfir.buffers.values()
     )
     plot = next(
-        axis for axis in mir.document["figures"][0]["axes"] if axis.get("role") != "colorbar"
+        axis for axis in bfir.document["figures"][0]["axes"] if axis.get("role") != "colorbar"
     )
     colorbar = next(
-        axis for axis in mir.document["figures"][0]["axes"] if axis.get("role") == "colorbar"
+        axis for axis in bfir.document["figures"][0]["axes"] if axis.get("role") == "colorbar"
     )
     extracted = next(artist for artist in plot["artists"] if artist["type"] == "bfplot.image")
     assert set(extracted["data"]["values"]) == {"$buffer"}
@@ -70,18 +70,18 @@ def test_3d_scatter_translation_has_no_orphaned_buffers() -> None:
     axes = figure.add_subplot(projection="3d")
     axes.scatter([0, 1], [1, 2], [2, 3], c=[0, 1])
 
-    mir = bfplot.translate(figure)
+    bfir = bfplot.translate(figure)
 
     referenced = set()
-    for artist in mir.document["figures"][0]["axes"][0]["artists"]:
+    for artist in bfir.document["figures"][0]["axes"][0]["artists"]:
         for value in artist["data"].values():
             if isinstance(value, dict) and "$buffer" in value:
                 referenced.add(value["$buffer"])
-    assert referenced == set(mir.buffers)
+    assert referenced == set(bfir.buffers)
 
 
-def test_mir_validation_rejects_dangling_buffers_and_references() -> None:
-    builder = MirBuilder(metadata={"created_utc": "2026-01-01T00:00:00Z"})
+def test_bfir_validation_rejects_dangling_buffers_and_references() -> None:
+    builder = BfirBuilder(metadata={"created_utc": "2026-01-01T00:00:00Z"})
     document = {
         "figures": [
             {
@@ -105,20 +105,20 @@ def test_mir_validation_rejects_dangling_buffers_and_references() -> None:
         ],
     }
 
-    with pytest.raises(MirValidationError, match="dangling buffer reference") as error:
+    with pytest.raises(BfirValidationError, match="dangling buffer reference") as error:
         builder.build(document)
     assert "must reference its containing axes" in str(error.value)
     assert "dangling colorbar mappable" in str(error.value)
 
 
-def test_mir_validation_requires_processing_metadata() -> None:
-    builder = MirBuilder(metadata={})
-    with pytest.raises(MirValidationError, match="metadata.created_utc is required"):
+def test_bfir_validation_requires_processing_metadata() -> None:
+    builder = BfirBuilder(metadata={})
+    with pytest.raises(BfirValidationError, match="metadata.created_utc is required"):
         builder.build({"figures": []})
 
 
-def test_mir_validation_rejects_bad_and_duplicate_figure_names() -> None:
-    builder = MirBuilder(metadata={"created_utc": "2026-01-01T00:00:00Z"})
+def test_bfir_validation_rejects_bad_and_duplicate_figure_names() -> None:
+    builder = BfirBuilder(metadata={"created_utc": "2026-01-01T00:00:00Z"})
     document = {
         "figures": [
             {"id": "figure-0", "name": "spectrum", "axes": []},
@@ -126,6 +126,6 @@ def test_mir_validation_rejects_bad_and_duplicate_figure_names() -> None:
             {"id": "figure-2", "name": "", "axes": []},
         ],
     }
-    with pytest.raises(MirValidationError, match="duplicate figure name") as error:
+    with pytest.raises(BfirValidationError, match="duplicate figure name") as error:
         builder.build(document)
     assert "figures[2].name must be a non-empty string" in str(error.value)

@@ -11,13 +11,13 @@ from .api import (
     show,
     translate,
 )
-from .mir import MirBuffer, MirDocument, MirValidationError
+from .bfir import BfirBuffer, BfirDocument, BfirValidationError
 
 __all__ = [
     "Animation",
-    "MirBuffer",
-    "MirDocument",
-    "MirValidationError",
+    "BfirBuffer",
+    "BfirDocument",
+    "BfirValidationError",
     "Result",
     "animation",
     "compile",

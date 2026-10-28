@@ -5,33 +5,33 @@ BFPlot turns plots into self-contained, content-addressed results that a browser
 ## Pipeline
 
 ```text
-plotting library -> adapter -> MIR -> writer -> result -> Rust CLI -> viewer
+plotting library -> adapter -> BFIR -> writer -> result -> Rust CLI -> viewer
 ```
 
 `bfplot.savefig()` is `bfplot.translate()` followed by `bfplot.compile()`.
 
 | Part | Location | Responsibility |
 | --- | --- | --- |
-| Adapter | `src/bfplot/adapters/matplotlib.py` | Matplotlib figures to MIR. Knows nothing about hashes, compression or files. |
-| MIR | `src/bfplot/mir.py`, `src/bfplot/mir.schema.json` | The language-neutral document model and its validator. |
-| Writer | `src/bfplot/artifact.py` | Validates MIR, encodes buffers, writes and replaces results. Knows nothing about Matplotlib. |
-| Preview | `src/bfplot/preview.py` | Draws MIR as Braille/ASCII text, appended to the manifest as TOML comments. |
+| Adapter | `src/bfplot/adapters/matplotlib.py` | Matplotlib figures to BFIR. Knows nothing about hashes, compression or files. |
+| BFIR | `src/bfplot/bfir.py`, `src/bfplot/bfir.schema.json` | The language-neutral document model and its validator. |
+| Writer | `src/bfplot/artifact.py` | Validates BFIR, encodes buffers, writes and replaces results. Knows nothing about Matplotlib. |
+| Preview | `src/bfplot/preview.py` | Draws BFIR as Braille/ASCII text, appended to the manifest as TOML comments. |
 | Results | `src/bfplot/result.py`, `src/bfplot/temporal.py` | `bfplot.result()` and animation recording. |
 | Core | `crates/bfplot-core` | Reads, validates, verifies, packs and unpacks results. |
 | App | `crates/bfplot-cli` | The `bfplot` program: `verify`, `pack`, `unpack`, `manifest`, `serve`, `view`. Embeds the viewer. |
 | Viewer | `viewer/` | Browser UI and renderers. The built copy in `viewer/dist` is committed and compiled into the app. |
 
-## MIR
+## BFIR
 
-MIR is the boundary that other producers (Julia, C, ...) target. A MIR document has `metadata` (with a required `created_utc`), a `document` of figures, axes and artists, and typed numeric `buffers`. Arrays in the document are references to buffers:
+BFIR is the boundary that other producers (Julia, C, ...) target. A BFIR document has `metadata` (with a required `created_utc`), a `document` of figures, axes and artists, and typed numeric `buffers`. Arrays in the document are references to buffers:
 
 ```json
 {"$buffer": "buffer-0"}
 ```
 
-Validation checks unique IDs, unique non-empty figure names, artist ownership, parent axes and colorbar references, timeline updates, and that every buffer reference resolves and every buffer is used. MIR never contains hashes, codecs or paths.
+Validation checks unique IDs, unique non-empty figure names, artist ownership, parent axes and colorbar references, timeline updates, and that every buffer reference resolves and every buffer is used. BFIR never contains hashes, codecs or paths.
 
-An animation is one initial scene plus a timeline of frames. Each update names a `figure`, `axes` or `artist` target by ID and a path whose first element is in `mir.ANIMATABLE` (mirrored by `animatable()` in Rust). Structure cannot change during an animation.
+An animation is one initial scene plus a timeline of frames. Each update names a `figure`, `axes` or `artist` target by ID and a path whose first element is in `bfir.ANIMATABLE` (mirrored by `animatable()` in Rust). Structure cannot change during an animation.
 
 ## Results
 
@@ -74,7 +74,7 @@ Every artist has `type`, `id`, `axes_id`, `props` and `data`. Types use the `bfp
 
 The result format is the contract between writers and the app. Writers are native to their language (the Python writer never calls Rust) and only need to produce valid results; the `bfplot` app reads them.
 
-BFPlot is distributed only through its GitHub repository; nothing is published to PyPI, crates.io, npm or any other registry. Each GitHub release carries macOS and Linux archives of the app, with `install.sh` and `uninstall.sh` for installing them with curl. The Python writer is installed from a checkout or straight from GitHub. `crates/bfplot-cli/pyproject.toml` lets pip build the app from source (maturin, `bindings = "bin"`) and put it next to the Python package. `bfplot.show()` looks for the app in its Python environment's scripts directory before `PATH`.
+Each GitHub release carries macOS and Linux archives of the app, with `install.sh` and `uninstall.sh` for installing them with curl. The Python writer is installed from a checkout or straight from GitHub. `crates/bfplot-cli/pyproject.toml` lets pip build the app from source (maturin, `bindings = "bin"`) and put it next to the Python package. `bfplot.show()` looks for the app in its Python environment's scripts directory before `PATH`.
 
 The viewer is compiled into the app by `crates/bfplot-cli/build.rs` from `viewer/dist`. `--viewer-dir` (or `BFPLOT_VIEWER_DIR`) serves a different build for viewer development. Releasing is described in `RELEASING.md`.
 

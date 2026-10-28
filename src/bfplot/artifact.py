@@ -1,4 +1,4 @@
-"""Write a MIR document as one self-contained BFPlot result.
+"""Write a BFIR document as one self-contained BFPlot result.
 
 A result is either a directory::
 
@@ -25,7 +25,7 @@ from typing import Any, Literal
 import numpy as np
 import zstandard as zstd
 
-from .mir import MirDocument
+from .bfir import BfirDocument
 from .preview import render
 from .provenance import processing_metadata
 
@@ -167,12 +167,12 @@ def _encode(array: np.ndarray) -> tuple[bytes, dict[str, Any]]:
     return zstd.ZstdCompressor(level=3).compress(array.tobytes()), descriptor
 
 
-def write_result(path: Path, mir: MirDocument, layout: Layout, *, preview: bool = True) -> Path:
-    """Write ``mir`` as one result at exactly ``path``, replacing any previous result.
+def write_result(path: Path, bfir: BfirDocument, layout: Layout, *, preview: bool = True) -> Path:
+    """Write ``bfir`` as one result at exactly ``path``, replacing any previous result.
 
     With ``preview``, the manifest ends with a text drawing of the figures in comments.
     """
-    mir.validate()
+    bfir.validate()
     objects: dict[str, bytes] = {}
 
     def put(data: bytes) -> str:
@@ -181,7 +181,7 @@ def write_result(path: Path, mir: MirDocument, layout: Layout, *, preview: bool 
         return f"sha256:{digest}"
 
     arrays = {}
-    for buffer_id, buffer in mir.buffers.items():
+    for buffer_id, buffer in bfir.buffers.items():
         data, descriptor = _encode(buffer.array)
         arrays[buffer_id] = {"object": put(data), **descriptor}
 
@@ -194,9 +194,9 @@ def write_result(path: Path, mir: MirDocument, layout: Layout, *, preview: bool 
             return [resolve(item) for item in value]
         return value
 
-    document = put(canonical_json(resolve(mir.document)))
-    drawing = render(mir) if preview else None
-    manifest = manifest_bytes(document, {**processing_metadata(), **mir.metadata}, drawing)
+    document = put(canonical_json(resolve(bfir.document)))
+    drawing = render(bfir) if preview else None
+    manifest = manifest_bytes(document, {**processing_metadata(), **bfir.metadata}, drawing)
 
     _check_destination(path)
     path.parent.mkdir(parents=True, exist_ok=True)

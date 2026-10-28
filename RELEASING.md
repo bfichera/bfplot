@@ -1,7 +1,5 @@
 # Releasing BFPlot
 
-BFPlot is released only on GitHub, at <https://github.com/bfichera/bfplot>. Nothing is published to PyPI, crates.io, npm or any other registry.
-
 ## Releasing a version
 
 1. On GitHub, open **Actions → Release → Run workflow**.
@@ -21,4 +19,3 @@ Create the repository `bfichera/bfplot` and push `main`. For the documentation s
 
 - If the result format changed in a way older readers would misread, raise `FORMAT_VERSION` in `crates/bfplot-core/src/format.rs` and `src/bfplot/artifact.py` together, and describe the change in `docs/format.md`, before releasing.
 - `python scripts/set_version.py X.Y.Z` is what the workflow uses to set the version; `python scripts/check_versions.py` checks that every package agrees.
-- The Cargo crates have `publish = false`, the Python packages have the `Private :: Do Not Upload` classifier, which PyPI rejects, and the viewer's `package.json` is `private`, so none of them can be uploaded to a registry by accident.

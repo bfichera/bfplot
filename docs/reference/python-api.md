@@ -136,10 +136,10 @@ Call `update(frame)` for each item in `frames` and capture the resulting figure 
 
 ```python
 bfplot.translate(figure=None, *, metadata=None)
-bfplot.compile(mir, path, *, layout="directory")
+bfplot.compile(bfir, path, *, layout="directory")
 ```
 
-`translate` turns Matplotlib figures into a validated `bfplot.MirDocument`, BFPlot's intermediate representation. `compile` writes a MIR document as one result at exactly `path`. `savefig` is the two combined. Producers in other languages can write MIR directly; its schema is `src/bfplot/mir.schema.json`.
+`translate` turns Matplotlib figures into a validated `bfplot.BfirDocument`, BFPlot's intermediate representation. `compile` writes a BFIR document as one result at exactly `path`. `savefig` is the two combined. Producers in other languages can write BFIR directly; its schema is `src/bfplot/bfir.schema.json`.
 
 ## `bfplot.show`
 

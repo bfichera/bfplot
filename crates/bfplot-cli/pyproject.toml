@@ -1,5 +1,5 @@
 # Lets `pip install ./crates/bfplot-cli` build the `bfplot` app from a source checkout and
-# put it next to the Python package. Not published anywhere.
+# put it next to the Python package.
 
 [build-system]
 requires = ["maturin>=1.9,<2"]

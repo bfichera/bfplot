@@ -1,6 +1,6 @@
 # Installation
 
-BFPlot is distributed only through [GitHub](https://github.com/bfichera/bfplot). It has two parts: the `bfplot` app, which opens results, and the Python library, which saves your figures. You need a modern browser to view results.
+BFPlot has two parts: the `bfplot` app, which opens results, and the Python library, which saves your figures. You need a modern browser to view results.
 
 ## The app
 

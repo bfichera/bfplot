@@ -8,23 +8,23 @@ import pytest
 
 import bfplot
 from bfplot.artifact import FORMAT_VERSION
-from bfplot.mir import MirBuilder
+from bfplot.bfir import BfirBuilder
 from helpers import read_array, read_result
 
 
-def test_compile_resolves_all_mir_buffers_and_preserves_metadata(tmp_path) -> None:
+def test_compile_resolves_all_bfir_buffers_and_preserves_metadata(tmp_path) -> None:
     figure, axes = plt.subplots()
     axes.plot([0, 1], [2, 3])
-    mir = bfplot.translate(
+    bfir = bfplot.translate(
         figure, metadata={"created_utc": "2026-01-01T00:00:00Z", "producer": "test"}
     )
 
-    output = bfplot.compile(mir, tmp_path / "compiled.bfplot")
+    output = bfplot.compile(bfir, tmp_path / "compiled.bfplot")
     manifest, document = read_result(output)
 
     assert manifest["provenance"] == {
         "created_utc": "2026-01-01T00:00:00Z",
-        "git_commit": mir.metadata["git_commit"],
+        "git_commit": bfir.metadata["git_commit"],
         "producer": "test",
     }
     assert "$buffer" not in json.dumps(document)
@@ -45,10 +45,10 @@ def test_manifest_starts_with_format_and_version(tmp_path) -> None:
 def test_compile_adds_missing_baseline_git_metadata(tmp_path) -> None:
     figure, axes = plt.subplots()
     axes.plot([0, 1], [2, 3])
-    mir = bfplot.translate(figure)
-    del mir.metadata["git_commit"]
+    bfir = bfplot.translate(figure)
+    del bfir.metadata["git_commit"]
 
-    output = bfplot.compile(mir, tmp_path / "compiled.bfplot")
+    output = bfplot.compile(bfir, tmp_path / "compiled.bfplot")
     manifest, _ = read_result(output)
 
     assert len(manifest["provenance"]["git_commit"]) == 40
@@ -74,21 +74,21 @@ def test_explicit_translate_compile_matches_savefig_artifact_document(
 
 
 def test_compile_stores_arrays_little_endian_and_rejects_non_numeric_buffers(tmp_path) -> None:
-    builder = MirBuilder(metadata={"created_utc": "2026-01-01T00:00:00Z"})
+    builder = BfirBuilder(metadata={"created_utc": "2026-01-01T00:00:00Z"})
     original = np.arange(12, dtype=">f8").reshape(3, 4)
     data = {"values": builder.buffer(original)}
     artist = {"id": "artist-0", "axes_id": "axes-0", "type": "bfplot.image", "props": {}}
     axes = {"id": "axes-0", "artists": [{**artist, "data": data}]}
-    mir = builder.build({"figures": [{"id": "figure-0", "axes": [axes]}]})
+    bfir = builder.build({"figures": [{"id": "figure-0", "axes": [axes]}]})
 
-    output = bfplot.compile(mir, tmp_path / "array.bfplot")
+    output = bfplot.compile(bfir, tmp_path / "array.bfplot")
     _, document = read_result(output)
     reference = document["figures"][0]["axes"][0]["artists"][0]["data"]["values"]
 
     assert reference["dtype"] == "f8"
     assert reference["codec"] == "zstd"
     np.testing.assert_array_equal(read_array(output, reference), original)
-    with pytest.raises(TypeError, match="unsupported MIR buffer dtype"):
+    with pytest.raises(TypeError, match="unsupported BFIR buffer dtype"):
         builder.buffer(np.array(["text"], dtype=object))
 
 
@@ -117,7 +117,7 @@ def test_preview_can_be_disabled(tmp_path) -> None:
 def test_preview_survives_unusable_axes(tmp_path) -> None:
     figure, axes = plt.subplots()
     axes.plot([0, 1], [2, 3])
-    mir = bfplot.translate(figure)
-    mir.document["figures"][0]["axes"][0]["x"]["limits"] = [None, None]
-    output = bfplot.compile(mir, tmp_path / "odd.bfplot")
+    bfir = bfplot.translate(figure)
+    bfir.document["figures"][0]["axes"][0]["x"]["limits"] = [None, None]
+    output = bfplot.compile(bfir, tmp_path / "odd.bfplot")
     assert "# (no preview: ValueError" in (output / "manifest.toml").read_text()

@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://bfplot.dev/schema/mir.schema.json",
+  "$id": "https://github.com/bfichera/bfplot/blob/main/src/bfplot/bfir.schema.json",
   "title": "BFPlot Intermediate Representation",
   "type": "object",
   "required": ["metadata", "document", "buffers"],

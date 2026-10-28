@@ -1,7 +1,7 @@
 """BFPlot Intermediate Representation: semantic plot records plus typed buffers.
 
-MIR is the boundary between plotting-library adapters and the BFPlot writer. Any
-producer that builds a valid ``MirDocument`` can be compiled into a BFPlot result.
+BFIR is the boundary between plotting-library adapters and the BFPlot writer. Any
+producer that builds a valid ``BfirDocument`` can be compiled into a BFPlot result.
 """
 
 from __future__ import annotations
@@ -20,71 +20,71 @@ ANIMATABLE = {
 }
 
 
-class MirValidationError(ValueError):
-    """Raised when a MIR document violates the producer/compiler contract."""
+class BfirValidationError(ValueError):
+    """Raised when a BFIR document violates the producer/compiler contract."""
 
 
 @dataclass(frozen=True)
-class MirBuffer:
-    """An immutable, C-contiguous numeric array owned by a MIR document."""
+class BfirBuffer:
+    """An immutable, C-contiguous numeric array owned by a BFIR document."""
 
     array: np.ndarray
 
     @classmethod
-    def from_value(cls, value: Any) -> MirBuffer:
+    def from_value(cls, value: Any) -> BfirBuffer:
         source = np.asanyarray(value)
         if np.ma.isMaskedArray(source):
             source = source.filled(np.nan)
         if source.dtype.kind not in "biuf":
-            raise TypeError(f"unsupported MIR buffer dtype: {source.dtype}")
-        # Copy so later changes to the producer's array cannot leak into MIR.
+            raise TypeError(f"unsupported BFIR buffer dtype: {source.dtype}")
+        # Copy so later changes to the producer's array cannot leak into BFIR.
         array = np.array(source, copy=True, order="C", subok=False)
         array.setflags(write=False)
         return cls(array)
 
 
 @dataclass(frozen=True)
-class MirDocument:
+class BfirDocument:
     """A plot document whose arrays are ``{"$buffer": id}`` references into ``buffers``."""
 
     document: dict[str, Any]
-    buffers: dict[str, MirBuffer]
+    buffers: dict[str, BfirBuffer]
     metadata: dict[str, Any]
 
     def validate(self) -> None:
         errors = _errors(self)
         if errors:
-            raise MirValidationError("invalid MIR:\n- " + "\n- ".join(errors))
+            raise BfirValidationError("invalid BFIR:\n- " + "\n- ".join(errors))
 
 
 @dataclass
-class MirBuilder:
+class BfirBuilder:
     """Collect buffers while building a document, then validate the result."""
 
     metadata: dict[str, Any]
-    _buffers: dict[str, MirBuffer] = field(default_factory=dict)
+    _buffers: dict[str, BfirBuffer] = field(default_factory=dict)
 
     def buffer(self, value: Any) -> dict[str, str]:
         buffer_id = f"buffer-{len(self._buffers)}"
-        self._buffers[buffer_id] = MirBuffer.from_value(value)
+        self._buffers[buffer_id] = BfirBuffer.from_value(value)
         return {"$buffer": buffer_id}
 
-    def build(self, document: dict[str, Any]) -> MirDocument:
-        mir = MirDocument(document, dict(self._buffers), dict(self.metadata))
-        mir.validate()
-        return mir
+    def build(self, document: dict[str, Any]) -> BfirDocument:
+        bfir = BfirDocument(document, dict(self._buffers), dict(self.metadata))
+        bfir.validate()
+        return bfir
 
 
 def _number(value: Any) -> bool:
     return isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(value)
 
 
-def _errors(mir: MirDocument) -> list[str]:
+def _errors(bfir: BfirDocument) -> list[str]:
     errors: list[str] = []
-    if not isinstance(mir.metadata, dict) or not mir.metadata.get("created_utc"):
+    if not isinstance(bfir.metadata, dict) or not bfir.metadata.get("created_utc"):
         errors.append("metadata.created_utc is required")
-    document = mir.document if isinstance(mir.document, dict) else {}
-    if not isinstance(mir.document, dict):
+    document = bfir.document if isinstance(bfir.document, dict) else {}
+    if not isinstance(bfir.document, dict):
         errors.append("document must be an object")
 
     ids: dict[str, set[str]] = {"figure": set(), "axes": set(), "artist": set()}
@@ -160,7 +160,7 @@ def _errors(mir: MirDocument) -> list[str]:
                     visit(item, f"{location}.{key}")
             elif set(value) != {"$buffer"} or not isinstance(value["$buffer"], str):
                 errors.append(f"{location} must be a single string $buffer reference")
-            elif value["$buffer"] not in mir.buffers:
+            elif value["$buffer"] not in bfir.buffers:
                 errors.append(f"dangling buffer reference {value['$buffer']!r} at {location}")
             else:
                 used.add(value["$buffer"])
@@ -169,11 +169,11 @@ def _errors(mir: MirDocument) -> list[str]:
                 visit(item, f"{location}[{index}]")
 
     visit(document, "document")
-    if unused := set(mir.buffers) - used:
+    if unused := set(bfir.buffers) - used:
         errors.append(f"unreferenced buffers: {', '.join(sorted(unused))}")
-    for buffer_id, buffer in mir.buffers.items():
-        if not isinstance(buffer, MirBuffer):
-            errors.append(f"buffers[{buffer_id!r}] must be a MirBuffer")
+    for buffer_id, buffer in bfir.buffers.items():
+        if not isinstance(buffer, BfirBuffer):
+            errors.append(f"buffers[{buffer_id!r}] must be a BfirBuffer")
     return errors
 
 

@@ -16,7 +16,7 @@ from matplotlib.patches import Patch, Polygon
 from matplotlib.spines import Spine
 from matplotlib.text import Text
 
-from ..mir import MirBuilder, MirDocument
+from ..bfir import BfirBuilder, BfirDocument
 
 
 def _finite(value: Any) -> Any:
@@ -52,7 +52,7 @@ def _common(artist: Artist) -> dict[str, Any]:
 
 @dataclass
 class ExtractionContext:
-    builder: MirBuilder
+    builder: BfirBuilder
     next_artist: int = 0
     artist_ids: dict[int, str] = field(default_factory=dict)
 
@@ -93,14 +93,14 @@ def translate_figures(
     names: list[str | None] | None = None,
     first_figure: int = 0,
     first_artist: int = 0,
-) -> tuple[MirDocument, int]:
-    """Translate Matplotlib figures into MIR and return the next unused artist number.
+) -> tuple[BfirDocument, int]:
+    """Translate Matplotlib figures into BFIR and return the next unused artist number.
 
     ``first_figure`` and ``first_artist`` offset generated IDs so separately translated
     groups can be combined into one document without collisions.
     """
     names = names or [None] * len(figures)
-    builder = MirBuilder(metadata=metadata)
+    builder = BfirBuilder(metadata=metadata)
     context = ExtractionContext(builder, next_artist=first_artist)
     records = []
     for index, (figure, name) in enumerate(zip(figures, names, strict=True)):

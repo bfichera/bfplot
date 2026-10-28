@@ -8,15 +8,15 @@ import bfplot
 from helpers import read_result
 
 
-def test_animation_exposes_defensive_initial_mir(tmp_path):
+def test_animation_exposes_defensive_initial_bfir(tmp_path):
     figure, axes = plt.subplots()
     axes.plot([0, 1], [0, 1])
     recording = bfplot.animation(tmp_path / "initial.bfplot", figure, provenance=False)
 
-    initial = recording.initial_mir
+    initial = recording.initial_bfir
     initial.document["figures"].clear()
 
-    assert len(recording.initial_mir.document["figures"]) == 1
+    assert len(recording.initial_bfir.document["figures"]) == 1
     recording.abort()
 
 

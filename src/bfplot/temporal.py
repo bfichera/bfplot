@@ -9,14 +9,14 @@ from typing import Any
 import numpy as np
 from matplotlib.figure import Figure
 
-from .mir import ANIMATABLE, MirDocument
+from .bfir import ANIMATABLE, BfirDocument
 
 FigureSource = Figure | Iterable[Figure] | None
-Translator = Callable[[FigureSource, dict[str, Any]], MirDocument]
+Translator = Callable[[FigureSource, dict[str, Any]], BfirDocument]
 
 
 class Animation:
-    """Record mutable Matplotlib figures as a timeline of semantic MIR updates.
+    """Record mutable Matplotlib figures as a timeline of semantic BFIR updates.
 
     Each ``capture()`` translates the figures again and stores only the fields that
     changed. Figures, axes and artists cannot be added or removed while recording.
@@ -30,7 +30,7 @@ class Animation:
         loop: bool = True,
         translator: Translator,
         metadata: dict[str, Any],
-        finisher: Callable[[MirDocument], Path] | None = None,
+        finisher: Callable[[BfirDocument], Path] | None = None,
     ):
         if not math.isfinite(fps) or fps <= 0:
             raise ValueError("fps must be a positive finite number")
@@ -41,7 +41,7 @@ class Animation:
         self._finisher = finisher
         self._closed = False
         self._result: Path | None = None
-        self._final: MirDocument | None = None
+        self._final: BfirDocument | None = None
         self._initial = translator(figure, metadata)
         self._previous = self._initial
         self._buffers = dict(self._initial.buffers)
@@ -61,16 +61,16 @@ class Animation:
         return len(self._frames)
 
     @property
-    def initial_mir(self) -> MirDocument:
+    def initial_bfir(self) -> BfirDocument:
         """A copy of the scene that playback starts from."""
         initial = self._initial
-        return MirDocument(
+        return BfirDocument(
             copy.deepcopy(initial.document), dict(initial.buffers), copy.deepcopy(initial.metadata)
         )
 
     @property
-    def finalized_mir(self) -> MirDocument:
-        """The temporal MIR document produced by ``close()``."""
+    def finalized_bfir(self) -> BfirDocument:
+        """The temporal BFIR document produced by ``close()``."""
         if self._final is None:
             raise RuntimeError("animation has not been closed")
         return self._final
@@ -109,7 +109,7 @@ class Animation:
             **self._previous.metadata,
             "temporal": {"fps": self.fps, "duration": duration, "frames": len(self._frames)},
         }
-        final = MirDocument(document, self._buffers, metadata)
+        final = BfirDocument(document, self._buffers, metadata)
         final.validate()
         self._final = final
         if self._finisher is not None:
@@ -137,7 +137,7 @@ class _Diff:
     fresh IDs so that every frame's arrays remain addressable.
     """
 
-    def __init__(self, old: MirDocument, new: MirDocument, buffers: dict[str, Any]):
+    def __init__(self, old: BfirDocument, new: BfirDocument, buffers: dict[str, Any]):
         self.old, self.new, self.buffers = old, new, buffers
         self.updates: list[dict[str, Any]] = []
         for old_figure, new_figure in self._pair(old.document, new.document, "figures"):

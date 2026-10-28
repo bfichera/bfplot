@@ -13,7 +13,7 @@ from matplotlib.figure import Figure
 
 from .adapters.matplotlib import translate_figures
 from .artifact import Layout, prepare_destination, write_result
-from .mir import MirDocument
+from .bfir import BfirDocument
 from .provenance import processing_metadata
 from .result import Result, figures_from, provenance_metadata, result
 from .temporal import Animation
@@ -25,8 +25,8 @@ def translate(
     figure: Figure | Iterable[Figure] | None = None,
     *,
     metadata: dict[str, Any] | None = None,
-) -> MirDocument:
-    """Translate Matplotlib figures into validated, storage-independent MIR."""
+) -> BfirDocument:
+    """Translate Matplotlib figures into validated, storage-independent BFIR."""
     processing = processing_metadata()
     if metadata is not None:
         if not isinstance(metadata, dict):
@@ -36,15 +36,15 @@ def translate(
 
 
 def compile(
-    document: MirDocument,
+    document: BfirDocument,
     path: str | Path,
     *,
     layout: Layout = "directory",
     preview: bool = True,
 ) -> Path:
-    """Compile validated MIR into one content-addressed BFPlot result at exactly ``path``."""
-    if not isinstance(document, MirDocument):
-        raise TypeError("document must be a MirDocument")
+    """Compile validated BFIR into one content-addressed BFPlot result at exactly ``path``."""
+    if not isinstance(document, BfirDocument):
+        raise TypeError("document must be a BfirDocument")
     output = Path(path)
     layout = prepare_destination(output, layout)
     return write_result(output, document, layout, preview=preview)
