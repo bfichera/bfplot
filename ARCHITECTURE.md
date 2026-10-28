@@ -15,6 +15,7 @@ plotting library -> adapter -> MIR -> writer -> result -> Rust CLI -> viewer
 | Adapter | `src/bfplot/adapters/matplotlib.py` | Matplotlib figures to MIR. Knows nothing about hashes, compression or files. |
 | MIR | `src/bfplot/mir.py`, `src/bfplot/mir.schema.json` | The language-neutral document model and its validator. |
 | Writer | `src/bfplot/artifact.py` | Validates MIR, encodes buffers, writes and replaces results. Knows nothing about Matplotlib. |
+| Preview | `src/bfplot/preview.py` | Draws MIR as Braille/ASCII text, appended to the manifest as TOML comments. |
 | Results | `src/bfplot/result.py`, `src/bfplot/temporal.py` | `bfplot.result()` and animation recording. |
 | Core | `crates/bfplot-core` | Reads, validates, verifies, packs and unpacks results. |
 | App | `crates/bfplot-cli` | The `bfplot` program: `verify`, `pack`, `unpack`, `manifest`, `serve`, `view`. Embeds the viewer. |
@@ -56,6 +57,8 @@ document = "sha256:<hex>"
 [provenance]
 created_utc = "2026-01-01T00:00:00Z"
 ```
+
+The Python writer ends the manifest with a text drawing of the figures in `#` comments. It does not affect parsing, hashes or the format version.
 
 `format` and `version` always come first. `version` is the format version (currently 1); it is raised whenever a change would make an older reader misread a result, and readers reject versions newer than their own `FORMAT_VERSION` with an "update bfplot" error before looking at anything else.
 

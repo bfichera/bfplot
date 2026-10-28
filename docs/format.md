@@ -32,7 +32,7 @@ git_commit = "98b821a316dd0a54f3e9d7bdd72c6e6007c1bbbf"
 python = "3.14.6"
 ```
 
-The manifest names the document object and records [provenance](guides/provenance.md). It is small and meant to be read, diffed and committed.
+The manifest names the document object and records [provenance](guides/provenance.md). It is small and meant to be read, diffed and committed. Python-written manifests end with a text preview of the figures in TOML comments (see [Using BFPlot with Git](guides/version-control.md)). Readers ignore the preview, and it is not part of any hash.
 
 `version` is the format version. Every writer, in any language, records the version it writes, and the `bfplot` app refuses a result whose version is newer than it understands:
 

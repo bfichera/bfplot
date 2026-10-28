@@ -21,6 +21,7 @@ bfplot.savefig(
     name=None,
     layout="directory",
     provenance=True,
+    preview=True,
 )
 ```
 
@@ -33,6 +34,7 @@ Save one or more Matplotlib figures as one BFPlot result.
 | `name` | A string for one figure, or a list with one name per figure (`None` entries allowed). |
 | `layout` | `"directory"` (default) or `"file"`. |
 | `provenance` | `True` for automatic metadata, `False` for none, or a dictionary of additional values. |
+| `preview` | End the manifest with a rough text drawing of the figures, as TOML comments. `bfplot.result()`, `bfplot.animation()`, `bfplot.save_animation()` and `bfplot.compile()` take the same argument. |
 
 Returns the output as a `pathlib.Path`.
 
@@ -43,7 +45,7 @@ output = bfplot.savefig("results/experiment.bfplot", fig, name="experiment")
 ## `bfplot.result`
 
 ```python
-bfplot.result(path, *, layout="directory", provenance=True)
+bfplot.result(path, *, layout="directory", provenance=True, preview=True)
 ```
 
 Collect several figures, at most one animation, and metadata into one result. Returns a `bfplot.Result`, best used as a context manager:

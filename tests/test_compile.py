@@ -90,3 +90,34 @@ def test_compile_stores_arrays_little_endian_and_rejects_non_numeric_buffers(tmp
     np.testing.assert_array_equal(read_array(output, reference), original)
     with pytest.raises(TypeError, match="unsupported MIR buffer dtype"):
         builder.buffer(np.array(["text"], dtype=object))
+
+
+def test_manifest_ends_with_a_commented_preview(tmp_path) -> None:
+    figure, axes = plt.subplots()
+    axes.plot([0, 1, 2], [0, 1, 0])
+    axes.set_title("tent")
+    output = bfplot.savefig(tmp_path / "tent.bfplot", figure, name="tent", provenance=False)
+
+    text = (output / "manifest.toml").read_text()
+    preview = text[text.index("# Preview") :].splitlines()
+    assert all(line.startswith("#") for line in preview)
+    assert "tent" in preview[2]
+    assert any(chr(0x2800) < char <= chr(0x28FF) for line in preview for char in line)
+    manifest, _ = read_result(output)
+    assert set(manifest) == {"format", "version", "document", "provenance"}
+
+
+def test_preview_can_be_disabled(tmp_path) -> None:
+    figure, axes = plt.subplots()
+    axes.plot([0, 1], [2, 3])
+    output = bfplot.savefig(tmp_path / "plain.bfplot", figure, preview=False)
+    assert "#" not in (output / "manifest.toml").read_text()
+
+
+def test_preview_survives_unusable_axes(tmp_path) -> None:
+    figure, axes = plt.subplots()
+    axes.plot([0, 1], [2, 3])
+    mir = bfplot.translate(figure)
+    mir.document["figures"][0]["axes"][0]["x"]["limits"] = [None, None]
+    output = bfplot.compile(mir, tmp_path / "odd.bfplot")
+    assert "# (no preview: ValueError" in (output / "manifest.toml").read_text()

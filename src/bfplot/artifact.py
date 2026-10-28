@@ -26,6 +26,7 @@ import numpy as np
 import zstandard as zstd
 
 from .mir import MirDocument
+from .preview import render
 from .provenance import processing_metadata
 
 Layout = Literal["directory", "file"]
@@ -104,9 +105,15 @@ def _toml_table(name: str, table: dict[str, Any], lines: list[str]) -> None:
         _toml_table(f"{name}.{_toml_key(key)}", value, lines)
 
 
-def manifest_bytes(document: str, provenance: dict[str, Any]) -> bytes:
+def manifest_bytes(
+    document: str, provenance: dict[str, Any], preview: list[str] | None = None
+) -> bytes:
     lines = ['format = "bfplot"', f"version = {FORMAT_VERSION}", f'document = "{document}"']
     _toml_table("provenance", provenance, lines)
+    if preview:
+        # Comments, so readers ignore the drawing and it needs no format version.
+        lines += ["", "# Preview (approximate; regenerated on every save)", "#"]
+        lines += [f"# {line}".rstrip() for line in preview]
     return ("\n".join(lines) + "\n").encode("utf-8")
 
 
@@ -160,8 +167,11 @@ def _encode(array: np.ndarray) -> tuple[bytes, dict[str, Any]]:
     return zstd.ZstdCompressor(level=3).compress(array.tobytes()), descriptor
 
 
-def write_result(path: Path, mir: MirDocument, layout: Layout) -> Path:
-    """Write ``mir`` as one result at exactly ``path``, replacing any previous result."""
+def write_result(path: Path, mir: MirDocument, layout: Layout, *, preview: bool = True) -> Path:
+    """Write ``mir`` as one result at exactly ``path``, replacing any previous result.
+
+    With ``preview``, the manifest ends with a text drawing of the figures in comments.
+    """
     mir.validate()
     objects: dict[str, bytes] = {}
 
@@ -185,7 +195,8 @@ def write_result(path: Path, mir: MirDocument, layout: Layout) -> Path:
         return value
 
     document = put(canonical_json(resolve(mir.document)))
-    manifest = manifest_bytes(document, {**processing_metadata(), **mir.metadata})
+    drawing = render(mir) if preview else None
+    manifest = manifest_bytes(document, {**processing_metadata(), **mir.metadata}, drawing)
 
     _check_destination(path)
     path.parent.mkdir(parents=True, exist_ok=True)

@@ -67,9 +67,11 @@ class Result:
         *,
         layout: Layout = "directory",
         provenance: bool | dict[str, Any] = True,
+        preview: bool = True,
         _stacklevel: int = 1,
     ):
         self.path = Path(path)
+        self.preview = bool(preview)
         self.layout = prepare_destination(self.path, layout, stacklevel=_stacklevel + 1)
         self.metadata = Metadata()
         self._base_metadata = provenance_metadata(provenance)
@@ -172,7 +174,7 @@ class Result:
         self._closed = True
         if not self._groups:
             raise ValueError("a result needs at least one figure")
-        self._written = write_result(self.path, self._document(), self.layout)
+        self._written = write_result(self.path, self._document(), self.layout, preview=self.preview)
         return self._written
 
     def abort(self) -> None:
@@ -267,6 +269,7 @@ def result(
     *,
     layout: Layout = "directory",
     provenance: bool | dict[str, Any] = True,
+    preview: bool = True,
 ) -> Result:
     """Collect figures, an optional animation, and metadata into one output at ``path``."""
-    return Result(path, layout=layout, provenance=provenance, _stacklevel=2)
+    return Result(path, layout=layout, provenance=provenance, preview=preview, _stacklevel=2)
