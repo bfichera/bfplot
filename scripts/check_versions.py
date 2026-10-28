@@ -15,7 +15,6 @@ import sys
 from pathlib import Path
 
 import tomllib
-from packaging.requirements import Requirement
 from packaging.version import Version
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -28,8 +27,6 @@ def declared() -> list[tuple[str, str]]:
     cargo = toml("Cargo.toml")
     cli = toml("crates/bfplot-cli/Cargo.toml")
     pyproject = toml("pyproject.toml")
-    pins = [Requirement(item) for item in pyproject["project"]["dependencies"]]
-    cli_pin = next(req for req in pins if req.name == "bfplot-cli")
     init = (ROOT / "src/bfplot/__init__.py").read_text()
     provenance = (ROOT / "src/bfplot/provenance.py").read_text()
     lock = toml("Cargo.lock")
@@ -45,7 +42,6 @@ def declared() -> list[tuple[str, str]]:
             if package["name"] in {"bfplot-cli", "bfplot-core"}
         ),
         ("pyproject.toml", pyproject["project"]["version"]),
-        ("pyproject.toml bfplot-cli pin", str(cli_pin.specifier).removeprefix("==")),
         ("src/bfplot/__init__.py", re.search(r'__version__ = "([^"]+)"', init).group(1)),
         ("viewer/package.json", json.loads((ROOT / "viewer/package.json").read_text())["version"]),
         (

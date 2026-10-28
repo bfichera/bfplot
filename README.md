@@ -22,16 +22,16 @@ BFPlot is new. Please try it on real plots and tell us what behaves strangely.
 
 ## Installation
 
-You need Python 3.10+.
-
-```console
-$ python -m pip install bfplot
-```
-
-This installs the Python library and the `bfplot` app that opens results, with the viewer built in. To install only the app on macOS or Linux:
+BFPlot is distributed only through GitHub. Install the `bfplot` app, which opens results and has the viewer built in, on macOS or Linux:
 
 ```console
 $ curl -LsSf https://github.com/bfichera/bfplot/releases/latest/download/install.sh | sh
+```
+
+Then install the Python library (Python 3.10+) from GitHub:
+
+```console
+$ python -m pip install "bfplot @ git+https://github.com/bfichera/bfplot"
 ```
 
 See [Installation](https://bfichera.github.io/bfplot/getting-started/installation/) for uninstalling and other options.

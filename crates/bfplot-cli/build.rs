@@ -1,8 +1,6 @@
 //! Embed the browser viewer in the binary.
 //!
-//! In the repository the assets come from `viewer/dist`. Published crates and source
-//! distributions carry a copy in `viewer/` next to this file, staged by
-//! `scripts/stage-crates.sh`.
+//! The assets come from `viewer/dist`, or from `viewer/` next to this file if present.
 
 use std::{
     env, fs,
@@ -22,7 +20,7 @@ fn main() {
     else {
         panic!(
             "viewer assets not found in viewer/dist or crates/bfplot-cli/viewer; \
-             run `npm --prefix viewer run build` (or scripts/stage-crates.sh for packaging)"
+             run `npm --prefix viewer run build`"
         );
     };
     let root = root.canonicalize().unwrap();
@@ -49,7 +47,7 @@ fn main() {
     fs::write(out, source).unwrap();
 }
 
-/// Runtime files only: source maps and type declarations are for the npm package.
+/// Runtime files only: source maps and type declarations are not embedded.
 fn collect(root: &Path, directory: &Path, files: &mut Vec<(String, String)>) {
     for entry in fs::read_dir(directory).unwrap() {
         let path = entry.unwrap().path();

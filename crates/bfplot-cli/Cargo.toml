@@ -8,18 +8,7 @@ repository.workspace = true
 homepage.workspace = true
 description = "The bfplot app: view, serve, verify and pack BFPlot results"
 readme = "README.md"
-keywords = ["plotting", "visualization", "scientific", "viewer", "matplotlib"]
-categories = ["command-line-utilities", "visualization", "science"]
-# viewer/ and the license texts are staged by scripts/stage-crates.sh and ignored by Git.
-include = [
-  "/src/**/*.rs",
-  "/build.rs",
-  "/viewer/**/*",
-  "/README.md",
-  "/pyproject.toml",
-  "/LICENSE-APACHE",
-  "/LICENSE-MIT",
-]
+publish = false
 
 [[bin]]
 name = "bfplot"

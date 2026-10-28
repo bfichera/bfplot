@@ -147,7 +147,7 @@ def show(
         executable = _find_executable()
         if executable is None:
             raise RuntimeError(
-                "the bfplot app is not installed (pip install bfplot-cli); use open_browser=False"
+                "the bfplot app is not installed (see the installation docs); use open_browser=False"
             )
         subprocess.Popen([executable, "view", str(output)], start_new_session=True)
     return output
@@ -156,8 +156,8 @@ def show(
 def _find_executable() -> str | None:
     """The ``bfplot`` app, preferring the one installed in this Python environment.
 
-    The ``bfplot-cli`` dependency installs it next to this interpreter's scripts, which may
-    not be on ``PATH`` when the environment is not activated.
+    A source install (``pip install ./crates/bfplot-cli``) puts it next to this interpreter's
+    scripts, which may not be on ``PATH`` when the environment is not activated.
     """
     name = "bfplot.exe" if os.name == "nt" else "bfplot"
     for scheme in dict.fromkeys(

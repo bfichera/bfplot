@@ -1,5 +1,5 @@
-# The pure-Python `bfplot` writer. The app it opens results with comes from the
-# `bfplot-cli` package (crates/bfplot-cli), released with the same version.
+# The pure-Python `bfplot` writer. The app it opens results with is built from
+# crates/bfplot-cli. Distributed only through https://github.com/bfichera/bfplot.
 
 [build-system]
 requires = ["hatchling>=1.27"]
@@ -23,10 +23,9 @@ classifiers = [
   "Programming Language :: Python :: 3 :: Only",
   "Topic :: Scientific/Engineering :: Visualization",
   "Typing :: Typed",
+  "Private :: Do Not Upload",
 ]
 dependencies = [
-  # Keep in step with the version above; scripts/check_versions.py checks it.
-  "bfplot-cli==0.9.9",
   "matplotlib>=3.7",
   "numpy>=1.24",
   "zstandard>=0.21",
@@ -39,12 +38,11 @@ Repository = "https://github.com/bfichera/bfplot"
 Issues = "https://github.com/bfichera/bfplot/issues"
 Changelog = "https://github.com/bfichera/bfplot/releases"
 
-# Development only (PEP 735, `pip install --group test`); not part of the published metadata.
+# Development only (PEP 735, `pip install --group test`).
 [dependency-groups]
 test = ["pytest>=8", "pytest-cov>=5", "ruff>=0.14", "tomli>=2; python_version < '3.11'"]
 docs = ["mkdocs-material>=9.6,<10"]
-release = ["build>=1.2", "maturin>=1.9,<2", "packaging>=24", "twine>=6"]
-dev = [{ include-group = "test" }, { include-group = "docs" }, { include-group = "release" }]
+dev = [{ include-group = "test" }, { include-group = "docs" }, "packaging>=24"]
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/bfplot"]

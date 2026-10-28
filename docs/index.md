@@ -71,7 +71,7 @@ Anything else is shown as a visible placeholder, never silently dropped. To supp
 <div class="bfplot-next-grid">
 <a href="getting-started/installation/">
 <strong>Install</strong>
-<span><code>pip install bfplot</code>: the Python package and the app.</span>
+<span>The app and the Python package, from GitHub.</span>
 </a>
 <a href="getting-started/first-plot/">
 <strong>Save a plot</strong>

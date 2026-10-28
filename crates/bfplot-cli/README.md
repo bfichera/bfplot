@@ -8,12 +8,13 @@ $ bfplot verify experiment.bfplot
 $ bfplot pack experiment.bfplot shared/experiment.bfplot
 ```
 
-Most people get it with `pip install bfplot`, which installs this app together with the Python library that writes results. You can also install the app on its own:
+Install it on macOS or Linux from the GitHub release:
 
 ```console
-$ pip install bfplot-cli      # or: uv tool install bfplot-cli
-$ cargo install bfplot-cli
+$ curl -LsSf https://github.com/bfichera/bfplot/releases/latest/download/install.sh | sh
 ```
+
+Or build it from a checkout with `cargo build --release -p bfplot-cli`.
 
 See the [command reference](https://bfichera.github.io/bfplot/reference/cli/).
 

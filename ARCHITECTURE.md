@@ -72,18 +72,11 @@ Every artist has `type`, `id`, `axes_id`, `props` and `data`. Types use the `bfp
 
 ## Distribution
 
-The result format is the contract between writers and the app. Writers are native to their language (the Python writer never calls Rust) and only need to produce valid results; the `bfplot` app reads them. Each release builds the app once per platform, and every ecosystem depends on that build instead of bundling its own:
+The result format is the contract between writers and the app. Writers are native to their language (the Python writer never calls Rust) and only need to produce valid results; the `bfplot` app reads them.
 
-| Package | Contents |
-| --- | --- |
-| `bfplot` (PyPI) | The pure-Python writer. Depends on `bfplot-cli` at exactly the same version. |
-| `bfplot-cli` (PyPI) | Only the `bfplot` binary, as platform wheels built by maturin (`bindings = "bin"`). |
-| GitHub release | macOS and Linux archives of the same binaries, with `install.sh` and `uninstall.sh` for installing them with curl. |
-| `bfplot-cli`, `bfplot-core` (crates.io) | The source of the app and the core library, for Rust developers (`cargo install bfplot-cli`, or depending on `bfplot-core`). |
+BFPlot is distributed only through its GitHub repository; nothing is published to PyPI, crates.io, npm or any other registry. Each GitHub release carries macOS and Linux archives of the app, with `install.sh` and `uninstall.sh` for installing them with curl. The Python writer is installed from a checkout or straight from GitHub. `crates/bfplot-cli/pyproject.toml` lets pip build the app from source (maturin, `bindings = "bin"`) and put it next to the Python package. `bfplot.show()` looks for the app in its Python environment's scripts directory before `PATH`.
 
-Other languages follow the same pattern (Julia, for example, through a `bfplot_jll` package built from the same release). `bfplot.show()` looks for the app in its Python environment's scripts directory before `PATH`.
-
-The viewer is compiled into the app by `crates/bfplot-cli/build.rs` from `viewer/dist`; published crates and the `bfplot-cli` sdist carry a copy staged by `scripts/stage-crates.sh`. `--viewer-dir` (or `BFPLOT_VIEWER_DIR`) serves a different build for viewer development. Releasing is described in `RELEASING.md`.
+The viewer is compiled into the app by `crates/bfplot-cli/build.rs` from `viewer/dist`. `--viewer-dir` (or `BFPLOT_VIEWER_DIR`) serves a different build for viewer development. Releasing is described in `RELEASING.md`.
 
 ## Safety
 

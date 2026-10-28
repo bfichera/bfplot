@@ -30,12 +30,12 @@ case "$(uname -s)" in
   Darwin) os=apple-darwin ;;
   # Statically linked, so it runs on any distribution.
   Linux) os=unknown-linux-musl ;;
-  *) fail "this script supports macOS and Linux; elsewhere run: pip install bfplot-cli" ;;
+  *) fail "this script supports macOS and Linux; elsewhere build from source (see https://github.com/bfichera/bfplot)" ;;
 esac
 case "$(uname -m)" in
   x86_64 | amd64) arch=x86_64 ;;
   arm64 | aarch64) arch=aarch64 ;;
-  *) fail "no prebuilt bfplot for $(uname -m); try: pip install bfplot-cli" ;;
+  *) fail "no prebuilt bfplot for $(uname -m); build from source (see https://github.com/bfichera/bfplot)" ;;
 esac
 # A shell running under Rosetta reports x86_64 on Apple silicon; use the native build.
 if [ "$os" = apple-darwin ] && [ "$arch" = x86_64 ] &&

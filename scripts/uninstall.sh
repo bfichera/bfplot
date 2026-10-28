@@ -29,5 +29,5 @@ fi
 
 if other="$(command -v bfplot 2>/dev/null)" && [ -n "$other" ]; then
   say "another bfplot is still on your PATH: $other"
-  say "if pip installed it, remove it with: pip uninstall bfplot bfplot-cli"
+  say "if pip installed it from a source checkout, remove it with: pip uninstall bfplot bfplot-cli"
 fi

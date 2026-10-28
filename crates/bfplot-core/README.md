@@ -1,6 +1,6 @@
 # bfplot-core
 
-Reads, validates, packs and unpacks [BFPlot](https://bfichera.github.io/bfplot/) results: a `manifest.toml` plus content-addressed objects, in a directory or a single packed file. It is the library behind the `bfplot` app ([`bfplot-cli`](https://crates.io/crates/bfplot-cli)).
+Reads, validates, packs and unpacks [BFPlot](https://bfichera.github.io/bfplot/) results: a `manifest.toml` plus content-addressed objects, in a directory or a single packed file. It is the library behind the `bfplot` app (`crates/bfplot-cli`).
 
 ```rust
 let report = bfplot_core::verify_artifact(std::path::Path::new("experiment.bfplot"))?;

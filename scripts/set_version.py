@@ -58,7 +58,6 @@ def main() -> None:
     for crate in ("bfplot-cli", "bfplot-core"):
         substitute("Cargo.lock", rf'^name = "{crate}"\nversion = "{any_version}"', cargo)
     substitute("pyproject.toml", rf'^version = "{any_version}"', python)
-    substitute("pyproject.toml", rf'"bfplot-cli=={any_version}"', python)
     substitute("src/bfplot/__init__.py", rf'^__version__ = "{any_version}"', python)
     substitute("src/bfplot/provenance.py", rf'packages\[package\] = "{any_version}"', python)
     set_json("viewer/package.json", ("version",), value=cargo)
