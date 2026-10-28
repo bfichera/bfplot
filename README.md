@@ -1,6 +1,6 @@
 # BFPlot
 
-> **[Read the documentation →](https://bfplot-dev.github.io/bfplot/)**
+> **[Read the documentation →](https://bfichera.github.io/bfplot/)**
 
 BFPlot saves Matplotlib figures as interactive results. You can zoom, pan and inspect your data later, or hand it to someone else, instead of keeping only a static PNG.
 
@@ -31,10 +31,10 @@ $ python -m pip install bfplot
 This installs the Python library and the `bfplot` app that opens results, with the viewer built in. To install only the app on macOS or Linux:
 
 ```console
-$ curl -LsSf https://github.com/bfplot-dev/bfplot/releases/latest/download/install.sh | sh
+$ curl -LsSf https://github.com/bfichera/bfplot/releases/latest/download/install.sh | sh
 ```
 
-See [Installation](https://bfplot-dev.github.io/bfplot/getting-started/installation/) for uninstalling and other options.
+See [Installation](https://bfichera.github.io/bfplot/getting-started/installation/) for uninstalling and other options.
 
 ## Results
 

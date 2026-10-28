@@ -15,13 +15,13 @@ A version such as `1.1.0-rc.1` is a pre-release: pip and `install.sh` ignore it 
 
 Before the first release:
 
-1. **GitHub.** Create the public repository `bfplot-dev/bfplot` and push `main`. In **Settings → Pages**, set the source to **GitHub Actions** for the documentation site.
+1. **GitHub.** Create the public repository `bfichera/bfplot` and push `main`. In **Settings → Pages**, set the source to **GitHub Actions** for the documentation site.
 2. **PyPI.** Sign in to <https://pypi.org>, open [Publishing](https://pypi.org/manage/account/publishing/), and add a pending publisher for `bfplot-cli`, then the same for `bfplot`:
 
    | Field | Value |
    | --- | --- |
    | PyPI project name | `bfplot-cli` (then `bfplot`) |
-   | Owner | `bfplot-dev` |
+   | Owner | `bfichera` |
    | Repository name | `bfplot` |
    | Workflow name | `release.yml` |
    | Environment name | `pypi` |

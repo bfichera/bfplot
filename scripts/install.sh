@@ -1,7 +1,7 @@
 #!/bin/sh
 # Install the bfplot app on macOS or Linux:
 #
-#   curl -LsSf https://github.com/bfplot-dev/bfplot/releases/latest/download/install.sh | sh
+#   curl -LsSf https://github.com/bfichera/bfplot/releases/latest/download/install.sh | sh
 #
 # Settings (environment variables):
 #   BFPLOT_VERSION      version to install, such as 1.0.0 (default: the latest release)
@@ -10,7 +10,7 @@
 # Remove it again with uninstall.sh from the same release page.
 set -eu
 
-repo="https://github.com/bfplot-dev/bfplot"
+repo="https://github.com/bfichera/bfplot"
 install_dir="${BFPLOT_INSTALL_DIR:-$HOME/.local/bin}"
 if [ -n "${BFPLOT_VERSION:-}" ]; then
   base="$repo/releases/download/v${BFPLOT_VERSION#v}"

@@ -2,7 +2,7 @@
 
 ## Reporting a vulnerability
 
-Please **do not** open a public issue. Use GitHub's private vulnerability reporting for `bfplot-dev/bfplot` (**Security → Report a vulnerability**). Include the version or commit, the component (Rust core/CLI, Python package, viewer), reproduction steps or a minimal result if safe to share, and the likely impact.
+Please **do not** open a public issue. Use GitHub's private vulnerability reporting for `bfichera/bfplot` (**Security → Report a vulnerability**). Include the version or commit, the component (Rust core/CLI, Python package, viewer), reproduction steps or a minimal result if safe to share, and the likely impact.
 
 If private reporting is unavailable, contact a maintainer privately through a verified GitHub profile and ask for a secure channel.
 

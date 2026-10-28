@@ -1,7 +1,7 @@
 #!/bin/sh
 # Remove the bfplot app installed by install.sh:
 #
-#   curl -LsSf https://github.com/bfplot-dev/bfplot/releases/latest/download/uninstall.sh | sh
+#   curl -LsSf https://github.com/bfichera/bfplot/releases/latest/download/uninstall.sh | sh
 #
 # Set BFPLOT_INSTALL_DIR if you installed somewhere other than ~/.local/bin.
 # bfplot keeps no other files, so this removes everything install.sh added.

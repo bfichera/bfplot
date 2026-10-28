@@ -1,8 +1,8 @@
 site_name: BFPlot
 site_description: Save Matplotlib figures as interactive, reproducible scientific files.
-site_url: https://bfplot-dev.github.io/bfplot/
-repo_url: https://github.com/bfplot-dev/bfplot
-repo_name: bfplot-dev/bfplot
+site_url: https://bfichera.github.io/bfplot/
+repo_url: https://github.com/bfichera/bfplot
+repo_name: bfichera/bfplot
 edit_uri: edit/main/docs/
 copyright: Copyright &copy; 2026 BFPlot contributors
 
@@ -115,6 +115,6 @@ extra_javascript:
 extra:
   social:
     - icon: fontawesome/brands/github
-      link: https://github.com/bfplot-dev/bfplot
+      link: https://github.com/bfichera/bfplot
       name: BFPlot on GitHub
   generator: false

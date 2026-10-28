@@ -1,6 +1,6 @@
 # bfplot-cli
 
-The `bfplot` app: opens [BFPlot](https://bfplot-dev.github.io/bfplot/) results in your browser, and verifies, packs and unpacks them. The interactive viewer is built into the program, so it needs nothing else.
+The `bfplot` app: opens [BFPlot](https://bfichera.github.io/bfplot/) results in your browser, and verifies, packs and unpacks them. The interactive viewer is built into the program, so it needs nothing else.
 
 ```console
 $ bfplot view experiment.bfplot
@@ -15,6 +15,6 @@ $ pip install bfplot-cli      # or: uv tool install bfplot-cli
 $ cargo install bfplot-cli
 ```
 
-See the [command reference](https://bfplot-dev.github.io/bfplot/reference/cli/).
+See the [command reference](https://bfichera.github.io/bfplot/reference/cli/).
 
 Licensed under either the Apache License, Version 2.0, or the MIT license, at your option.

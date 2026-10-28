@@ -10,8 +10,8 @@ version = "0.9.9"
 edition = "2024"
 license = "Apache-2.0 OR MIT"
 rust-version = "1.88"
-repository = "https://github.com/bfplot-dev/bfplot"
-homepage = "https://bfplot-dev.github.io/bfplot/"
+repository = "https://github.com/bfichera/bfplot"
+homepage = "https://bfichera.github.io/bfplot/"
 
 [workspace.dependencies]
 anyhow = "1.0"
