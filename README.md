@@ -58,6 +58,8 @@ results/fit.bfplot/
 └── objects/
 ```
 
+By default, `manifest.toml` ends with a rough ASCII/Braille drawing of each figure, written as `#` comments. It lets you see the plot in a diff or commit without opening the viewer. It is only a preview: it does not affect parsing or hashes, and the real data lives in `objects/`. Pass `preview=False` to leave it out.
+
 Pass `layout="file"` for one packed file instead. `bfplot pack` and `bfplot unpack` convert between the two.
 
 The path is used exactly as given (BFPlot warns if it does not end in `.bfplot`). An existing result at the path is replaced; anything else raises `FileExistsError` before any work is done.
@@ -86,20 +88,50 @@ bfir = bfplot.translate(fig)
 bfplot.compile(bfir, "my_plot.bfplot")
 ```
 
-BFIR is described by `src/bfplot/bfir.schema.json`, so producers for other languages can target it. See [`ARCHITECTURE.md`](ARCHITECTURE.md).
+BFIR is described by `src/bfplot/bfir.schema.json`, so producers for other languages can target it. See [`ARCHITECTURE.md`](https://github.com/bfichera/bfplot/blob/main/ARCHITECTURE.md).
+
+## Serving
+
+`bfplot view` serves a result and opens it in your browser. `bfplot serve` does the same without opening a browser. By default the server listens on `127.0.0.1:8080`; use `--port` to change the port.
+
+To serve remotely, bind to another address explicitly:
+
+```console
+$ bfplot serve my_plot.bfplot --bind 0.0.0.0 --port 9000
+```
+
+> **Warning:** The server has no authentication or TLS. Put an authenticated reverse proxy in front of it and restrict network access. See the [security policy](https://github.com/bfichera/bfplot/blob/main/SECURITY.md) and the [serving guide](https://bfichera.github.io/bfplot/guides/serving/).
+
+### Using BFPlot with psana (SLAC S3DF)
+
+To view a result stored on psana, keep the server on loopback and reach it through an SSH tunnel. Nothing is exposed to the network.
+
+On S3DF (`ssh <username>@s3df.slac.stanford.edu`, then to your psana node), start the server without a browser:
+
+```console
+$ bfplot serve /path/to/my_plot.bfplot --port 9000
+```
+
+On your own machine, forward the port through S3DF to the node running the server:
+
+```console
+$ ssh -L 9000:<psana-node>:9000 <username>@s3df.slac.stanford.edu
+```
+
+Then open <http://127.0.0.1:9000> in your local browser. If you run the server on the login node itself, use `localhost` in place of `<psana-node>`. Pick a port that other users are not using.
 
 ## Supported plots
 
 Lines, scatter plots, images, error bars, filled regions, histograms, contours, text, patches and common 3D plots. Anything else is shown as a visible placeholder, never silently dropped.
 
-To see them all, run the [example gallery](examples/gallery.py): `python examples/gallery.py`, then `bfplot view gallery.bfplot`.
+To see them all, run the [example gallery](https://github.com/bfichera/bfplot/blob/main/examples/gallery.py): `python examples/gallery.py`, then `bfplot view gallery.bfplot`.
 
 ## More
 
-- [Contributing](CONTRIBUTING.md)
-- [Security policy](SECURITY.md)
-- [Architecture](ARCHITECTURE.md)
+- [Contributing](https://github.com/bfichera/bfplot/blob/main/CONTRIBUTING.md)
+- [Security policy](https://github.com/bfichera/bfplot/blob/main/SECURITY.md)
+- [Architecture](https://github.com/bfichera/bfplot/blob/main/ARCHITECTURE.md)
 
 ## License
 
-Apache License 2.0 or MIT License, at your option: [LICENSE-APACHE](LICENSE-APACHE), [LICENSE-MIT](LICENSE-MIT).
+Apache License 2.0 or MIT License, at your option: [LICENSE-APACHE](https://github.com/bfichera/bfplot/blob/main/LICENSE-APACHE), [LICENSE-MIT](https://github.com/bfichera/bfplot/blob/main/LICENSE-MIT).
