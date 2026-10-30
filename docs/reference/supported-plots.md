@@ -29,5 +29,4 @@ BFPlot does not silently remove unsupported data. The viewer displays a placehol
 
 For another Matplotlib artist, please open an issue or submit a pull request that adds its exporter and viewer renderer to BFPlot.
 
-!!! note "Pre-1.0 reality check"
-    Matplotlib has a wonderfully large and occasionally surprising artist ecosystem. Test BFPlot against the exact plot types your analysis uses before relying on it for final archival output.
+> Matplotlib has a wonderfully large and occasionally surprising artist ecosystem. Test BFPlot against the exact plot types your analysis uses before relying on it for final archival output.

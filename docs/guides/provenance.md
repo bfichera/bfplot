@@ -37,8 +37,7 @@ bfplot.savefig("plot.bfplot", fig, provenance=False)
 
 keeps only the creation time and Git commit.
 
-!!! warning
-    Default provenance includes absolute paths and your username. Check the manifest before publishing a result.
+> Default provenance includes absolute paths and your username. Check the manifest before publishing a result.
 
 ## Limits
 

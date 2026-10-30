@@ -1,58 +1,13 @@
 site_name: BFPlot
-site_description: Interactive, reproducible scientific plots, with a Python implementation for Matplotlib.
+site_description: Interactive, reproducible scientific plots, with a Python implementation for Matplotlib
 site_url: https://bfichera.github.io/bfplot/
 repo_url: https://github.com/bfichera/bfplot
 repo_name: bfichera/bfplot
 edit_uri: edit/main/docs/
-copyright: Copyright &copy; 2026 BFPlot contributors
 
 theme:
-  name: material
-  custom_dir: docs/overrides
-  language: en
-  logo: assets/logo.svg
-  favicon: assets/favicon.svg
-  icon:
-    repo: fontawesome/brands/github
-  font: false
-  palette:
-    - media: "(prefers-color-scheme: light)"
-      scheme: bfplot-light
-      primary: custom
-      accent: custom
-      toggle:
-        icon: material/weather-night
-        name: Switch to dark mode
-    - media: "(prefers-color-scheme: dark)"
-      scheme: slate
-      primary: custom
-      accent: custom
-      toggle:
-        icon: material/weather-sunny
-        name: Switch to light mode
-  features:
-    - announce.dismiss
-    - content.action.edit
-    - content.code.annotate
-    - content.code.copy
-    - content.tabs.link
-    - navigation.footer
-    - navigation.indexes
-    - navigation.instant
-    - navigation.instant.prefetch
-    - navigation.path
-    - navigation.sections
-    - navigation.tabs
-    - navigation.tabs.sticky
-    - navigation.top
-    - search.highlight
-    - search.share
-    - search.suggest
-    - toc.follow
-
-plugins:
-  - search:
-      separator: '[\s\-,:!=\[\]()"`/]+|\.(?!\d)|&[lg]t;|(?!\b)(?=[A-Z][a-z])'
+  name: terminal
+  palette: gruvbox_dark
 
 nav:
   - Home: index.md
@@ -78,42 +33,11 @@ nav:
       - Architecture: project/architecture.md
 
 markdown_extensions:
-  - abbr
   - admonition
-  - attr_list
-  - def_list
-  - footnotes
-  - md_in_html
   - tables
   - toc:
       permalink: true
-      title: On this page
-  - pymdownx.details
-  - pymdownx.highlight:
-      anchor_linenums: true
-      line_spans: __span
-      pygments_lang_class: true
-  - pymdownx.inlinehilite
-  - pymdownx.keys
-  - pymdownx.magiclink
   - pymdownx.snippets:
       base_path: ["."]
       check_paths: true
   - pymdownx.superfences
-  - pymdownx.tabbed:
-      alternate_style: true
-  - pymdownx.tasklist:
-      custom_checkbox: true
-
-extra_css:
-  - stylesheets/extra.css
-
-extra_javascript:
-  - javascripts/extra.js
-
-extra:
-  social:
-    - icon: fontawesome/brands/github
-      link: https://github.com/bfichera/bfplot
-      name: BFPlot on GitHub
-  generator: false

@@ -30,8 +30,7 @@ The manifest records the document hash and provenance, so a diff shows when an o
 
 Lines, markers and outlines are drawn with Braille dots, and images and colorbars with ASCII shading. The drawing is only a sketch: it shows the first frame of an animation, skips fine detail, and does not replace the data. The lines are TOML comments, so readers ignore them. Pass `preview=False` to leave the drawing out.
 
-!!! warning "Git keeps the manifest, not the data"
-    A fresh clone has manifests without data. Re-run the pipeline, or share the directory or a packed file another way.
+> A fresh clone has manifests without data. Re-run the pipeline, or share the directory or a packed file another way.
 
 ## Verify
 

@@ -41,7 +41,7 @@ Changelog = "https://github.com/bfichera/bfplot/releases"
 # Development only (PEP 735, `pip install --group test`).
 [dependency-groups]
 test = ["pytest>=8", "pytest-cov>=5", "ruff>=0.14", "tomli>=2; python_version < '3.11'"]
-docs = ["mkdocs-material>=9.6,<10"]
+docs = ["mkdocs-terminal>=4.8", "pymdown-extensions>=10"]
 dev = [{ include-group = "test" }, { include-group = "docs" }, "packaging>=24"]
 
 [tool.hatch.build.targets.wheel]
