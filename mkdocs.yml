@@ -1,13 +1,16 @@
 site_name: BFPlot
-site_description: Interactive, reproducible scientific plots, with a Python implementation for Matplotlib
 site_url: https://bfichera.github.io/bfplot/
 repo_url: https://github.com/bfichera/bfplot
-repo_name: bfichera/bfplot
 edit_uri: edit/main/docs/
 
 theme:
   name: terminal
-  palette: gruvbox_dark
+  palette: default
+  features:
+    - navigation.side.toc.hide
+
+extra_css:
+  - extra.css
 
 nav:
   - Home: index.md
@@ -33,7 +36,6 @@ nav:
       - Architecture: project/architecture.md
 
 markdown_extensions:
-  - admonition
   - tables
   - toc:
       permalink: true

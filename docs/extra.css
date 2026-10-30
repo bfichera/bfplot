@@ -1,0 +1,14 @@
+pre {
+    white-space: pre;
+    overflow-x: auto;
+}
+
+.terminal-mkdocs-main-grid {
+    grid-template-columns: minmax(0, 1fr);
+}
+
+@media only screen and (min-width: 70em) {
+    .terminal-mkdocs-main-grid {
+        grid-template-columns: minmax(0, 4fr) minmax(0, 9fr);
+    }
+}
