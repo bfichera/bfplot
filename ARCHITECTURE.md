@@ -80,4 +80,4 @@ The viewer is compiled into the app by `crates/bfplot-cli/build.rs` from `viewer
 
 ## Safety
 
-Results contain data, never code, and cannot load renderers. Object digests are verified before decoding. The server binds to loopback unless told otherwise.
+Results contain data, never code, and cannot load renderers. Object digests are verified before decoding.

@@ -93,6 +93,6 @@ $ bfplot unpack shared/experiment.bfplot restored/experiment.bfplot
 
 ## Safety
 
-Results contain data, never code, and cannot load extra renderers. Treat files from strangers as untrusted input anyway; see the [security policy](project/security.md).
+Results contain data, never code, and cannot load extra renderers.
 
 BFPlot is pre-1.0, so the format may still change before 1.0.

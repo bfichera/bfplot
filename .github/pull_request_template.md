@@ -2,9 +2,9 @@
 
 <!-- What problem does this solve, and how? -->
 
-## Compatibility and security
+## Compatibility
 
-<!-- Note format/API effects, untrusted-input considerations, or write "none". -->
+<!-- Note format/API effects, or write "none". -->
 
 ## Checks
 

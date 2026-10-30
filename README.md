@@ -100,8 +100,6 @@ To serve remotely, bind to another address explicitly:
 $ bfplot serve my_plot.bfplot --bind 0.0.0.0 --port 9000
 ```
 
-> **Warning:** The server has no authentication or TLS. Put an authenticated reverse proxy in front of it and restrict network access. See the [security policy](https://github.com/bfichera/bfplot/blob/main/SECURITY.md) and the [serving guide](https://bfichera.github.io/bfplot/guides/serving/).
-
 ### Using BFPlot with psana (SLAC S3DF)
 
 To view a result stored on psana, keep the server on loopback and reach it through an SSH tunnel. Nothing is exposed to the network.
@@ -129,7 +127,6 @@ To see them all, run the [example gallery](https://github.com/bfichera/bfplot/bl
 ## More
 
 - [Contributing](https://github.com/bfichera/bfplot/blob/main/CONTRIBUTING.md)
-- [Security policy](https://github.com/bfichera/bfplot/blob/main/SECURITY.md)
 - [Architecture](https://github.com/bfichera/bfplot/blob/main/ARCHITECTURE.md)
 
 ## License

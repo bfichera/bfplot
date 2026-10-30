@@ -2,7 +2,7 @@
 
 Thank you! Bug reports, documentation fixes and small tests are just as welcome as features.
 
-For a small fix, go ahead. For a new public API, artist type or format change, please open an issue first. Report security problems privately as described in `SECURITY.md`, not in the public tracker.
+For a small fix, go ahead. For a new public API, artist type or format change, please open an issue first.
 
 ## Repository layout
 

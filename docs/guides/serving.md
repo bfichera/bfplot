@@ -28,6 +28,3 @@ Binding to another address is an explicit choice:
 ```console
 $ bfplot serve result.bfplot --bind 0.0.0.0
 ```
-
-!!! danger
-    The server has no authentication or TLS. Put an authenticated reverse proxy in front of it and restrict network access. See the [security policy](../project/security.md).
