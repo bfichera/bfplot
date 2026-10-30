@@ -2,7 +2,7 @@
 
 > **[Read the documentation →](https://bfichera.github.io/bfplot/)**
 
-BFPlot saves Matplotlib figures as interactive results. You can zoom, pan and inspect your data later, or hand it to someone else, instead of keeping only a static PNG.
+BFPlot is a language-independent format for interactive plots: it defines its own graphics representation (BFIR) and a viewer for it, so plots can be zoomed, panned and inspected later, or handed to someone else, instead of keeping only a static PNG. The Python package binds BFPlot to Matplotlib, so you can save Matplotlib figures directly.
 
 ```python
 import matplotlib.pyplot as plt

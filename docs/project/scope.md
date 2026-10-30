@@ -1,6 +1,6 @@
 # What BFPlot is (and isn't)
 
-BFPlot saves Matplotlib figures as interactive results: plot structure, numerical arrays and provenance, opened in a local browser viewer. It is built for scripts, the command line and version control.
+BFPlot is a format for interactive plots, with a viewer and a Python implementation that saves Matplotlib figures. A result holds plot structure, numerical arrays and provenance, opened in a local browser viewer. It is built for scripts, the command line and version control.
 
 It is **not**:
 

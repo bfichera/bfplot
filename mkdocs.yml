@@ -1,5 +1,5 @@
 site_name: BFPlot
-site_description: Save Matplotlib figures as interactive, reproducible scientific files.
+site_description: Interactive, reproducible scientific plots, with a Python implementation for Matplotlib.
 site_url: https://bfichera.github.io/bfplot/
 repo_url: https://github.com/bfichera/bfplot
 repo_name: bfichera/bfplot

@@ -8,7 +8,7 @@ build-backend = "hatchling.build"
 [project]
 name = "bfplot"
 version = "1.0.0rc1"
-description = "Save Matplotlib figures as interactive, reproducible scientific results"
+description = "Interactive, reproducible scientific plots, with a Python implementation for Matplotlib"
 readme = "README.md"
 requires-python = ">=3.10"
 license = "Apache-2.0 OR MIT"
