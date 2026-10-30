@@ -1,6 +1,6 @@
 # Example gallery
 
-`examples/gallery.py` in the repository builds seven Matplotlib figures that cover everything BFPlot can save, and writes them as one result. Use it to see what the viewer can do, or as a starting point for your own scripts.
+`examples/gallery.py` in the repository builds seven Matplotlib figures that cover everything BFPlot can save and writes them as one result. Run it to see what the viewer can do, or copy it as a starting point.
 
 ```console
 $ python examples/gallery.py
@@ -30,7 +30,7 @@ The figure names come from `name=`; the headings in the viewer come from each fi
 
 ## How it works
 
-Each figure is built by its own function, from one seeded random generator, so the data are the same on every run. Set `SOURCE_DATE_EPOCH` to fix the provenance timestamp too.
+Each figure has its own function, and all of them draw from one seeded random generator, so the data is the same on every run. Set `SOURCE_DATE_EPOCH` to fix the provenance timestamp too.
 
 `write_gallery()` shows the main parts of the Python API in one place:
 
@@ -38,8 +38,8 @@ Each figure is built by its own function, from one seeded random generator, so t
 - `result.animation()` records the first two figures as an animation. Each `capture()` saves the figures as they are at that moment.
 - `result.add()` adds the other five figures as static plots.
 
-??? example "Full source of `examples/gallery.py`"
+## Source
 
-    ```python
-    --8<-- "examples/gallery.py"
-    ```
+```python
+--8<-- "examples/gallery.py"
+```

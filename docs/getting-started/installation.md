@@ -10,7 +10,7 @@ On macOS and Linux:
 $ curl -LsSf https://github.com/bfichera/bfplot/releases/latest/download/install.sh | sh
 ```
 
-This puts `bfplot` in `~/.local/bin`, after checking the download's SHA-256. Set `BFPLOT_INSTALL_DIR` to put it elsewhere, or `BFPLOT_VERSION` (such as `1.0.0`) for a particular version. Run the same command again to update. It needs no root access, and the app is a single program with the viewer built in, so you don't need Rust, Node.js or anything else.
+This puts `bfplot` in `~/.local/bin`, after checking the download's SHA-256. Set `BFPLOT_INSTALL_DIR` to put it elsewhere, or `BFPLOT_VERSION` (such as `1.0.0`) for a particular version. Run the same command again to update. It needs no root access. The app is a single program with the viewer built in, so you don't need Rust or Node.js.
 
 To remove it:
 
@@ -18,7 +18,7 @@ To remove it:
 $ curl -LsSf https://github.com/bfichera/bfplot/releases/latest/download/uninstall.sh | sh
 ```
 
-That's all you need to open results that someone else made, or that were written from another language.
+That's all you need to open results made by someone else, or written from another language.
 
 ## The Python library
 

@@ -25,8 +25,8 @@ The [example gallery](../guides/gallery.md) uses every artist in this table.
 
 ## What happens to an unsupported artist?
 
-BFPlot does not silently remove unsupported data. The viewer displays a placeholder containing the artist type and ID, so it is clear that the saved figure contains something the current renderer cannot draw.
+Nothing is dropped silently. The viewer shows a placeholder with the artist type and ID, so you can see that the figure contains something it cannot draw yet.
 
-For another Matplotlib artist, please open an issue or submit a pull request that adds its exporter and viewer renderer to BFPlot.
+To add another artist, open an issue or send a pull request with its exporter and viewer renderer.
 
-> Matplotlib has a wonderfully large and occasionally surprising artist ecosystem. Test BFPlot against the exact plot types your analysis uses before relying on it for final archival output.
+Matplotlib has a lot of artist types. Before you rely on BFPlot for final archival output, check that it handles the plots you actually use.

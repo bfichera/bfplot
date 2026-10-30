@@ -23,7 +23,7 @@ Every command that reads a result accepts a result directory or a packed file. R
 
 ## Diffing packed files in Git
 
-```text title=".gitattributes"
+```text
 *.bfplot diff=bfplot
 ```
 

@@ -14,7 +14,7 @@ results/
     └── .gitignore
 ```
 
-The manifest records the document hash and provenance, so a diff shows when an output changed. It also ends with a rough text drawing of every figure, so the commit shows roughly what the plot looked like and a diff shows how it changed:
+The manifest records the document hash and provenance, so a diff shows when an output changed. It also ends with a rough text drawing of every figure, so you can see roughly what changed in a diff:
 
 ```toml
 # Preview (approximate; regenerated on every save)
@@ -28,9 +28,9 @@ The manifest records the document hash and provenance, so a diff shows when an o
 #     0                                         6.3
 ```
 
-Lines, markers and outlines are drawn with Braille dots, and images and colorbars with ASCII shading. The drawing is only a sketch: it shows the first frame of an animation, skips fine detail, and does not replace the data. The lines are TOML comments, so readers ignore them. Pass `preview=False` to leave the drawing out.
+Lines, markers and outlines are drawn with Braille dots, and images and colorbars with ASCII shading. The drawing is only a sketch. It shows the first frame of an animation and skips fine detail. The lines are TOML comments, so readers ignore them. Pass `preview=False` to leave it out.
 
-> A fresh clone has manifests without data. Re-run the pipeline, or share the directory or a packed file another way.
+Note that a fresh clone has manifests but no data. Re-run the pipeline, or share the directory or a packed file some other way.
 
 ## Verify
 
@@ -50,6 +50,6 @@ $ bfplot verify releases/calibration.bfplot
 
 Store the packed file in a release, an archive or Git LFS. To diff packed files in Git, see the [CLI reference](../reference/cli.md#diffing-packed-files-in-git).
 
-## Integrity, not authenticity
+## Hashes are not signatures
 
-Hashes show that bytes have not changed, not who made them. Sign releases externally if authorship matters.
+Hashes tell you the bytes have not changed, not who made them. If authorship matters, sign releases some other way.

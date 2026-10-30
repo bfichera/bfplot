@@ -23,7 +23,7 @@ $ export BFPLOT_VIEWER_DIR=/path/to/bfplot/viewer/dist
 
 ## Remote access
 
-Binding to another address is an explicit choice:
+To listen on another address, pass `--bind`:
 
 ```console
 $ bfplot serve result.bfplot --bind 0.0.0.0

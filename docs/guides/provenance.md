@@ -37,8 +37,8 @@ bfplot.savefig("plot.bfplot", fig, provenance=False)
 
 keeps only the creation time and Git commit.
 
-> Default provenance includes absolute paths and your username. Check the manifest before publishing a result.
+Default provenance includes absolute paths and your username, so check the manifest before you publish a result.
 
 ## Limits
 
-BFPlot records paths, not source code, patches, lockfiles or input data. Reproducing a result still requires keeping those.
+BFPlot records paths, not source code, patches, lockfiles or input data. To reproduce a result you still need to keep those.

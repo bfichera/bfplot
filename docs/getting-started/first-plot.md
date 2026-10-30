@@ -2,7 +2,7 @@
 
 ## Save a figure
 
-```python title="analysis.py"
+```python
 import matplotlib.pyplot as plt
 import numpy as np
 import bfplot

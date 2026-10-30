@@ -6,13 +6,13 @@ It is **not**:
 
 - **a replacement for Matplotlib.** Matplotlib still makes and styles the figure.
 - **a notebook system.** Notebook integration is not a goal.
-- **a reproducibility machine.** A result cannot recreate code or data that were never kept.
-- **finished.** BFPlot is young; check the plots that matter to you.
+- **a reproducibility tool.** A result can't recreate code or data you didn't keep.
+- **finished.** BFPlot is young, so check the plots that matter to you.
 
 ## Principles
 
 1. Saving a plot is one function call.
-2. Data never disappears silently: unsupported artists and corrupt arrays fail visibly.
+2. Data is never dropped silently. Unsupported artists and corrupt arrays fail visibly.
 3. Files are inspectable: the manifest is TOML and the document is JSON.
 4. Arrays are compressed and content-addressed.
 5. Results never execute code. Exporters and renderers ship with BFPlot.
