@@ -1,0 +1,25 @@
+# Lets `pip install ./crates/bfplot-cli` build the `bfplot` app from a source checkout and
+# put it next to the Python package.
+
+[build-system]
+requires = ["maturin>=1.9,<2"]
+build-backend = "maturin"
+
+[project]
+name = "bfplot-cli"
+dynamic = ["version"]
+description = "The bfplot app: view, serve and verify BFPlot results"
+readme = "README.md"
+license = "Apache-2.0 OR MIT"
+classifiers = ["Private :: Do Not Upload"]
+
+[project.urls]
+Homepage = "https://bfichera.github.io/bfplot/"
+Documentation = "https://bfichera.github.io/bfplot/"
+Repository = "https://github.com/bfichera/bfplot"
+Issues = "https://github.com/bfichera/bfplot/issues"
+
+[tool.maturin]
+bindings = "bin"
+locked = true
+strip = true

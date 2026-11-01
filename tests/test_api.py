@@ -1,0 +1,255 @@
+from __future__ import annotations
+
+import os
+from datetime import datetime, timedelta
+from pathlib import Path
+
+import matplotlib.dates as mdates
+import matplotlib.pyplot as plt
+import numpy as np
+
+import bfplot
+from helpers import read_array, read_result
+
+
+def test_savefig_extracts_broad_artist_set(tmp_path):
+    figure, axes = plt.subplots(2, 3)
+    x = np.linspace(0, 1, 8)
+    axes[0, 0].plot(x, x**2, marker="o")
+    axes[0, 0].scatter(x, x)
+    axes[0, 1].imshow(np.arange(9).reshape(3, 3))
+    axes[0, 2].errorbar(x, x, yerr=0.1)
+    axes[1, 0].fill_between(x, x, x**2)
+    axes[1, 1].hist(x)
+    axes[1, 2].contourf(np.arange(16).reshape(4, 4))
+    axes[1, 2].set_title("Contours")
+    axes[1, 2].set_xlabel("x")
+    axes[1, 2].text(0.5, 0.5, "label")
+
+    output = bfplot.savefig(tmp_path / "all.bfplot", figure)
+    assert output == tmp_path / "all.bfplot"
+    assert output.is_dir()
+    _, document = read_result(output)
+    types = {
+        artist["type"] for axis in document["figures"][0]["axes"] for artist in axis["artists"]
+    }
+    assert {
+        "bfplot.line",
+        "bfplot.scatter",
+        "bfplot.image",
+        "bfplot.errorbar",
+        "bfplot.fill_between",
+        "bfplot.histogram",
+        "bfplot.contourf",
+        "bfplot.text",
+    } <= types
+    assert all(
+        len([artist for artist in axis["artists"] if artist["type"] == "bfplot.patch"]) == 0
+        for axis in document["figures"][0]["axes"]
+    )
+    for axis in document["figures"][0]["axes"]:
+        for artist in axis["artists"]:
+            assert {"type", "id", "axes_id", "props", "data"} == artist.keys()
+    final_axis = document["figures"][0]["axes"][5]
+    contour = next(
+        artist for artist in final_axis["artists"] if artist["type"] == "bfplot.contourf"
+    )
+    text = [artist for artist in final_axis["artists"] if artist["type"] == "bfplot.text"]
+    assert "facecolors" in contour["props"]
+    assert read_array(output, contour["data"]["path_codes"]).size > 0
+    assert final_axis["title"] == "Contours"
+    assert final_axis["x"]["label"] == "x"
+    assert len(text) == 1
+    assert text[0]["data"]["text"] == "label"
+
+
+def test_savefig_records_no_metadata(tmp_path):
+    figure, axes = plt.subplots()
+    axes.plot([0, 1], [0, 1])
+
+    output = bfplot.savefig(tmp_path / "minimal.bfplot", figure, preview=False)
+    manifest, document = read_result(output)
+
+    assert set(manifest) == {"format", "version", "hash"}
+    assert set(document) == {"figures"}
+    text = (output / "manifest.toml").read_text()
+    assert text == f'format = "bfplot"\nversion = 2\nhash = "{manifest["hash"]}"\n'
+
+
+def test_savefig_marks_colorbars_as_auxiliary_axes(tmp_path):
+    figure, (image_axes, scatter_axes) = plt.subplots(1, 2)
+    image = image_axes.imshow(np.arange(9).reshape(3, 3), cmap="magma")
+    scatter = scatter_axes.scatter([0, 1], [0, 1], c=[2, 4], cmap="viridis")
+    figure.colorbar(image, ax=image_axes, label="intensity")
+    figure.colorbar(scatter, ax=scatter_axes, label="points")
+
+    output = bfplot.savefig(tmp_path / "colorbar.bfplot", figure)
+    _, document = read_result(output)
+    plots = [axis for axis in document["figures"][0]["axes"] if axis.get("role") != "colorbar"]
+    colorbars = [axis for axis in document["figures"][0]["axes"] if axis.get("role") == "colorbar"]
+    assert all(colorbar["artists"] == [] for colorbar in colorbars)
+    assert [colorbar["colorbar"]["orientation"] for colorbar in colorbars] == [
+        "vertical",
+        "vertical",
+    ]
+    assert [colorbar["colorbar"]["label"] for colorbar in colorbars] == ["intensity", "points"]
+    assert colorbars[0]["colorbar"]["limits"] == [0, 8]
+    assert colorbars[0]["colorbar"]["mappable"] == plots[0]["artists"][0]["id"]
+    assert colorbars[1]["colorbar"]["mappable"] == plots[1]["artists"][0]["id"]
+    assert len(colorbars[0]["colorbar"]["colors"]) == 64
+
+
+def test_savefig_links_filled_contour_colorbar_to_mappable(tmp_path):
+    figure, axes = plt.subplots()
+    contour = axes.contourf(np.arange(16).reshape(4, 4), levels=[0, 4, 8, 12, 16], cmap="viridis")
+    figure.colorbar(contour, ax=axes, label="level")
+
+    output = bfplot.savefig(tmp_path / "contour-colorbar.bfplot", figure)
+    _, document = read_result(output)
+    plot = next(axis for axis in document["figures"][0]["axes"] if axis.get("role") != "colorbar")
+    colorbar = next(
+        axis for axis in document["figures"][0]["axes"] if axis.get("role") == "colorbar"
+    )
+    extracted = next(artist for artist in plot["artists"] if artist["type"] == "bfplot.contourf")
+
+    assert colorbar["colorbar"]["mappable"] == extracted["id"]
+    path_values = read_array(output, extracted["data"]["path_values"])
+    path_lengths = read_array(output, extracted["data"]["path_lengths"])
+    assert len(path_values) == len(path_lengths) > 0
+
+
+def test_savefig_preserves_dates_insets_and_public_labels(tmp_path):
+    figure, axes = plt.subplots()
+    dates = [datetime(2026, 1, 1) + timedelta(days=index) for index in range(3)]
+    axes.plot(dates, [1, 2, 3])
+    axes.xaxis.set_major_formatter(mdates.DateFormatter("%b %d"))
+    inset = axes.inset_axes([0.6, 0.6, 0.2, 0.2])
+    inset.plot([0, 1], [0, 1], label="_child0")
+
+    output = bfplot.savefig(tmp_path / "semantic-axes.bfplot", figure)
+    _, document = read_result(output)
+    primary, extracted_inset = document["figures"][0]["axes"]
+    assert primary["x"]["scale"] == "date"
+    assert primary["x"]["date_format"] == "%b %d"
+    assert primary["x"]["ticklabels"]
+    assert extracted_inset["role"] == "inset"
+    assert extracted_inset["parent_axes_id"] == primary["id"]
+    assert extracted_inset["artists"][0]["props"]["label"] is None
+
+
+def test_savefig_preserves_true_3d_surface_and_wire_geometry(tmp_path):
+    figure = plt.figure()
+    surface_axes = figure.add_subplot(1, 2, 1, projection="3d")
+    wire_axes = figure.add_subplot(1, 2, 2, projection="3d")
+    values = np.linspace(-1, 1, 6)
+    x, y = np.meshgrid(values, values)
+    z = np.sin(x) * np.cos(y)
+    surface_axes.plot_surface(x, y, z)
+    wire_axes.plot_wireframe(x, y, z)
+
+    output = bfplot.savefig(tmp_path / "three-dimensional.bfplot", figure)
+    _, document = read_result(output)
+    surface = next(
+        artist
+        for artist in document["figures"][0]["axes"][0]["artists"]
+        if artist["type"] == "bfplot.surface3d"
+    )
+    wire = next(
+        artist
+        for artist in document["figures"][0]["axes"][1]["artists"]
+        if artist["type"] == "bfplot.mesh3d"
+    )
+    surface_vertices = read_array(output, surface["data"]["vertices"])
+    wire_vertices = read_array(output, wire["data"]["vertices"])
+    assert surface_vertices.shape[1] == wire_vertices.shape[1] == 3
+    assert np.ptp(surface_vertices[:, 0]) > 1
+    assert np.ptp(wire_vertices[:, 1]) > 1
+    assert len(read_array(output, surface["data"]["path_lengths"])) > 1
+    assert len(read_array(output, wire["data"]["path_lengths"])) > 1
+
+
+def test_surface_faces_drop_matplotlib_padding_vertices(tmp_path):
+    figure = plt.figure()
+    axes = figure.add_subplot(projection="3d")
+    values = np.linspace(0, 6, 7)
+    x, y = np.meshgrid(values, values)
+    # A stride that does not divide the grid gives faces of unequal length.
+    axes.plot_surface(x, y, x * y, rstride=4, cstride=4)
+
+    output = bfplot.savefig(tmp_path / "surface.bfplot", figure)
+    _, document = read_result(output)
+    surface = document["figures"][0]["axes"][0]["artists"][0]
+    vertices = read_array(output, surface["data"]["vertices"])
+    lengths = read_array(output, surface["data"]["path_lengths"])
+    assert len(set(lengths.tolist())) > 1
+    offsets = np.concatenate([[0], np.cumsum(lengths)])
+    for start, end in zip(offsets[:-1], offsets[1:], strict=True):
+        face = vertices[start:end]
+        assert np.ptp(face[:, 0]) <= 4 and np.ptp(face[:, 1]) <= 4
+
+
+def test_savefig_records_the_suptitle_as_the_figure_title(tmp_path):
+    figure, axes = plt.subplots()
+    axes.plot([0, 1], [0, 1])
+    figure.suptitle("Overview")
+    untitled, _ = plt.subplots()
+
+    output = bfplot.savefig(tmp_path / "titled.bfplot", [figure, untitled])
+    _, document = read_result(output)
+    assert document["figures"][0]["title"] == "Overview"
+    assert "title" not in document["figures"][1]
+
+
+def test_savefig_preserves_large_multi_figure_collections(tmp_path):
+    figures = []
+    for figure_index in range(10):
+        figure, axes = plt.subplots(2, 2)
+        for axis_index, axis in enumerate(axes.flat):
+            axis.plot([0, 1, 2], [figure_index, axis_index, figure_index + axis_index])
+            axis.set_title(f"Figure {figure_index + 1}, plot {axis_index + 1}")
+        figures.append(figure)
+
+    output = bfplot.savefig(tmp_path / "many.bfplot", figures)
+    _, document = read_result(output)
+    assert len(document["figures"]) == 10
+    assert sum(len(figure["axes"]) for figure in document["figures"]) == 40
+    positions = [axis["bounds"] for figure in document["figures"] for axis in figure["axes"]]
+    assert all(len(position) == 4 for position in positions)
+    assert len({tuple(position) for position in positions}) == 4
+    plt.close("all")
+
+
+def test_show_can_avoid_viewer_side_effect(tmp_path):
+    figure, axes = plt.subplots()
+    axes.plot([0, 1])
+    assert bfplot.show(figure, path=tmp_path / "shown.bfplot", open_browser=False).exists()
+
+
+def test_show_prefers_the_app_installed_in_this_environment(tmp_path, monkeypatch):
+    from bfplot import api
+
+    scripts = tmp_path / "scripts"
+    elsewhere = tmp_path / "elsewhere"
+    for directory in (scripts, elsewhere):
+        directory.mkdir()
+        app = directory / ("bfplot.exe" if os.name == "nt" else "bfplot")
+        app.write_text("")
+        app.chmod(0o755)
+    monkeypatch.setenv("PATH", str(elsewhere))
+
+    monkeypatch.setattr(api.sysconfig, "get_path", lambda name, scheme: str(scripts))
+    assert Path(api._find_executable()).parent == scripts
+
+    # Without one in the environment, fall back to PATH.
+    monkeypatch.setattr(api.sysconfig, "get_path", lambda name, scheme: str(tmp_path / "none"))
+    assert Path(api._find_executable()).parent == elsewhere
+
+    figure, axes = plt.subplots()
+    axes.plot([0, 1])
+    launched = []
+    with monkeypatch.context() as patch:
+        patch.setattr(api.subprocess, "Popen", lambda args, **kwargs: launched.append(args))
+        patch.setattr(api, "savefig", lambda path, figure: Path(path))
+        output = bfplot.show(figure, path=tmp_path / "shown.bfplot")
+    assert launched == [[api._find_executable(), "view", str(output)]]
+    plt.close(figure)

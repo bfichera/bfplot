@@ -1,0 +1,44 @@
+site_name: BFPlot
+site_url: https://bfichera.github.io/bfplot/
+repo_url: https://github.com/bfichera/bfplot
+edit_uri: edit/main/docs/
+
+theme:
+  name: terminal
+  palette: default
+  features:
+    - navigation.side.toc.hide
+
+extra_css:
+  - extra.css
+
+nav:
+  - Home: index.md
+  - Get started:
+      - Quick start: getting-started/index.md
+      - Installation: getting-started/installation.md
+      - Your first BFPlot: getting-started/first-plot.md
+  - Guides:
+      - Using BFPlot with Git: guides/version-control.md
+      - Comparing results: guides/comparing.md
+      - Using BFPlot with Snakemake: guides/snakemake.md
+      - Serving plots: guides/serving.md
+      - Example gallery: guides/gallery.md
+  - Reference:
+      - Python API: reference/python-api.md
+      - Command-line interface: reference/cli.md
+      - Supported plots: reference/supported-plots.md
+      - File format: format.md
+  - Project:
+      - What BFPlot is (and isn't): project/scope.md
+      - Contributing: project/contributing.md
+      - Architecture: project/architecture.md
+
+markdown_extensions:
+  - tables
+  - toc:
+      permalink: true
+  - pymdownx.snippets:
+      base_path: ["."]
+      check_paths: true
+  - pymdownx.superfences

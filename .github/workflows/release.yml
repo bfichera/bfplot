@@ -1,0 +1,183 @@
+# Release BFPlot: Actions → Release → Run workflow, type the version, press Run.
+#
+# The workflow sets that version everywhere, builds and tests the `bfplot` app for macOS
+# and Linux, and only if all of it passes commits the version to main, tags it and creates
+# the GitHub release with the app archives, install.sh and uninstall.sh. Nothing is
+# published anywhere else. Tick "dry run" to build and test without releasing. Pull
+# requests that touch packaging run the build and tests too. See RELEASING.md.
+
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to release, such as 1.0.0 (or 1.1.0-rc.1 for a pre-release)"
+        required: true
+        type: string
+      dry-run:
+        description: "Dry run: build and test everything, release nothing"
+        type: boolean
+        default: false
+  pull_request:
+    paths:
+      - ".github/workflows/release.yml"
+      - "crates/**"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "pyproject.toml"
+      - "scripts/**"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  plan:
+    name: Check the version
+    runs-on: ubuntu-latest
+    outputs:
+      # The version without a leading "v"; empty for pull requests.
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.13"
+      - run: python -m pip install packaging
+      - name: Releases come from main and use a new version
+        id: version
+        if: github.event_name == 'workflow_dispatch'
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          VERSION="$(echo "$VERSION" | tr -d '[:space:]')"
+          VERSION="${VERSION#v}"
+          if [[ "$GITHUB_REF" != refs/heads/main && "${{ inputs.dry-run }}" != true ]]; then
+            echo "::error::Run releases from the main branch (this is $GITHUB_REF_NAME)."; exit 1
+          fi
+          if git rev-parse -q --verify "refs/tags/v$VERSION" >/dev/null; then
+            echo "::error::v$VERSION has already been released; pick a new version."; exit 1
+          fi
+          python scripts/set_version.py "$VERSION"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+      - run: python scripts/check_versions.py
+
+  app:
+    name: bfplot app (${{ matrix.target }})
+    needs: plan
+    env:
+      VERSION: ${{ needs.plan.outputs.version }}
+      CARGO_PROFILE_RELEASE_STRIP: "true"
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # The musl builds are statically linked, so one Linux archive per CPU runs anywhere.
+          - { runner: ubuntu-latest, target: x86_64-unknown-linux-musl, check-writer: true }
+          - { runner: ubuntu-24.04-arm, target: aarch64-unknown-linux-musl }
+          - { runner: macos-15-intel, target: x86_64-apple-darwin }
+          - { runner: macos-latest, target: aarch64-apple-darwin }
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.13"
+      - name: Set the version
+        if: env.VERSION != ''
+        run: python -m pip install -q packaging && python scripts/set_version.py "$VERSION"
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+      - name: Install musl
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y musl-tools
+      - name: Build
+        run: cargo build --release --locked -p bfplot-cli --target ${{ matrix.target }}
+      - name: The app runs and carries the requested version
+        run: |
+          app="target/${{ matrix.target }}/release/bfplot"
+          "$app" --version
+          if [[ -n "$VERSION" ]]; then test "$("$app" --version)" = "bfplot-cli $VERSION"; fi
+      - name: The Python writer's results open in the app
+        if: matrix.check-writer
+        run: |
+          python -m venv "$RUNNER_TEMP/venv"
+          "$RUNNER_TEMP/venv/bin/python" -m pip install .
+          app="$PWD/target/${{ matrix.target }}/release/bfplot"
+          cd "$RUNNER_TEMP"
+          "$RUNNER_TEMP/venv/bin/python" -c "
+          import matplotlib; matplotlib.use('Agg')
+          import matplotlib.pyplot as plt, bfplot
+          fig, ax = plt.subplots(); ax.plot([1, 2, 3], [1, 4, 9])
+          bfplot.savefig('check.bfplot', fig)
+          "
+          "$app" verify check.bfplot
+      - name: Package the app for install.sh
+        run: |
+          mkdir -p "$RUNNER_TEMP/app" archives
+          cp "target/${{ matrix.target }}/release/bfplot" LICENSE-APACHE LICENSE-MIT "$RUNNER_TEMP/app/"
+          name="bfplot-${{ matrix.target }}.tar.gz"
+          tar -czf "archives/$name" -C "$RUNNER_TEMP/app" bfplot LICENSE-APACHE LICENSE-MIT
+          (cd archives && shasum -a 256 "$name" > "$name.sha256")
+      - name: install.sh and uninstall.sh work
+        run: |
+          export BFPLOT_DOWNLOAD_URL="file://$PWD/archives" BFPLOT_INSTALL_DIR="$RUNNER_TEMP/bin"
+          sh scripts/install.sh
+          "$BFPLOT_INSTALL_DIR/bfplot" --version
+          sh scripts/uninstall.sh
+          test ! -e "$BFPLOT_INSTALL_DIR/bfplot"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: app-${{ matrix.target }}
+          path: archives/*
+          if-no-files-found: error
+
+  release:
+    name: Commit, tag and create the GitHub release
+    needs: [plan, app]
+    if: github.event_name == 'workflow_dispatch' && !inputs.dry-run
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      VERSION: ${{ needs.plan.outputs.version }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.13"
+      - run: python -m pip install packaging
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: app-*
+          path: ${{ runner.temp }}/release
+          merge-multiple: true
+      - name: Commit the version and tag it
+        run: |
+          python scripts/set_version.py "$VERSION"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -am "chore: release $VERSION" || echo "the version was already $VERSION"
+          git tag -a "v$VERSION" -m "BFPlot $VERSION"
+          # Fails, releasing nothing, if main moved on while this ran; just run it again.
+          git push origin HEAD:main "v$VERSION"
+      - name: Create the GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cp scripts/install.sh scripts/uninstall.sh "$RUNNER_TEMP/release/"
+          # A pre-release (1.1.0-rc.1) is skipped by releases/latest, and so by install.sh.
+          prerelease=()
+          if [[ "$VERSION" == *-* ]]; then prerelease=(--prerelease); fi
+          gh release create "v$VERSION" --verify-tag --title "BFPlot $VERSION" \
+            --generate-notes "${prerelease[@]}" "$RUNNER_TEMP"/release/*

@@ -1,0 +1,10 @@
+/target/
+**/__pycache__/
+*.py[cod]
+.venv/
+node_modules/
+dist/
+release-dist/
+/site/
+.DS_Store
+/gallery.bfplot

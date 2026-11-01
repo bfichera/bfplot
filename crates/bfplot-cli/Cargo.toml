@@ -1,0 +1,27 @@
+[package]
+name = "bfplot-cli"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+repository.workspace = true
+homepage.workspace = true
+description = "The bfplot app: view, serve and verify BFPlot results"
+readme = "README.md"
+publish = false
+
+[[bin]]
+name = "bfplot"
+path = "src/main.rs"
+
+[dependencies]
+anyhow.workspace = true
+axum.workspace = true
+clap.workspace = true
+bfplot-core = { version = "1.0.0-rc.1", path = "../bfplot-core" }
+serde_json.workspace = true
+tempfile.workspace = true
+tokio.workspace = true
+
+[dev-dependencies]
+toml.workspace = true
