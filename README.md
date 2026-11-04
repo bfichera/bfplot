@@ -196,6 +196,10 @@ To see them all, run the [example gallery](https://github.com/bfichera/bfplot/bl
 
 The first two gallery figures are independent animations: each has its own play button, timeline slider and frame rate, shown in the left rail while that figure is on screen.
 
+## Security
+
+Only open bfplot results from sources you trust.
+
 ## More
 
 - [Contributing](https://github.com/bfichera/bfplot/blob/main/CONTRIBUTING.md)
