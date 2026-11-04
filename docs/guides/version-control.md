@@ -28,10 +28,6 @@ The manifest records the result's hash, so a diff shows exactly when an output c
 #     0                                         6.3
 ```
 
-Lines, markers and outlines are drawn with Braille dots, and images and colorbars with ASCII shading. The drawing is only a sketch. It shows the first frame of an animation and skips fine detail. The lines are TOML comments, so readers ignore them. Pass `preview=False` to leave it out.
-
-Note that a fresh clone has manifests but no data. Re-run the pipeline, or share the directory some other way.
-
 ## Verify
 
 ```console
@@ -41,7 +37,3 @@ sha256:769fe0976cfeecf73414d7b467013c6cde561405bce6c5af5828836e03016e37
 ```
 
 This checks the manifest, the document and the SHA-256 of every object, then prints the hash. To compare two results, see [Comparing results](comparing.md).
-
-## Hashes are not signatures
-
-Hashes tell you the bytes have not changed, not who made them. If authorship matters, sign releases some other way.

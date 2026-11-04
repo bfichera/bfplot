@@ -1,8 +1,6 @@
 # Comparing results
 
-Every result has one hash, such as `sha256:769fe0976cfeecf73414d7b467013c6cde561405bce6c5af5828836e03016e37`. Two results have the same hash exactly when everything needed to draw them is identical: every figure, axis, artist, style, animation frame and array, down to the last bit. Results record no timestamps, paths or other metadata, so saving the same figures again gives the same hash, on any machine.
-
-The hash describes what was saved, not the script that made it. A different Matplotlib version may place axes or ticks slightly differently for the same script; that gives a different hash, and `bfplot compare` shows exactly which values moved.
+Every result has one hash, such as `sha256:769fe0976cfeecf73414d7b467013c6cde561405bce6c5af5828836e03016e37`. Two results have the same hash exactly when everything needed to draw them is identical.
 
 ## In Python
 
@@ -17,7 +15,9 @@ bfplot.same(fig, "results/fit.bfplot")            # would saving fig change the 
 bfplot.verify("results/fit.bfplot")               # raise bfplot.ResultError if damaged
 ```
 
-`bfplot.hash()` and `bfplot.same()` accept result paths, Matplotlib figures (or lists of figures) and `bfplot.BfirDocument`s. `bfplot.result()` exposes the hash of what it wrote:
+`bfplot.hash()` and `bfplot.same()` accept result paths, Matplotlib figures (or lists of figures) and `bfplot.BfirDocument`s.
+
+`bfplot.result()` exposes the hash of what it wrote:
 
 ```python
 with bfplot.result("results/fit.bfplot") as result:
@@ -46,10 +46,8 @@ figures[0].axes[0].artists[0].data.y: array "f8" [3] sha256:17550ce41805… -> a
 figures[0].axes[0].title: "Tent" -> "Tall tent"
 ```
 
-It exits with status 0 if the results are identical, 1 if they differ and 2 on error, so it works in scripts and CI. `-q` prints nothing; `--verify` checks every object of both results first.
+It exits with status 0 if the results are identical, 1 if they differ and 2 on error.
 
-## Trusting a hash
+## "Trusting" a hash
 
 `bfplot hash` and `bfplot.hash(path)` read the hash from the manifest without opening the data, so they are instant. To make sure the objects really match the hash, for example after copying a result, use `bfplot verify`, `bfplot hash --verify` or `bfplot.verify()`. `bfplot serve` and `bfplot view` always verify before serving.
-
-A hash proves the content is unchanged, not who made it. BFPlot records no provenance; if you need to know where a result came from, track it with a separate tool, keyed by the hash.

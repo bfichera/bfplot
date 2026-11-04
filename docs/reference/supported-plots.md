@@ -23,10 +23,4 @@ BFPlot also records linear, logarithmic, symmetric-log, and common Matplotlib ax
 
 The [example gallery](../guides/gallery.md) uses every artist in this table.
 
-## What happens to an unsupported artist?
-
-Nothing is dropped silently. The viewer shows a placeholder with the artist type and ID, so you can see that the figure contains something it cannot draw yet.
-
-To add another artist, open an issue or send a pull request with its exporter and viewer renderer.
-
-Matplotlib has a lot of artist types. Before you rely on BFPlot for final archival output, check that it handles the plots you actually use.
+In the case of an unsupported artist, the viewer shows a placeholder with the artist type and ID, so you can see that the figure contains something it can't draw.

@@ -1,17 +1,5 @@
 # Python API
 
-Most scripts only need `bfplot.savefig()` or `bfplot.result()`, and `bfplot.hash()` to compare outputs.
-
-## Paths and overwriting
-
-These rules apply to every function that writes a result:
-
-- **One output is one result.** It holds all figures saved together and an optional animation, and no metadata.
-- **Every result has a hash.** Saving the same figures again gives the same hash; any change gives a different one. See [`bfplot.hash`](#bfplothash).
-- **The path is used exactly as given.** No suffix is added or rewritten. If the name does not end in `.bfplot`, BFPlot warns but still writes exactly that path.
-- **A result is a directory** with a readable `manifest.toml`.
-- **Existing results are replaced.** A BFPlot result at the path (or an empty directory) is replaced only after the new result is fully built. Anything else at the path raises `FileExistsError`, checked when the save starts, before expensive work.
-
 ## `bfplot.savefig`
 
 ```python
@@ -58,7 +46,7 @@ with bfplot.result("results/fit.bfplot") as result:
 print(result.hash)
 ```
 
-Nothing is written until the `with` block ends. If the block raises, nothing is written and any previous result at the path is left untouched. An empty result raises `ValueError`.
+Nothing is written until the `with` block ends. If the block raises, nothing is written and any previous result at the path is left untouched.
 
 ### `Result.add`
 
@@ -66,7 +54,7 @@ Nothing is written until the `with` block ends. If the block raises, nothing is 
 result.add(figure=None, *, name=None)
 ```
 
-Capture the figure’s state at that moment. Later changes to the figure do not affect what was captured. `figure` and `name` work as in `bfplot.savefig()`.
+Capture the figure’s state at that moment. `figure` and `name` work as in `bfplot.savefig()`.
 
 ### `Result.animation`
 
@@ -74,7 +62,7 @@ Capture the figure’s state at that moment. Later changes to the figure do not 
 result.animation(figure=None, *, name=None, fps=30, loop=True)
 ```
 
-Record a timeline for some figures of the result; call `capture()` on the returned recording after each update. A result may hold several animations: each has its own timeline, frame rate and playback controls in the viewer. Figures added with `add()` stay static. An animation that is still open is closed when the result closes.
+Record a timeline for some figures of the result; call `capture()` on the returned recording after each update. A result may hold several animations: each has its own timeline, frame rate and playback controls in the viewer.
 
 ### `Result.hash`
 
@@ -186,7 +174,3 @@ bfplot.show(fig)
 ```
 
 Set `open_browser=False` to create the output without launching the CLI.
-
-## Additional artist types
-
-BFPlot does not load third-party exporters or renderers. To support another Matplotlib artist, send a pull request that implements and tests both sides in BFPlot.

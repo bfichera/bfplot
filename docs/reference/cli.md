@@ -1,6 +1,6 @@
 # Command-line interface
 
-Every command that reads a result takes a result directory. Run `bfplot COMMAND --help` for details.
+Run `bfplot COMMAND --help` for details.
 
 | Command | What it does |
 | --- | --- |
