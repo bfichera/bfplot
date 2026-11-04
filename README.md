@@ -36,6 +36,50 @@ $ python -m pip install "bfplot @ git+https://github.com/bfichera/bfplot"
 
 See [Installation](https://bfichera.github.io/bfplot/getting-started/installation/) for uninstalling and other options.
 
+## Building from source
+
+On other platforms, or to build everything yourself, you need:
+
+- Python 3.10+ (pip 25.1+ if you want the development dependency groups)
+- Rust 1.88+ (install with [rustup](https://rustup.rs))
+- Node.js, only if you change the viewer
+
+Clone the repository and install both parts into a virtual environment:
+
+```console
+$ git clone https://github.com/bfichera/bfplot.git
+$ cd bfplot
+$ python -m venv .venv
+$ . .venv/bin/activate
+$ python -m pip install --upgrade pip
+$ python -m pip install ./crates/bfplot-cli -e .
+```
+
+`./crates/bfplot-cli` compiles the `bfplot` app with Cargo (through maturin) and installs it into the same environment as the Python library, where `bfplot.show()` finds it even if the environment is not activated. `-e .` installs the Python library in editable mode. Check both parts:
+
+```console
+$ python -c "import bfplot; print(bfplot.__version__)"
+$ bfplot --version
+```
+
+To build only the app, without Python:
+
+```console
+$ cargo build --release --locked -p bfplot-cli
+```
+
+The binary is written to `target/release/bfplot`; copy it anywhere on your `PATH`.
+
+The app embeds the browser viewer from `viewer/dist`, which is committed, so Node.js is not needed for a normal build. If you edit `viewer/src`, rebuild the viewer first and then reinstall the app:
+
+```console
+$ npm install --prefix viewer
+$ npm --prefix viewer run build
+$ python -m pip install ./crates/bfplot-cli
+```
+
+For the development setup, tests and linters, see [Contributing](https://github.com/bfichera/bfplot/blob/main/CONTRIBUTING.md).
+
 ## Results
 
 Each output is one result: the figures saved together and an optional animation. A result holds the objects and data needed to draw the plots, and nothing else: no timestamps, paths, user names or other metadata.
