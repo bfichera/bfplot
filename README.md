@@ -2,7 +2,7 @@
 
 > **[Read the documentation →](https://bfichera.github.io/bfplot/)**
 
-BFPlot is a language-independent format for interactive plots: it defines its own graphics representation (BFIR) and a viewer for it, so plots can be zoomed, panned and inspected later, or handed to someone else, instead of keeping only a static PNG. The Python package binds BFPlot to Matplotlib, so you can save Matplotlib figures directly.
+Basically I was tired of saving `matplotlib` outputs as non-interactive static files. I also [hate jupyter notebooks](https://www.youtube.com/watch?v=7jiPeIFXb6U)! `bfplot` lets you save `matplotlib` figures:
 
 ```python
 import matplotlib.pyplot as plt
@@ -14,23 +14,25 @@ ax.plot([1, 2, 3, 4], [1, 4, 9, 16], marker="o")
 bfplot.savefig("my_plot.bfplot", fig)
 ```
 
+in a format that you can open up and interact with later using an integrated viewer app:
+
 ```console
 $ bfplot view my_plot.bfplot
 ```
 
-![The BFPlot viewer showing the example gallery: six panels of lines, bands, scatter, error bars, a histogram and bars, with animation controls in the left rail](https://raw.githubusercontent.com/bfichera/bfplot/main/docs/assets/gallery-core.png)
+Here's what the viewer looks like:
 
-BFPlot is new. Please try it on real plots and tell us what behaves strangely.
+![The BFPlot viewer showing the example gallery: six panels of lines, bands, scatter, error bars, a histogram and bars, with animation controls in the left rail](https://raw.githubusercontent.com/bfichera/bfplot/main/docs/assets/gallery-core.png)
 
 ## Installation
 
-Install the `bfplot` app, which opens results and has the viewer built in, on macOS or Linux:
+Install the `bfplot` app, which has the viewer built in, on macOS or Linux:
 
 ```console
 $ curl -LsSf https://github.com/bfichera/bfplot/releases/latest/download/install.sh | sh
 ```
 
-Then install the Python library (Python 3.10+) from GitHub:
+Then install the Python interface (Python 3.10+) from GitHub:
 
 ```console
 $ python -m pip install "bfplot @ git+https://github.com/bfichera/bfplot"
@@ -72,30 +74,18 @@ $ cargo build --release --locked -p bfplot-cli
 
 The binary is written to `target/release/bfplot`; copy it anywhere on your `PATH`.
 
-The app embeds the browser viewer from `viewer/dist`, which is committed, so Node.js is not needed for a normal build. If you edit `viewer/src`, rebuild the viewer first and then reinstall the app:
-
-```console
-$ npm install --prefix viewer
-$ npm --prefix viewer run build
-$ python -m pip install ./crates/bfplot-cli
-```
-
 For the development setup, tests and linters, see [Contributing](https://github.com/bfichera/bfplot/blob/main/CONTRIBUTING.md).
 
 ## Results
 
-Each output is one result: the figures saved together and an optional animation. A result holds the objects and data needed to draw the plots, and nothing else: no timestamps, paths, user names or other metadata.
+The code here: 
 
 ```python
 with bfplot.result("results/fit.bfplot") as result:
     result.add(fig_spectrum, name="spectrum")
     result.add(fig_residuals, name="residuals")
 ```
-
-`add()` captures a figure as it is at that moment. Nothing is written until the block ends, and nothing at all if it raises.
-
-A result is a small directory. Its own `.gitignore` keeps the data out of Git, so committing it commits only the manifest:
-
+produces a directory called `results/fit.bfplot` with the following structure:
 ```text
 results/fit.bfplot/
 ├── manifest.toml
@@ -103,9 +93,21 @@ results/fit.bfplot/
 └── objects/
 ```
 
-By default, `manifest.toml` ends with a rough ASCII/Braille drawing of each figure, written as `#` comments. It lets you see the plot in a diff or commit without opening the viewer. It is only a preview: it does not affect parsing or the hash, and the real data lives in `objects/`. Pass `preview=False` to leave it out.
+The `.gitignore` file keeps the data (in `objects/`) out of version control.
 
-The path is used exactly as given (BFPlot warns if it does not end in `.bfplot`). An existing result at the path is replaced; anything else raises `FileExistsError` before any work is done.
+By default, `manifest.toml` ends with a rough ASCII/Braille drawing of each figure, written as `#` comments. It lets you see the plot in a diff or commit without opening the viewer. Pass `preview=False` to leave it out.
+
+```toml
+# Preview (approximate; regenerated on every save)
+#
+# ── calibration · Detector calibration ──────────────────────────────────
+#  1.1┌──────────────── Response ─────────────────┐
+#   s │⠐⠲⣄⡴⠒⠲⡄                         ⣠⠖⠂        │
+#   i │ ⢠⠟⣆  ⠙⣆                      ⣰⠃          │
+#   g │⢀⠏ ⠘⣆  ⠘⡆                   ⣰⠃            │
+# -1.1└───────────────────────────────────────────┘
+#     0                                         6.3
+```
 
 ## Animations
 
@@ -116,11 +118,9 @@ with bfplot.animation("wave.bfplot", fig, fps=30) as recording:
         recording.capture()
 ```
 
-Only what changes between frames is stored. Update existing artists rather than adding or removing them.
-
 ## Hashes
 
-Every result has one hash, recorded in its manifest. Two results have the same hash exactly when everything in them is identical: every figure, axis, artist, style, animation frame and array. Saving the same figures twice gives the same hash on any machine, since nothing about the machine, time or user is stored. (Different Matplotlib versions may lay out the same script slightly differently; the hash then changes, because the plots really differ.)
+Every result has one hash, recorded in its manifest. Two results have the same hash exactly when everything in them is identical.
 
 ```python
 bfplot.hash("results/fit.bfplot")         # 'sha256:769fe097...'
@@ -139,22 +139,9 @@ different
 figures[0].axes[0].title: "Tent" -> "Tall tent"
 ```
 
-BFPlot records no provenance; keep track of where results came from with a separate tool, keyed by the hash.
-
-## Other producers
-
-The Matplotlib adapter produces BFPlot's intermediate representation (BFIR), and a separate writer turns BFIR into a result:
-
-```python
-bfir = bfplot.translate(fig)
-bfplot.compile(bfir, "my_plot.bfplot")
-```
-
-BFIR is described by `src/bfplot/bfir.schema.json`, so producers for other languages can target it. See [`ARCHITECTURE.md`](https://github.com/bfichera/bfplot/blob/main/ARCHITECTURE.md).
-
 ## Serving
 
-`bfplot view` serves a result and opens it in your browser. `bfplot serve` does the same without opening a browser. By default the server listens on `127.0.0.1:8080`; use `--port` to change the port. The viewer shows the result's hash, and the server returns it at `/hash`.
+`bfplot view` serves a result and opens it in your browser. `bfplot serve` does the same without opening a browser. By default the server listens on `127.0.0.1:8080`; use `--port` to change the port.
 
 To serve remotely, bind to another address explicitly:
 
@@ -162,9 +149,7 @@ To serve remotely, bind to another address explicitly:
 $ bfplot serve my_plot.bfplot --bind 0.0.0.0 --port 9000
 ```
 
-### Using BFPlot with psana (SLAC S3DF)
-
-To view a result stored on psana, keep the server on loopback and reach it through an SSH tunnel. Nothing is exposed to the network.
+### Example: Using BFPlot with psana (SLAC S3DF)
 
 On S3DF (`ssh <username>@s3df.slac.stanford.edu`, then to your psana node), start the server without a browser:
 
@@ -178,7 +163,7 @@ On your own machine, forward the port through S3DF to the node running the serve
 $ ssh -L 9000:<psana-node>:9000 <username>@s3df.slac.stanford.edu
 ```
 
-Then open <http://127.0.0.1:9000> in your local browser. If you run the server on the login node itself, use `localhost` in place of `<psana-node>`. Pick a port that other users are not using.
+Then open <http://127.0.0.1:9000> in your local browser. If you run the server on the login node itself, use `localhost` in place of `<psana-node>`.
 
 ## Supported plots
 
@@ -203,7 +188,6 @@ Only open bfplot results from sources you trust.
 ## More
 
 - [Contributing](https://github.com/bfichera/bfplot/blob/main/CONTRIBUTING.md)
-- [Architecture](https://github.com/bfichera/bfplot/blob/main/ARCHITECTURE.md)
 
 ## License
 
