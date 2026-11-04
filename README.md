@@ -18,6 +18,8 @@ bfplot.savefig("my_plot.bfplot", fig)
 $ bfplot view my_plot.bfplot
 ```
 
+![The BFPlot viewer showing the example gallery: six panels of lines, bands, scatter, error bars, a histogram and bars, with animation controls in the left rail](https://raw.githubusercontent.com/bfichera/bfplot/main/docs/assets/gallery-core.png)
+
 BFPlot is new. Please try it on real plots and tell us what behaves strangely.
 
 ## Installation
@@ -183,6 +185,16 @@ Then open <http://127.0.0.1:9000> in your local browser. If you run the server o
 Lines, scatter plots, images, error bars, filled regions, histograms, contours, text, patches and common 3D plots. Anything else is shown as a visible placeholder, never silently dropped.
 
 To see them all, run the [example gallery](https://github.com/bfichera/bfplot/blob/main/examples/gallery.py): `python examples/gallery.py`, then `bfplot view gallery.bfplot`.
+
+| Images, contours and colorbars | Three-dimensional geometry |
+| --- | --- |
+| ![Raster image, contour lines, filled contours and closed paths](https://raw.githubusercontent.com/bfichera/bfplot/main/docs/assets/gallery-fields.png) | ![Helix, 3D scatter, surface and wire mesh](https://raw.githubusercontent.com/bfichera/bfplot/main/docs/assets/gallery-3d.png) |
+
+| Dense data |
+| --- |
+| ![A 220,000-point line, a 65,000-point scatter, a long random walk and a large image](https://raw.githubusercontent.com/bfichera/bfplot/main/docs/assets/gallery-dense.png) |
+
+The first two gallery figures are independent animations: each has its own play button, timeline slider and frame rate, shown in the left rail while that figure is on screen.
 
 ## More
 
