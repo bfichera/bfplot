@@ -9,7 +9,7 @@ That's all. The workflow sets the version everywhere and builds the app for macO
 
 Tick **Dry run** to build and test without releasing.
 
-A version such as `1.1.0-rc.1` is a pre-release: `install.sh` ignores it unless asked for it (`BFPLOT_VERSION=1.1.0-rc.1`).
+A version such as `1.1.0-rc.1` is a pre-release: the `releases/latest/download/install.sh` link ignores it, but the `install.sh` attached to that release installs it (`curl -LsSf https://github.com/bfichera/bfplot/releases/download/v1.1.0-rc.1/install.sh | sh`).
 
 ## One-time setup
 

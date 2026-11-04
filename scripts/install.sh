@@ -12,7 +12,11 @@ set -eu
 
 repo="https://github.com/bfichera/bfplot"
 install_dir="${BFPLOT_INSTALL_DIR:-$HOME/.local/bin}"
-if [ -n "${BFPLOT_VERSION:-}" ]; then
+# The release workflow sets this in the published copy, so a release's install.sh
+# installs that release (pre-releases included) unless BFPLOT_VERSION says otherwise.
+release_version=""
+BFPLOT_VERSION="${BFPLOT_VERSION:-$release_version}"
+if [ -n "$BFPLOT_VERSION" ]; then
   base="$repo/releases/download/v${BFPLOT_VERSION#v}"
 else
   base="$repo/releases/latest/download"

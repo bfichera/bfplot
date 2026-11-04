@@ -199,7 +199,10 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           cp scripts/install.sh scripts/uninstall.sh "$RUNNER_TEMP/release/"
-          # A pre-release (1.1.0-rc.1) is skipped by releases/latest, and so by install.sh.
+          # Each release's install.sh installs that release, so pre-releases work too.
+          sed -i "s/^release_version=\"\"$/release_version=\"$VERSION\"/" "$RUNNER_TEMP/release/install.sh"
+          grep -qx "release_version=\"$VERSION\"" "$RUNNER_TEMP/release/install.sh"
+          # A pre-release (1.1.0-rc.1) is skipped by releases/latest/download/install.sh.
           prerelease=()
           if [[ "$VERSION" == *-* ]]; then prerelease=(--prerelease); fi
           gh release create "v$VERSION" --verify-tag --title "BFPlot $VERSION" \
