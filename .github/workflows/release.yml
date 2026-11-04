@@ -83,8 +83,11 @@ jobs:
           # The musl builds are statically linked, so one Linux archive per CPU runs anywhere.
           - { runner: ubuntu-latest, target: x86_64-unknown-linux-musl, check-writer: true }
           - { runner: ubuntu-24.04-arm, target: aarch64-unknown-linux-musl }
-          - { runner: macos-15-intel, target: x86_64-apple-darwin }
-          - { runner: macos-latest, target: aarch64-apple-darwin }
+          # GitHub's macOS runners are often unavailable for long stretches, so the macOS
+          # apps are cross-compiled on Linux with cargo-zigbuild. They can't be run here.
+          - { runner: ubuntu-latest, target: x86_64-apple-darwin, cross: true }
+          - { runner: ubuntu-latest, target: aarch64-apple-darwin, cross: true }
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v7
         with:
@@ -98,12 +101,31 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
         with:
           targets: ${{ matrix.target }}
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ matrix.target }}
       - name: Install musl
-        if: runner.os == 'Linux'
+        if: ${{ !matrix.cross }}
         run: sudo apt-get update && sudo apt-get install -y musl-tools
+      - name: Install cargo-zigbuild
+        if: matrix.cross
+        run: python -m pip install -q ziglang cargo-zigbuild
       - name: Build
+        if: ${{ !matrix.cross }}
         run: cargo build --release --locked -p bfplot-cli --target ${{ matrix.target }}
+      - name: Cross-compile
+        if: matrix.cross
+        # Linux's strip can't handle macOS binaries (and would break their signature).
+        env:
+          CARGO_PROFILE_RELEASE_STRIP: "false"
+        run: cargo zigbuild --release --locked -p bfplot-cli --target ${{ matrix.target }}
+      - name: The app was built for the right platform
+        if: matrix.cross
+        run: |
+          file "target/${{ matrix.target }}/release/bfplot" | tee /dev/stderr |
+            grep -q "Mach-O 64-bit.*$(case ${{ matrix.target }} in x86_64*) echo x86_64;; *) echo arm64;; esac)"
       - name: The app runs and carries the requested version
+        if: ${{ !matrix.cross }}
         run: |
           app="target/${{ matrix.target }}/release/bfplot"
           "$app" --version
@@ -130,6 +152,7 @@ jobs:
           tar -czf "archives/$name" -C "$RUNNER_TEMP/app" bfplot LICENSE-APACHE LICENSE-MIT
           (cd archives && shasum -a 256 "$name" > "$name.sha256")
       - name: install.sh and uninstall.sh work
+        if: ${{ !matrix.cross }}
         run: |
           export BFPLOT_DOWNLOAD_URL="file://$PWD/archives" BFPLOT_INSTALL_DIR="$RUNNER_TEMP/bin"
           sh scripts/install.sh

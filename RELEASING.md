@@ -5,7 +5,7 @@
 1. On GitHub, open **Actions → Release → Run workflow**.
 2. Type the version, such as `1.0.0`, and press **Run workflow**.
 
-That's all. The workflow sets the version everywhere and builds and tests the app for macOS and Linux. Only if everything passes does it commit the version to `main`, tag it and create the GitHub release, with the app archives, `install.sh` and `uninstall.sh`. If anything fails, nothing is released; fix it and run it again.
+That's all. The workflow sets the version everywhere and builds the app for macOS and Linux. Everything is built on Linux, because GitHub's macOS machines are often unavailable. The Linux apps are tested; the macOS apps are only checked to be the right kind of file, so try one on a Mac after releasing. Only if everything passes does it commit the version to `main`, tag it and create the GitHub release, with the app archives, `install.sh` and `uninstall.sh`. If anything fails, nothing is released; fix it and run it again.
 
 Tick **Dry run** to build and test without releasing.
 
