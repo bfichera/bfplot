@@ -472,7 +472,7 @@ fn viewer_document(document: &Document, manifest: &Manifest) -> anyhow::Result<V
         "figures": figures,
         "axes": axes_values,
         "artists": artists,
-        "timeline": document.timeline,
+        "timelines": document.timelines,
         "hash": manifest.hash.to_string(),
     }))
     .map_err(Into::into)

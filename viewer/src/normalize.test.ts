@@ -21,10 +21,10 @@ describe("document normalization",()=>{
     const result=normalizeDocument({figures:[{id:"f",name:"spectrum",axes:[]},{id:"g",axes:[]}]});
     expect(result.figures[0]).toMatchObject({id:"f",name:"spectrum"});
     expect(result.figures[1]?.name).toBeUndefined();
-    const timeline={fps:2,duration:0.5,frames:[{time:0.5,updates:[]}]};
+    const timelines=[{figures:["figure"],fps:2,duration:0.5,frames:[{time:0.5,updates:[]}]}];
     const hash=`sha256:${"ab".repeat(32)}`;
-    const animated=normalizeDocument({figures:[],timeline,hash,metadata:{provenance:{git_commit:"abc"}}});
-    expect(animated.timeline).toEqual(timeline);
+    const animated=normalizeDocument({figures:[],timelines,hash,metadata:{provenance:{git_commit:"abc"}}});
+    expect(animated.timelines).toEqual(timelines);
     expect(animated.hash).toBe(hash);
     expect(animated).not.toHaveProperty("metadata");
     expect(normalizeDocument({figures:[],hash:"sha256:abc"})).not.toHaveProperty("hash");

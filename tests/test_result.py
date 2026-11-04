@@ -235,8 +235,6 @@ def test_result_mixes_static_figures_with_one_animation(tmp_path):
                 wave.set_ydata(x**power)
                 recording.capture()
         result.add(_line("after"), name="summary")
-        with pytest.raises(RuntimeError, match="only one animation"):
-            result.animation(_line())
 
     manifest, document = read_result(tmp_path / "mixed.bfplot")
     assert [figure["name"] for figure in document["figures"]] == [
@@ -244,7 +242,7 @@ def test_result_mixes_static_figures_with_one_animation(tmp_path):
         "evolution",
         "summary",
     ]
-    timeline = document["timeline"]
+    timeline = document["timelines"][0]
     assert [frame["time"] for frame in timeline["frames"]] == [0.25, 0.5]
     animated_artists = {
         artist["id"] for axes in document["figures"][1]["axes"] for artist in axes["artists"]
@@ -252,6 +250,68 @@ def test_result_mixes_static_figures_with_one_animation(tmp_path):
     targets = {update["target"] for frame in timeline["frames"] for update in frame["updates"]}
     assert targets <= animated_artists
     assert set(manifest) == {"format", "version", "hash"}
+
+
+def test_result_holds_independent_animations(tmp_path):
+    first, first_axes = plt.subplots()
+    (a,) = first_axes.plot([0, 1], [0, 1])
+    second, second_axes = plt.subplots()
+    (b,) = second_axes.plot([0, 1], [0, 1])
+
+    with bfplot.result(tmp_path / "two.bfplot") as result:
+        result.add(_line("static"), name="overview")
+        with result.animation(first, name="fast", fps=10) as recording:
+            a.set_ydata([1, 0])
+            recording.capture()
+        with result.animation(second, name="slow", fps=1, loop=False) as recording:
+            for value in (2, 3, 4):
+                b.set_ydata([value, 0])
+                recording.capture()
+
+    _, document = read_result(tmp_path / "two.bfplot")
+    ids = {figure["name"]: figure["id"] for figure in document["figures"]}
+    fast, slow = document["timelines"]
+    assert fast["figures"] == [ids["fast"]] and slow["figures"] == [ids["slow"]]
+    assert (fast["fps"], fast["duration"], fast["loop"]) == (10.0, 0.1, True)
+    assert (slow["fps"], slow["duration"], slow["loop"]) == (1.0, 3.0, False)
+    assert len(fast["frames"]) == 1 and len(slow["frames"]) == 3
+
+
+def test_timeline_updates_must_stay_within_their_figures():
+    from bfplot.bfir import BfirDocument, BfirValidationError
+
+    def figure(index):
+        artist = {"id": f"line-{index}", "axes_id": f"axes-{index}", "type": "bfplot.line"}
+        axes = {"id": f"axes-{index}", "artists": [artist | {"props": {}, "data": {}}]}
+        return {"id": f"figure-{index}", "axes": [axes]}
+
+    def timeline(figures, target):
+        update = {"target_kind": "artist", "target": target, "path": ["props"], "value": {}}
+        return {
+            "figures": figures,
+            "fps": 1,
+            "duration": 1,
+            "frames": [{"time": 1, "updates": [update]}],
+        }
+
+    def errors(timelines):
+        document = BfirDocument({"figures": [figure(0), figure(1)], "timelines": timelines}, {})
+        with pytest.raises(BfirValidationError) as error:
+            document.validate()
+        return str(error.value)
+
+    BfirDocument(
+        {
+            "figures": [figure(0), figure(1)],
+            "timelines": [timeline(["figure-0"], "line-0"), timeline(["figure-1"], "line-1")],
+        },
+        {},
+    ).validate()
+    assert "outside this timeline's figures" in errors([timeline(["figure-0"], "line-1")])
+    assert "more than one timeline" in errors(
+        [timeline(["figure-0"], "line-0"), timeline(["figure-0"], "line-0")]
+    )
+    assert "unknown figure" in errors([timeline(["nope"], "line-0")])
 
 
 def test_result_closes_an_unclosed_animation(tmp_path):
@@ -262,7 +322,7 @@ def test_result_closes_an_unclosed_animation(tmp_path):
         line.set_ydata([1, 0])
         recording.capture()
     _, document = read_result(tmp_path / "auto.bfplot")
-    assert len(document["timeline"]["frames"]) == 1
+    assert len(document["timelines"][0]["frames"]) == 1
 
 
 def test_standalone_animation_writes_a_directory_by_default(tmp_path):

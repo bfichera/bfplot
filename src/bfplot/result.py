@@ -25,7 +25,7 @@ def figures_from(figure: FigureSource) -> list[Figure]:
 
 
 class Collection:
-    """Named figures and at most one animation, combined into one BFIR document."""
+    """Named figures and any number of animations, combined into one BFIR document."""
 
     def __init__(self) -> None:
         self._groups: list[BfirDocument | Animation] = []
@@ -79,12 +79,10 @@ class Collection:
     ) -> Animation:
         """Record a timeline for some figures of this result.
 
-        A result holds one timeline. Its figures appear where the animation started;
-        other figures in the result stay static.
+        Each animation has its own timeline and playback controls. Its figures appear
+        where the animation started; figures added with ``add()`` stay static.
         """
         self._check_open()
-        if any(isinstance(group, Animation) for group in self._groups):
-            raise RuntimeError("a result can contain only one animation")
         figures = figures_from(figure)
         names = self._claim_names(figures, name)
         first_figure, first_artist = self._next_figure, self._next_artist
@@ -153,7 +151,7 @@ class Collection:
     def _document(self) -> BfirDocument:
         figures: list[dict[str, Any]] = []
         buffers: dict[str, Any] = {}
-        timeline: dict[str, Any] | None = None
+        timelines: list[dict[str, Any]] = []
         for group in self._groups:
             document = group.finalized_bfir if isinstance(group, Animation) else group
             renamed: dict[str, str] = {}
@@ -162,16 +160,15 @@ class Collection:
                 buffers[renamed[buffer_id]] = buffer
             content = _rename_buffers(document.document, renamed)
             figures.extend(content["figures"])
-            if "timeline" in content:
-                timeline = content["timeline"]
+            timelines.extend(content.get("timelines", []))
         content: dict[str, Any] = {"figures": figures}
-        if timeline is not None:
-            content["timeline"] = timeline
+        if timelines:
+            content["timelines"] = timelines
         return BfirDocument(content, buffers)
 
 
 class Result(Collection):
-    """One BFPlot output: named figures and at most one animation.
+    """One BFPlot output: named figures and any number of animations.
 
     Figures are captured when they are added. Nothing is written until the result
     closes, and a result whose ``with`` block raises writes nothing. An existing BFPlot
@@ -230,5 +227,5 @@ def _rename_buffers(value: Any, renamed: dict[str, str]) -> Any:
 
 
 def result(path: str | Path, *, preview: bool = True) -> Result:
-    """Collect figures and an optional animation into one output at ``path``."""
+    """Collect figures and animations into one output at ``path``."""
     return Result(path, preview=preview, _stacklevel=2)

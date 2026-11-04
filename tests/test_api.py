@@ -73,7 +73,7 @@ def test_savefig_records_no_metadata(tmp_path):
     assert set(manifest) == {"format", "version", "hash"}
     assert set(document) == {"figures"}
     text = (output / "manifest.toml").read_text()
-    assert text == f'format = "bfplot"\nversion = 2\nhash = "{manifest["hash"]}"\n'
+    assert text == f'format = "bfplot"\nversion = 3\nhash = "{manifest["hash"]}"\n'
 
 
 def test_savefig_marks_colorbars_as_auxiliary_axes(tmp_path):

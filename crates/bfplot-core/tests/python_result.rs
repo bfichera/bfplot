@@ -20,7 +20,7 @@ fn write_result(dir: &std::path::Path, values: [f64; 2]) -> String {
     let hash = store.put_json(&document).unwrap();
     fs::write(
         dir.join("manifest.toml"),
-        format!("format = \"bfplot\"\nversion = 2\nhash = \"{hash}\"\n\n# Preview\n# ⠉⠒⠤\n"),
+        format!("format = \"bfplot\"\nversion = 3\nhash = \"{hash}\"\n\n# Preview\n# ⠉⠒⠤\n"),
     )
     .unwrap();
     hash.to_string()

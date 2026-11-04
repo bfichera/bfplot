@@ -96,12 +96,16 @@ class Animation:
         self._closed = True
         duration = self._frames[-1]["time"] if self._frames else 0.0
         document = copy.deepcopy(self._initial.document)
-        document["timeline"] = {
-            "fps": self.fps,
-            "duration": duration,
-            "loop": self.loop,
-            "frames": self._frames,
-        }
+        figure_ids = [figure["id"] for figure in document["figures"]]
+        document["timelines"] = [
+            {
+                "figures": figure_ids,
+                "fps": self.fps,
+                "duration": duration,
+                "loop": self.loop,
+                "frames": self._frames,
+            }
+        ]
         final = BfirDocument(document, self._buffers)
         final.validate()
         self._final = final

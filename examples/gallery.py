@@ -1,7 +1,8 @@
 """BFPlot example gallery.
 
 Builds seven Matplotlib figures that cover what BFPlot can save, and writes them
-as one result: the first two figures are animated, the other five are static.
+as one result: the first two figures are independent animations, each with its
+own frame rate and playback controls, and the other five are static.
 
     python examples/gallery.py              # writes gallery.bfplot/
     python examples/gallery.py out.bfplot   # writes out.bfplot/
@@ -39,6 +40,7 @@ NAMES = [
     "dashboard",
 ]
 FRAMES = 8
+IMAGE_FRAMES = 12
 
 
 def core_artists(rng: np.random.Generator) -> plt.Figure:
@@ -316,12 +318,16 @@ def write_gallery(path: str | Path) -> Path:
         initial = np.asarray(image.get_array()).copy()
 
         with bfplot.result(path) as result:
-            # The sine wave travels and the raster image scrolls sideways.
-            with result.animation(figures[:2], name=NAMES[:2], fps=4) as recording:
+            # Two independent animations: the sine wave travels in a loop, and the
+            # raster image scrolls sideways once at a different rate.
+            with result.animation(figures[0], name=NAMES[0], fps=4) as recording:
                 for frame in range(1, FRAMES + 1):
                     phase = 2 * np.pi * frame / FRAMES
                     wave.set_ydata(np.sin(np.asarray(wave.get_xdata()) + phase))
-                    shift = round(initial.shape[1] * frame / FRAMES)
+                    recording.capture()
+            with result.animation(figures[1], name=NAMES[1], fps=6, loop=False) as recording:
+                for frame in range(1, IMAGE_FRAMES + 1):
+                    shift = round(initial.shape[1] * frame / IMAGE_FRAMES)
                     image.set_data(np.roll(initial, shift, axis=1))
                     recording.capture()
             result.add(figures[2:], name=NAMES[2:])

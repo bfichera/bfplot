@@ -34,12 +34,16 @@ def render(bfir: BfirDocument, width: int = WIDTH) -> list[str]:
         return np.asarray(value)
 
     document = bfir.document
-    timeline = document.get("timeline")
+    animated = {
+        figure_id
+        for timeline in document.get("timelines", [])
+        for figure_id in timeline.get("figures", [])
+    }
     lines: list[str] = []
     for index, figure in enumerate(document.get("figures", [])):
         if index:
             lines.append("")
-        lines.append(_heading(figure, index, width, animated=timeline is not None))
+        lines.append(_heading(figure, index, width, animated=figure.get("id") in animated))
         try:
             lines += _figure(figure, array, width)
         except Exception as error:  # a preview must never stop a result from being written

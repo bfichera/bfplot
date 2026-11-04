@@ -40,7 +40,11 @@ def test_gallery_covers_every_supported_artist(tmp_path):
     manifest, document = read_result(directory)
     assert [figure["name"] for figure in document["figures"]] == gallery.NAMES
     assert all(figure["title"] for figure in document["figures"])
-    assert len(document["timeline"]["frames"]) == gallery.FRAMES
+    ids = [figure["id"] for figure in document["figures"]]
+    wave, image = document["timelines"]
+    assert wave["figures"] == [ids[0]] and image["figures"] == [ids[1]]
+    assert (len(wave["frames"]), wave["fps"], wave["loop"]) == (gallery.FRAMES, 4.0, True)
+    assert (len(image["frames"]), image["fps"], image["loop"]) == (gallery.IMAGE_FRAMES, 6.0, False)
     assert set(manifest) == {"format", "version", "hash"}
     types = {
         artist["type"]

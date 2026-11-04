@@ -31,7 +31,7 @@ BFIR is the boundary that other producers (Julia, C, ...) target. A BFIR documen
 
 Validation checks unique IDs, unique non-empty figure names, artist ownership, parent axes and colorbar references, timeline updates, and that every buffer reference resolves and every buffer is used. BFIR never contains hashes, codecs or paths.
 
-An animation is one initial scene plus a timeline of frames. Each update names a `figure`, `axes` or `artist` target by ID and a path whose first element is in `bfir.ANIMATABLE` (mirrored by `animatable()` in Rust). Structure cannot change during an animation.
+An animation is one initial scene plus a timeline of frames. A document holds a list of `timelines`, each naming the figures it drives; a figure belongs to at most one timeline and updates may only target their own timeline's figures. Each update names a `figure`, `axes` or `artist` target by ID and a path whose first element is in `bfir.ANIMATABLE` (mirrored by `animatable()` in Rust). Structure cannot change during an animation.
 
 ## Results
 
@@ -49,13 +49,13 @@ The manifest is TOML:
 
 ```toml
 format = "bfplot"
-version = 2
+version = 3
 hash = "sha256:<hex>"
 ```
 
 These are the only keys; unknown keys are rejected. The Python writer ends the manifest with a text drawing of the figures in `#` comments. It does not affect parsing, the hash or the format version.
 
-`format` and `version` always come first. `version` is the format version (currently 2, `FORMAT_VERSION` in `artifact.py` and `format.rs`); it is raised whenever a change would make an older reader misread a result. Readers reject newer versions with an "update bfplot" error, and version 1 (which carried provenance and hashed compressed array bytes) with a "save it again" error, before looking at anything else.
+`format` and `version` always come first. `version` is the format version (currently 3, `FORMAT_VERSION` in `artifact.py` and `format.rs`); it is raised whenever a change would make an older reader misread a result. Readers reject newer versions with an "update bfplot" error, and version 1 (which carried provenance and hashed compressed array bytes) with a "save it again" error, before looking at anything else.
 
 The document object is canonical JSON (sorted keys, compact separators, UTF-8, finite numbers), named by the SHA-256 of those bytes. Arrays are little-endian and C-ordered, referenced as `{"object": "sha256:<hex>", "dtype": "f8", "shape": [N], "codec": "zstd"}`, and named by the SHA-256 of their **raw, uncompressed** bytes; the stored object is compressed with zstd (or stored as is with codec `none`). Identical arrays are stored once.
 

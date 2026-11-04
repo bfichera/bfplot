@@ -84,8 +84,10 @@ def _errors(bfir: BfirDocument) -> list[str]:
         errors.append("document must be an object")
 
     ids: dict[str, set[str]] = {"figure": set(), "axes": set(), "artist": set()}
+    owners: dict[str, str] = {}
     names: set[str] = set()
     references: list[tuple[str, str, str]] = []
+    current_figure = ""
 
     def register(kind: str, record: Any, location: str) -> bool:
         if not isinstance(record, dict):
@@ -98,6 +100,7 @@ def _errors(bfir: BfirDocument) -> list[str]:
             errors.append(f"duplicate id {value!r} at {location}")
         else:
             ids[kind].add(value)
+            owners[value] = value if kind == "figure" else current_figure
         return True
 
     def records(parent: dict[str, Any], key: str, location: str) -> list[Any]:
@@ -111,6 +114,7 @@ def _errors(bfir: BfirDocument) -> list[str]:
         location = f"document.figures[{f}]"
         if not register("figure", figure, location):
             continue
+        current_figure = figure.get("id")
         if "name" in figure:
             name = figure["name"]
             if not isinstance(name, str) or not name:
@@ -145,7 +149,9 @@ def _errors(bfir: BfirDocument) -> list[str]:
             errors.append(f"dangling {what} {target!r}")
 
     if "timeline" in document:
-        errors.extend(_timeline_errors(document["timeline"], ids))
+        errors.append("document.timeline is no longer supported; use document.timelines")
+    if "timelines" in document:
+        errors.extend(_timelines_errors(document["timelines"], ids, owners))
 
     used: set[str] = set()
 
@@ -173,21 +179,53 @@ def _errors(bfir: BfirDocument) -> list[str]:
     return errors
 
 
-def _timeline_errors(timeline: Any, ids: dict[str, set[str]]) -> list[str]:
-    if not isinstance(timeline, dict):
-        return ["document.timeline must be an object"]
+def _timelines_errors(
+    timelines: Any, ids: dict[str, set[str]], owners: dict[str, str]
+) -> list[str]:
+    if not isinstance(timelines, list):
+        return ["document.timelines must be an array"]
+    errors: list[str] = []
+    claimed: set[str] = set()
+    for t, timeline in enumerate(timelines):
+        location = f"document.timelines[{t}]"
+        if not isinstance(timeline, dict):
+            errors.append(f"{location} must be an object")
+            continue
+        figures = timeline.get("figures")
+        if not (isinstance(figures, list) and figures and all(isinstance(f, str) for f in figures)):
+            errors.append(f"{location}.figures must be a non-empty string array")
+            figures = []
+        for figure in figures:
+            if figure not in ids["figure"]:
+                errors.append(f"{location}.figures references unknown figure {figure!r}")
+            elif figure in claimed:
+                errors.append(f"figure {figure!r} belongs to more than one timeline")
+            claimed.add(figure)
+        errors.extend(_timeline_errors(timeline, location, ids, owners, set(figures)))
+    return errors
+
+
+def _timeline_errors(
+    timeline: dict[str, Any],
+    prefix: str,
+    ids: dict[str, set[str]],
+    owners: dict[str, str],
+    figures: set[str],
+) -> list[str]:
     errors: list[str] = []
     fps, duration, frames = timeline.get("fps"), timeline.get("duration"), timeline.get("frames")
     if not _number(fps) or fps <= 0:
-        errors.append("document.timeline.fps must be a positive finite number")
+        errors.append(f"{prefix}.fps must be a positive finite number")
     if not _number(duration) or duration < 0:
-        errors.append("document.timeline.duration must be a non-negative finite number")
+        errors.append(f"{prefix}.duration must be a non-negative finite number")
+    if "loop" in timeline and not isinstance(timeline["loop"], bool):
+        errors.append(f"{prefix}.loop must be a boolean")
     if not isinstance(frames, list):
-        return [*errors, "document.timeline.frames must be an array"]
+        return [*errors, f"{prefix}.frames must be an array"]
 
     last = 0.0
     for f, frame in enumerate(frames):
-        location = f"document.timeline.frames[{f}]"
+        location = f"{prefix}.frames[{f}]"
         if not isinstance(frame, dict):
             errors.append(f"{location} must be an object")
             continue
@@ -210,6 +248,8 @@ def _timeline_errors(timeline: Any, ids: dict[str, set[str]]) -> list[str]:
                 errors.append(f"{where}.target_kind is unsupported")
             elif update.get("target") not in ids[kind]:
                 errors.append(f"{where}.target is dangling")
+            elif owners[update["target"]] not in figures:
+                errors.append(f"{where}.target is outside this timeline's figures")
             if not (
                 isinstance(path, list) and path and all(isinstance(p, str) and p for p in path)
             ):
@@ -219,5 +259,5 @@ def _timeline_errors(timeline: Any, ids: dict[str, set[str]]) -> list[str]:
             if "value" not in update:
                 errors.append(f"{where}.value is required")
     if _number(duration) and float(duration) != last:
-        errors.append("document.timeline.duration must equal the final frame time (or 0)")
+        errors.append(f"{prefix}.duration must equal the final frame time (or 0)")
     return errors

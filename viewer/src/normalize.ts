@@ -90,10 +90,10 @@ export function normalizeDocument(value: unknown): BFPlotDocument {
   }
   for (const axisValue of list(raw.axes)) { const axis = normalizeAxis(axisValue, text(record(axisValue).figure_id)); if (!axes.some((item) => item.id === axis.id)) axes.push(axis); }
   for (const artistValue of list(raw.artists)) { const artist = normalizeArtist(artistValue, text(record(artistValue).axes_id)); if (!artists.some((item) => item.id === artist.id)) artists.push(artist); }
-  const timeline = Array.isArray(record(raw.timeline).frames) ? raw.timeline as Timeline : undefined;
+  const timelines = list(raw.timelines).filter((item) => Array.isArray(record(item).frames) && Array.isArray(record(item).figures)) as Timeline[];
   return {
     figures, axes, artists,
-    ...(timeline ? { timeline } : {}),
+    ...(timelines.length ? { timelines } : {}),
     ...(text(raw.title) ? { title: text(raw.title) } : {}),
     ...(/^sha256:[0-9a-f]{64}$/.test(text(raw.hash)) ? { hash: text(raw.hash) } : {}),
   };

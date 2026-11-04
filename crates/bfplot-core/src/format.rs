@@ -65,7 +65,7 @@ impl<'de> Deserialize<'de> for ObjectId {
 /// The format version this library reads and writes.
 ///
 /// Raise it whenever a change would make an older `bfplot` misread a result.
-pub const FORMAT_VERSION: u64 = 2;
+pub const FORMAT_VERSION: u64 = 3;
 
 /// `manifest.toml`: the only part of a result that is meant to be committed.
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -133,8 +133,9 @@ impl Manifest {
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
 pub struct Document {
     pub figures: Vec<Figure>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub timeline: Option<Timeline>,
+    /// Independent animations, each driving its own figures.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub timelines: Vec<Timeline>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -225,6 +226,8 @@ impl ArrayRef {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Timeline {
+    /// IDs of the figures this timeline animates; a figure belongs to at most one.
+    pub figures: Vec<String>,
     pub fps: f64,
     pub duration: f64,
     #[serde(default = "default_true")]
@@ -290,6 +293,7 @@ pub fn validate_document(document: &Document) -> Vec<String> {
         ("axes", HashSet::new()),
         ("artist", HashSet::new()),
     ];
+    let mut owners: BTreeMap<&str, &str> = BTreeMap::new();
     let mut names = HashSet::new();
     let mut unique = |id: &str, path: String, issues: &mut Vec<String>| {
         if id.is_empty() {
@@ -303,6 +307,7 @@ pub fn validate_document(document: &Document) -> Vec<String> {
         let path = format!("figures[{fi}]");
         unique(&figure.id, path.clone(), &mut issues);
         targets[0].1.insert(&figure.id);
+        owners.insert(&figure.id, &figure.id);
         match figure.properties.get("name") {
             None => {}
             Some(Value::String(name)) if name.is_empty() => {
@@ -318,10 +323,12 @@ pub fn validate_document(document: &Document) -> Vec<String> {
             let path = format!("{path}.axes[{ai}]");
             unique(&axes.id, path.clone(), &mut issues);
             targets[1].1.insert(&axes.id);
+            owners.insert(&axes.id, &figure.id);
             for (ri, artist) in axes.artists.iter().enumerate() {
                 let path = format!("{path}.artists[{ri}]");
                 unique(&artist.id, path.clone(), &mut issues);
                 targets[2].1.insert(&artist.id);
+                owners.insert(&artist.id, &figure.id);
                 if artist.axes_id != axes.id {
                     issues.push(format!("{path}.axes_id: does not match containing axes"));
                 }
@@ -335,13 +342,27 @@ pub fn validate_document(document: &Document) -> Vec<String> {
         }
     }
 
-    if let Some(timeline) = &document.timeline {
+    let mut claimed = HashSet::new();
+    for (ti, timeline) in document.timelines.iter().enumerate() {
+        let prefix = format!("timelines[{ti}]");
+        if timeline.figures.is_empty() {
+            issues.push(format!("{prefix}.figures: must not be empty"));
+        }
+        for figure in &timeline.figures {
+            if !targets[0].1.contains(figure.as_str()) {
+                issues.push(format!("{prefix}.figures: no figure {figure:?}"));
+            } else if !claimed.insert(figure.as_str()) {
+                issues.push(format!(
+                    "{prefix}.figures: figure {figure:?} belongs to more than one timeline"
+                ));
+            }
+        }
         if !timeline.fps.is_finite() || timeline.fps <= 0.0 {
-            issues.push("timeline.fps: must be positive and finite".into());
+            issues.push(format!("{prefix}.fps: must be positive and finite"));
         }
         let mut last = 0.0;
         for (i, frame) in timeline.frames.iter().enumerate() {
-            let path = format!("timeline.frames[{i}]");
+            let path = format!("{prefix}.frames[{i}]");
             if !frame.time.is_finite() || frame.time <= last {
                 issues.push(format!(
                     "{path}.time: must be finite and strictly increasing"
@@ -358,6 +379,14 @@ pub fn validate_document(document: &Document) -> Vec<String> {
                 let known = targets.iter().find(|(name, _)| *name == kind);
                 if !known.is_some_and(|(_, ids)| ids.contains(update.target.as_str())) {
                     issues.push(format!("{path}.target: no {kind} {:?}", update.target));
+                } else if !owners
+                    .get(update.target.as_str())
+                    .is_some_and(|owner| timeline.figures.iter().any(|f| f == owner))
+                {
+                    issues.push(format!(
+                        "{path}.target: {:?} is outside this timeline's figures",
+                        update.target
+                    ));
                 }
                 let field = update.path.first().map(String::as_str).unwrap_or_default();
                 if !fields.contains(&field) || update.path.iter().any(String::is_empty) {
@@ -366,7 +395,9 @@ pub fn validate_document(document: &Document) -> Vec<String> {
             }
         }
         if timeline.duration != last {
-            issues.push("timeline.duration: must equal the final frame time (or 0)".into());
+            issues.push(format!(
+                "{prefix}.duration: must equal the final frame time (or 0)"
+            ));
         }
     }
 
@@ -414,15 +445,12 @@ pub fn array_refs(document: &Document) -> (Vec<ArrayRef>, Vec<String>) {
             }
         }
     }
-    for (i, frame) in document
-        .timeline
-        .iter()
-        .flat_map(|t| t.frames.iter())
-        .enumerate()
-    {
-        for (u, update) in frame.updates.iter().enumerate() {
-            let path = format!("timeline.frames[{i}].updates[{u}].value");
-            walk(&update.value, path, &mut ids, &mut issues);
+    for (t, timeline) in document.timelines.iter().enumerate() {
+        for (i, frame) in timeline.frames.iter().enumerate() {
+            for (u, update) in frame.updates.iter().enumerate() {
+                let path = format!("timelines[{t}].frames[{i}].updates[{u}].value");
+                walk(&update.value, path, &mut ids, &mut issues);
+            }
         }
     }
     (ids, issues)
@@ -449,7 +477,7 @@ mod tests {
         let current = toml::to_string(&Manifest::new(hash.clone())).unwrap();
         assert_eq!(
             current,
-            format!("format = \"bfplot\"\nversion = 2\nhash = \"{hash}\"\n")
+            format!("format = \"bfplot\"\nversion = 3\nhash = \"{hash}\"\n")
         );
         let manifest = Manifest::parse(&current).unwrap();
         assert_eq!((manifest.version, manifest.hash), (FORMAT_VERSION, hash));
@@ -532,7 +560,8 @@ mod tests {
             path: vec![path.into()],
             value: json!(null),
         };
-        document.timeline = Some(Timeline {
+        document.timelines = vec![Timeline {
+            figures: vec!["figure".into()],
             fps: 30.0,
             duration: 0.5,
             r#loop: true,
@@ -543,10 +572,10 @@ mod tests {
                     update("axes", "axes", "x"),
                 ],
             }],
-        });
+        }];
         assert!(validate_document(&document).is_empty());
 
-        let frame = &mut document.timeline.as_mut().unwrap().frames[0];
+        let frame = &mut document.timelines[0].frames[0];
         frame.updates = vec![
             update("axes", "line", "x"),
             update("figure", "figure", "axes"),
@@ -556,5 +585,50 @@ mod tests {
         assert!(issues.contains("updates[0].target: no axes \"line\""));
         assert!(issues.contains("updates[1].path: cannot update"));
         assert!(issues.contains("updates[2].target_kind: unsupported"));
+    }
+
+    #[test]
+    fn validates_independent_timelines() {
+        let mut document = document(json!("first"), "axes", json!([]));
+        let mut second = document.figures[0].clone();
+        second.id = "figure-2".into();
+        second.properties.insert("name".into(), json!("second"));
+        second.axes[0].id = "axes-2".into();
+        second.axes[0].artists[0].id = "line-2".into();
+        second.axes[0].artists[0].axes_id = "axes-2".into();
+        document.figures.push(second);
+        let timeline = |figures: &[&str], target: &str, duration: f64| Timeline {
+            figures: figures.iter().map(|f| (*f).into()).collect(),
+            fps: 10.0,
+            duration,
+            r#loop: true,
+            frames: vec![TimelineFrame {
+                time: duration,
+                updates: vec![TimelineUpdate {
+                    target_kind: "artist".into(),
+                    target: target.into(),
+                    path: vec!["data".into()],
+                    value: json!(null),
+                }],
+            }],
+        };
+        document.timelines = vec![
+            timeline(&["figure"], "line", 0.5),
+            timeline(&["figure-2"], "line-2", 2.0),
+        ];
+        assert!(validate_document(&document).is_empty());
+
+        document.timelines = vec![
+            timeline(&["figure"], "line-2", 0.5),
+            timeline(&["figure", "missing"], "line", 1.0),
+            timeline(&[], "line", 1.0),
+        ];
+        let issues = validate_document(&document).join("\n");
+        assert!(issues.contains("timelines[0].frames[0].updates[0].target: \"line-2\" is outside"));
+        assert!(
+            issues.contains("timelines[1].figures: figure \"figure\" belongs to more than one")
+        );
+        assert!(issues.contains("timelines[1].figures: no figure \"missing\""));
+        assert!(issues.contains("timelines[2].figures: must not be empty"));
     }
 }

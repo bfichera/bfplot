@@ -4,7 +4,7 @@ import { ViewerModel } from "./model.js";
 import { builtinRenderers, PLOT_TEXT_SIZE, type ArtistRenderer, type RenderContext } from "./renderers.js";
 import { createScale, formatTick, type Scale } from "./scales.js";
 import { resolveTheme } from "./theme.js";
-import { TimelinePlayer } from "./timeline.js";
+import { TimelineSet } from "./timeline.js";
 import type { Artist, ArrayResolver, Axis, Figure, BFPlotDocument, ResolvedData, Theme, ThemeName, Viewport } from "./types.js";
 import { cssColor, pairs, SVG_NS, svg } from "./svg.js";
 
@@ -47,7 +47,7 @@ export class BFPlotViewer extends EventTarget {
   private readonly comparison = new LineComparison();
   private compareMode = false;
   private comparisonElement: HTMLElement | undefined;
-  private readonly timeline: TimelinePlayer;
+  private readonly timeline: TimelineSet;
 
   constructor(target: HTMLElement, document: BFPlotDocument, options: ViewerOptions = {}) {
     super();
@@ -55,7 +55,7 @@ export class BFPlotViewer extends EventTarget {
     this.options = options;
     this.theme = resolveTheme(options.theme);
     this.model = new ViewerModel(document, options.arrayResolver);
-    this.timeline = new TimelinePlayer(document, (nextDocument) => this.renderTimelineDocument(nextDocument));
+    this.timeline = new TimelineSet(document, (nextDocument) => this.renderTimelineDocument(nextDocument));
     Object.entries(builtinRenderers).forEach(([type, renderer]) => this.renderers.set(type, renderer));
     this.element.classList.add("bfplot-viewer");
     this.element.setAttribute("role", "region");
@@ -152,8 +152,8 @@ export class BFPlotViewer extends EventTarget {
       this.activeFigureIdValue = this.model.document.figures[0]?.id;
     }
     header.append(this.createNavigator());
-    const timelineControls = this.timeline.createControls();
-    if (timelineControls) header.append(timelineControls);
+    header.append(...this.timeline.createControls());
+    this.timeline.showFigure(this.activeFigureIdValue);
     const figuresElement = document.createElement("main");
     figuresElement.className = "bfplot-figures";
     shell.append(header, figuresElement);
@@ -410,6 +410,7 @@ export class BFPlotViewer extends EventTarget {
     if (pageId === this.comparisonPageId && !this.comparison.open) return;
     if (pageId !== this.comparisonPageId && !this.figures.has(pageId)) return;
     this.activeFigureIdValue = pageId;
+    this.timeline.showFigure(pageId);
     for (const [id, figure] of this.figures) figure.element.hidden = id !== pageId;
     if (this.comparisonElement) this.comparisonElement.hidden = pageId !== this.comparisonPageId;
     if (pageId === this.comparisonPageId) {

@@ -192,13 +192,13 @@ describe("BFPlotViewer", () => {
     window.document.body.append(host);
     const animated: BFPlotDocument = {
       ...document,
-      timeline: {
-        fps: 2, duration: 1, loop: false,
+      timelines: [{
+        figures: document.figures.map((figure) => figure.id), fps: 2, duration: 1, loop: false,
         frames: [
           { time: .5, updates: [{ target_kind: "artist", target: "line", path: ["data", "y"], value: [4, 2, 0] }] },
           { time: 1, updates: [{ target_kind: "artist", target: "line", path: ["data", "y"], value: [1, 1, 1] }] },
         ],
-      },
+      }],
     };
     const viewer = new BFPlotViewer(host, animated);
     await viewer.render();
@@ -218,11 +218,35 @@ describe("BFPlotViewer", () => {
     viewer.destroy();
   });
 
+  it("shows the controls of the timeline that drives the current figure", async () => {
+    const host = window.document.createElement("div");
+    window.document.body.append(host);
+    const update = (target: string, time: number) => ({ time, updates: [{ target_kind: "artist" as const, target, path: ["data", "y"], value: [1, 1, 1] }] });
+    const viewer = new BFPlotViewer(host, {
+      ...document,
+      figures: [{ id: "f", axes: ["a"] }, { id: "g", axes: ["b"] }, { id: "s", axes: [] }],
+      axes: [...document.axes, { id: "b" }],
+      artists: [document.artists[0]!, { ...document.artists[0]!, id: "line-b", axes_id: "b" }],
+      timelines: [{ figures: ["f"], fps: 2, duration: 1, frames: [update("line", 1)] }, { figures: ["g"], fps: 1, duration: 3, frames: [update("line-b", 3)] }],
+    });
+    await viewer.render();
+    const visible = () => Array.from(host.querySelectorAll<HTMLElement>(".bfplot-timeline")).filter((controls) => !controls.hidden).map((controls) => controls.dataset.figures);
+    expect(visible()).toEqual(["f"]);
+    host.querySelector<HTMLButtonElement>('[data-page-id="g"]')!.click();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(visible()).toEqual(["g"]);
+    expect(host.querySelector(".bfplot-timeline:not([hidden]) .bfplot-timeline-time")?.textContent).toBe("0.00 / 3.00 s");
+    host.querySelector<HTMLButtonElement>('[data-page-id="s"]')!.click();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(visible()).toEqual([]);
+    viewer.destroy();
+  });
+
   it("draws the last frame after rapid timeline steps", async () => {
     const host = window.document.createElement("div");
     window.document.body.append(host);
     const update = (time: number, y: number[]) => ({ time, updates: [{ target_kind: "artist" as const, target: "line", path: ["data", "y"], value: y }] });
-    const viewer = new BFPlotViewer(host, { ...document, timeline: { fps: 2, duration: 1, frames: [update(.5, [4, 2, 0]), update(1, [1, 1, 1])] } });
+    const viewer = new BFPlotViewer(host, { ...document, timelines: [{ figures: document.figures.map((figure) => figure.id), fps: 2, duration: 1, frames: [update(.5, [4, 2, 0]), update(1, [1, 1, 1])] }] });
     await viewer.render();
     const path = () => host.querySelector("[data-artist-id='line'] path:not(.bfplot-line-hit)")?.getAttribute("d");
     const step = host.querySelectorAll<HTMLButtonElement>(".bfplot-timeline .bfplot-button")[2]!;

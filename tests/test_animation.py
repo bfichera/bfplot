@@ -33,8 +33,9 @@ def test_animation_records_semantic_buffer_updates(tmp_path):
 
     assert recording.result is not None
     manifest, document = read_result(recording.result)
-    timeline = document["timeline"]
+    timeline = document["timelines"][0]
     assert timeline == {
+        "figures": [figure["id"] for figure in document["figures"]],
         "duration": 0.25,
         "fps": 10.0,
         "frames": timeline["frames"],
@@ -55,8 +56,8 @@ def test_empty_animation_is_valid_and_has_zero_duration(tmp_path):
     recording = bfplot.animation(tmp_path / "still.bfplot", figure)
     output = recording.close()
     _, document = read_result(output)
-    assert document["timeline"]["duration"] == 0
-    assert document["timeline"]["frames"] == []
+    assert document["timelines"][0]["duration"] == 0
+    assert document["timelines"][0]["frames"] == []
 
 
 def test_animation_rejects_structural_changes_and_bad_times(tmp_path):
@@ -82,7 +83,7 @@ def test_animation_records_property_and_axes_updates(tmp_path):
     output = recording.close()
 
     _, document = read_result(output)
-    updates = document["timeline"]["frames"][0]["updates"]
+    updates = document["timelines"][0]["frames"][0]["updates"]
     assert any(
         update["target_kind"] == "artist" and update["path"] == ["props", "color"]
         for update in updates
@@ -109,4 +110,4 @@ def test_save_animation_convenience_api(tmp_path):
     )
 
     _, document = read_result(output)
-    assert [frame["time"] for frame in document["timeline"]["frames"]] == [0.2, 0.4]
+    assert [frame["time"] for frame in document["timelines"][0]["frames"]] == [0.2, 0.4]

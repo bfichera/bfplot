@@ -23,7 +23,7 @@ Every object is named by the SHA-256 hash of its content. Objects belong to this
 
 ```toml
 format = "bfplot"
-version = 2
+version = 3
 hash = "sha256:0123456789abcdef…"
 ```
 
@@ -33,14 +33,14 @@ The manifest holds exactly these three keys. `hash` is the hash of the whole res
 
 ```console
 $ bfplot verify experiment.bfplot
-error: this result uses BFPlot format version 3, but this bfplot only reads up to version 2; please update bfplot
+error: this result uses BFPlot format version 4, but this bfplot only reads up to version 3; please update bfplot
 ```
 
-Version 1 results recorded provenance and hashed arrays differently. They are no longer read; save them again with the current `bfplot`.
+Version 1 results recorded provenance and hashed arrays differently, and version 2 results held at most one `timeline`. They are no longer read; save them again with the current `bfplot`.
 
 ## The document
 
-The document is canonical JSON (sorted keys, no extra whitespace, finite numbers) describing figures, axes and artists. A figure may have a `name` that is unique within the result. An animated result also has a `timeline`.
+The document is canonical JSON (sorted keys, no extra whitespace, finite numbers) describing figures, axes and artists. A figure may have a `name` that is unique within the result. An animated result also has `timelines`: a list of independent animations, each with its own `fps`, `duration`, `loop` and `frames`. A timeline's `figures` lists the IDs of the figures it animates; a figure belongs to at most one timeline, and a timeline's updates may only target that figure and its axes and artists. The viewer gives each timeline its own playback controls.
 
 Every artist has:
 

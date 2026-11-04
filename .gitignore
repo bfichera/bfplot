@@ -8,3 +8,4 @@ release-dist/
 /site/
 .DS_Store
 /gallery.bfplot
+uv.lock

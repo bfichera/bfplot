@@ -215,7 +215,7 @@ def test_read_hash_rejects_what_is_not_a_current_result(tmp_path):
 
     broken = tmp_path / "broken.bfplot"
     broken.mkdir()
-    (broken / "manifest.toml").write_text('format = "bfplot"\nversion = 2\nhash = "sha256:12"\n')
+    (broken / "manifest.toml").write_text('format = "bfplot"\nversion = 3\nhash = "sha256:12"\n')
     with pytest.raises(bfplot.ResultError, match="no valid hash"):
         bfplot.hash(broken)
 

@@ -1,15 +1,57 @@
 const PLAYBACK_RATES = [0.25, 0.5, 1, 1.5, 2];
 const TIME_EPSILON = 1e-9;
 /**
- * Owns deterministic timeline replay and its controls.
+ * Owns deterministic replay of every timeline in a document.
  *
- * Seeking always starts from the immutable source document. This is deliberately
- * simple: updates are semantic replacements, so replay never depends on whatever
- * frame happened to render previously.
+ * Each timeline drives its own figures and has its own clock and controls. Seeking
+ * always starts from the immutable source document and replays every timeline up to
+ * its own time. This is deliberately simple: updates are semantic replacements, so
+ * replay never depends on whatever frame happened to render previously.
  */
-export class TimelinePlayer {
+export class TimelineSet {
     renderDocument;
     source;
+    players = [];
+    constructor(document, renderDocument) {
+        this.renderDocument = renderDocument;
+        this.source = structuredClone(document);
+        this.players = this.createPlayers();
+    }
+    get available() {
+        return this.players.length > 0;
+    }
+    setDocument(document) {
+        this.pause();
+        this.source = structuredClone(document);
+        this.players = this.createPlayers();
+    }
+    /** One controls element per timeline, each tagged with the figures it drives. */
+    createControls() {
+        return this.players.map((player) => player.createControls());
+    }
+    /** Show only the controls of the timeline that animates `figureId`. */
+    showFigure(figureId) {
+        for (const player of this.players)
+            player.setVisible(figureId !== undefined && player.drives(figureId));
+    }
+    pause() {
+        for (const player of this.players)
+            player.pause();
+    }
+    createPlayers() {
+        return (this.source.timelines ?? []).map((timeline) => new TimelinePlayer(timeline, () => this.render()));
+    }
+    async render() {
+        const document = structuredClone(this.source);
+        for (const player of this.players)
+            player.applyTo(document);
+        await this.renderDocument(document);
+    }
+}
+/** The clock and controls of one timeline. */
+export class TimelinePlayer {
+    timeline;
+    changed;
     time = 0;
     playing = false;
     playbackRate = 1;
@@ -17,25 +59,33 @@ export class TimelinePlayer {
     playbackOrigin = 0;
     animationFrame;
     controls;
-    constructor(document, renderDocument) {
-        this.renderDocument = renderDocument;
-        this.source = structuredClone(document);
+    constructor(timeline, changed) {
+        this.timeline = timeline;
+        this.changed = changed;
     }
-    get available() {
-        return this.source.timeline !== undefined;
+    drives(figureId) {
+        return this.timeline.figures.includes(figureId);
     }
-    setDocument(document) {
-        this.pause();
-        this.source = structuredClone(document);
-        this.time = 0;
-        this.controls = undefined;
+    setVisible(visible) {
+        if (!visible)
+            this.pause();
+        if (this.controls)
+            this.controls.hidden = !visible;
+    }
+    /** Apply every frame up to this timeline's current time. */
+    applyTo(document) {
+        for (const frame of this.timeline.frames) {
+            if (frame.time > this.time)
+                break;
+            for (const update of frame.updates)
+                applyTimelineUpdate(document, update);
+        }
     }
     createControls() {
-        const timeline = this.source.timeline;
-        if (!timeline)
-            return undefined;
+        const timeline = this.timeline;
         const controls = document.createElement("section");
         controls.className = "bfplot-timeline";
+        controls.dataset.figures = timeline.figures.join(" ");
         controls.setAttribute("aria-label", "Animation timeline");
         const play = this.button("Play", "play");
         play.classList.add("bfplot-play");
@@ -100,23 +150,13 @@ export class TimelinePlayer {
         return button;
     }
     async seek(requestedTime) {
-        const timeline = this.source.timeline;
-        if (!timeline)
-            return;
-        this.time = Math.max(0, Math.min(timeline.duration, requestedTime));
-        const document = structuredClone(this.source);
-        for (const frame of timeline.frames) {
-            if (frame.time > this.time)
-                break;
-            for (const update of frame.updates)
-                applyTimelineUpdate(document, update);
-        }
+        this.time = Math.max(0, Math.min(this.timeline.duration, requestedTime));
         this.refreshControls();
-        await this.renderDocument(document);
+        await this.changed();
     }
     play() {
-        const timeline = this.source.timeline;
-        if (!timeline || this.playing || timeline.duration <= 0)
+        const timeline = this.timeline;
+        if (this.playing || timeline.duration <= 0)
             return;
         if (this.time >= timeline.duration) {
             this.time = 0;
@@ -152,8 +192,7 @@ export class TimelinePlayer {
     }
     async step(offset) {
         this.pause();
-        const frameTimes = this.source.timeline?.frames.map((frame) => frame.time) ?? [];
-        const times = [0, ...frameTimes];
+        const times = [0, ...this.timeline.frames.map((frame) => frame.time)];
         let current = 0;
         for (let index = 0; index < times.length; index++) {
             if (times[index] <= this.time + TIME_EPSILON)
@@ -163,8 +202,7 @@ export class TimelinePlayer {
         await this.seek(times[next] ?? 0);
     }
     refreshControls() {
-        const timeline = this.source.timeline;
-        if (!timeline || !this.controls)
+        if (!this.controls)
             return;
         const play = this.controls.querySelector(".bfplot-play");
         const range = this.controls.querySelector(".bfplot-timeline-range");
@@ -176,7 +214,7 @@ export class TimelinePlayer {
         if (range)
             range.value = String(this.time);
         if (output)
-            output.textContent = `${this.time.toFixed(2)} / ${timeline.duration.toFixed(2)} s`;
+            output.textContent = `${this.time.toFixed(2)} / ${this.timeline.duration.toFixed(2)} s`;
     }
 }
 export function applyTimelineUpdate(document, update) {

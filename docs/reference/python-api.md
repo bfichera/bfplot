@@ -45,7 +45,7 @@ output = bfplot.savefig("results/experiment.bfplot", fig, name="experiment")
 bfplot.result(path, *, preview=True)
 ```
 
-Collect several figures and at most one animation into one result. Returns a `bfplot.Result`, best used as a context manager:
+Collect several figures and animations into one result. Returns a `bfplot.Result`, best used as a context manager:
 
 ```python
 with bfplot.result("results/fit.bfplot") as result:
@@ -74,7 +74,7 @@ Capture the figure’s state at that moment. Later changes to the figure do not 
 result.animation(figure=None, *, name=None, fps=30, loop=True)
 ```
 
-Record a timeline for some figures of the result; call `capture()` on the returned recording after each update. A result holds at most one animation, and other figures stay static. An animation that is still open is closed when the result closes.
+Record a timeline for some figures of the result; call `capture()` on the returned recording after each update. A result may hold several animations: each has its own timeline, frame rate and playback controls in the viewer. Figures added with `add()` stay static. An animation that is still open is closed when the result closes.
 
 ### `Result.hash`
 

@@ -149,10 +149,11 @@
   padding-top: 14px;
   border-top: 1px solid #deddd7;
 }
+.bfplot-timeline[hidden] { display: none; }
 .bfplot-timeline-range { grid-column: 1 / -1; width: 100%; accent-color: var(--bfplot-accent); }
 .bfplot-timeline-time { color: var(--bfplot-muted); font-size: 10px; font-style: italic; }
 .bfplot-playback-rate { border: 0; border-bottom: 1px solid #aaa79e; background: transparent; color: var(--bfplot-muted); font: 10px "CMU Serif", serif; }
-.bfplot-header:has(.bfplot-timeline) .bfplot-toolbar { margin-top: 0; }
+.bfplot-header:has(.bfplot-timeline:not([hidden])) .bfplot-toolbar { margin-top: 0; }
 
 .bfplot-navigator {
   display: flex;

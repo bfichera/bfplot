@@ -38,7 +38,7 @@ def test_manifest_starts_with_format_and_version(tmp_path) -> None:
         f"version = {FORMAT_VERSION}",
         f'hash = "{bfplot.hash(output)}"',
     ]
-    assert read_result(output)[0]["version"] == FORMAT_VERSION == 2
+    assert read_result(output)[0]["version"] == FORMAT_VERSION == 3
 
 
 def test_explicit_translate_compile_matches_savefig_artifact_document(tmp_path) -> None:

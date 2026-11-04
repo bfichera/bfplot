@@ -102,10 +102,10 @@ export function normalizeDocument(value) {
         if (!artists.some((item) => item.id === artist.id))
             artists.push(artist);
     }
-    const timeline = Array.isArray(record(raw.timeline).frames) ? raw.timeline : undefined;
+    const timelines = list(raw.timelines).filter((item) => Array.isArray(record(item).frames) && Array.isArray(record(item).figures));
     return {
         figures, axes, artists,
-        ...(timeline ? { timeline } : {}),
+        ...(timelines.length ? { timelines } : {}),
         ...(text(raw.title) ? { title: text(raw.title) } : {}),
         ...(/^sha256:[0-9a-f]{64}$/.test(text(raw.hash)) ? { hash: text(raw.hash) } : {}),
     };

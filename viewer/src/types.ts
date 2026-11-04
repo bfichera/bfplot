@@ -71,6 +71,8 @@ export interface TimelineUpdate {
 export interface TimelineFrame { time: number; updates: TimelineUpdate[]; }
 
 export interface Timeline {
+  /** IDs of the figures this timeline animates. */
+  figures: string[];
   fps: number;
   duration: number;
   loop?: boolean;
@@ -82,7 +84,7 @@ export interface BFPlotDocument {
   figures: Figure[];
   axes: Axis[];
   artists: Artist[];
-  timeline?: Timeline;
+  timelines?: Timeline[];
   /** The result's hash (`sha256:<hex>`); equal hashes mean identical results. */
   hash?: string;
 }

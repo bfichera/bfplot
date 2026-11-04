@@ -31,7 +31,7 @@ from .preview import render
 
 MANIFEST_PREFIX = b'format = "bfplot"'
 # The format version this writer produces; see docs/format.md.
-FORMAT_VERSION = 2
+FORMAT_VERSION = 3
 
 _HASH = re.compile(r"sha256:[0-9a-f]{64}")
 _DTYPE = re.compile(r"[biuf]([1-9][0-9]*)")
