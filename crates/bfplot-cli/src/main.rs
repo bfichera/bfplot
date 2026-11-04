@@ -274,7 +274,7 @@ async fn serve(
     let address = (bind, port);
     let listener = tokio::net::TcpListener::bind(address).await?;
     let url = format!("http://{}", listener.local_addr()?);
-    eprintln!("serving {} at {url}", state_hash);
+    eprintln!("serving {state_hash} at {url}");
     if open_browser {
         open_default_browser(&url)?;
     }
