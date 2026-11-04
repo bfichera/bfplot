@@ -125,4 +125,17 @@ describe("large data rendering", () => {
     expect(group.querySelector("image")?.getAttribute("href")).toBe("data:image/png;base64,test");
     expect(putImageData).toHaveBeenCalledOnce();
   });
+
+  it("keeps NaN pixels in place so rows stay aligned", () => {
+    const pixels = new Uint8ClampedArray(4 * 3 * 2);
+    vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue({ createImageData: () => ({ data: pixels }), putImageData: vi.fn() } as unknown as CanvasRenderingContext2D);
+    vi.spyOn(HTMLCanvasElement.prototype, "toDataURL").mockReturnValue("data:image/png;base64,test");
+    builtinRenderers["bfplot.image"]!({
+      group: svg("g"), artist: { ...artist, type: "bfplot.image", props: { clim: [0, 1] } }, data: { values: new Float32Array([NaN, 0, 0, 1, 1, 1]), shape: [2, 3], extent: [0, 3, 2, 0] }, x: createScale("linear", [0, 3], [0, 3]), y: createScale("linear", [0, 2], [2, 0]),
+      width: 3, height: 2, theme: themes.light, pointBudget: 1_000, project3d: (x, y) => [x, y],
+    });
+    expect(pixels[3]).toBe(0);
+    expect(Array.from(pixels.slice(12, 15))).toEqual(Array.from(pixels.slice(16, 19)));
+    expect(Array.from(pixels.slice(4, 7))).not.toEqual(Array.from(pixels.slice(12, 15)));
+  });
 });

@@ -163,7 +163,10 @@ const rasterDataUrl = (values, rows, columns, artist) => {
     return canvas.toDataURL("image/png");
 };
 const image = ({ group, artist, data, x, y }) => {
-    const extent = numeric(data.extent), values = numeric(data.values ?? data.array), shape = numeric(data.shape);
+    // Keep NaNs: dropping them would shift every later pixel out of its row.
+    const raw = data.values ?? data.array;
+    const values = Array.isArray(raw) || ArrayBuffer.isView(raw) ? Array.from(raw, Number) : [];
+    const extent = numeric(data.extent), shape = numeric(data.shape);
     const [left, right, bottom, top] = extent.length >= 4 ? extent : [0, 1, 0, 1];
     const rows = shape[0] ?? Math.round(Math.sqrt(values.length)), columns = shape[1] ?? Math.ceil(values.length / Math.max(1, rows));
     const supplied = typeof data.url === "string" ? data.url : typeof data.data_url === "string" ? data.data_url : "";
