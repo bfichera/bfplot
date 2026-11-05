@@ -23,10 +23,10 @@ $ curl -LsSf https://github.com/bfichera/bfplot/releases/latest/download/uninsta
 You need Python 3.10+:
 
 ```console
-$ python -m pip install "bfplot @ git+https://github.com/bfichera/bfplot"
+$ python -m pip install bfplot
 ```
 
-Add `@v1.0.0` to the URL for a particular version. Check both parts:
+Use `bfplot==1.0.0` for a particular version, and add `--pre` to get a pre-release such as `1.1.0rc1`. Check both parts:
 
 ```console
 $ python -c "import bfplot; print(bfplot.__version__)"

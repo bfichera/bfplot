@@ -2,9 +2,10 @@
 #
 # The workflow sets that version everywhere, builds and tests the `bfplot` app for macOS
 # and Linux, and only if all of it passes commits the version to main, tags it and creates
-# the GitHub release with the app archives, install.sh and uninstall.sh. Nothing is
-# published anywhere else. Tick "dry run" to build and test without releasing. Pull
-# requests that touch packaging run the build and tests too. See RELEASING.md.
+# the GitHub release with the app archives, install.sh and uninstall.sh. Last, it
+# publishes the Python package to PyPI (trusted publishing, `pypi` environment). Tick
+# "dry run" to build and test without releasing. Pull requests that touch packaging run
+# the build and tests too.
 
 name: Release
 
@@ -165,9 +166,46 @@ jobs:
           path: archives/*
           if-no-files-found: error
 
+  python:
+    name: Python package
+    needs: plan
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      VERSION: ${{ needs.plan.outputs.version }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.13"
+      - name: Set the version
+        if: env.VERSION != ''
+        run: python -m pip install -q packaging && python scripts/set_version.py "$VERSION"
+      - name: Build
+        run: python -m pip install -q build twine && python -m build
+      - name: The package is valid for PyPI
+        run: python -m twine check --strict dist/*
+      - name: The wheel installs and carries the requested version
+        run: |
+          python -m venv "$RUNNER_TEMP/venv"
+          "$RUNNER_TEMP/venv/bin/python" -m pip install -q dist/*.whl
+          cd "$RUNNER_TEMP"
+          "$RUNNER_TEMP/venv/bin/python" -c "import bfplot; print(bfplot.__version__)"
+          if [[ -n "$VERSION" ]]; then
+            test "$("$RUNNER_TEMP/venv/bin/python" -c 'import bfplot; print(bfplot.__version__)')" = \
+              "$(python -c "from packaging.version import Version; print(Version('$VERSION'))")"
+          fi
+      - uses: actions/upload-artifact@v7
+        with:
+          name: python-dist
+          path: dist/*
+          if-no-files-found: error
+
   release:
     name: Commit, tag and create the GitHub release
-    needs: [plan, app]
+    needs: [plan, app, python]
     if: github.event_name == 'workflow_dispatch' && !inputs.dry-run
     runs-on: ubuntu-latest
     permissions:
@@ -207,3 +245,22 @@ jobs:
           if [[ "$VERSION" == *-* ]]; then prerelease=(--prerelease); fi
           gh release create "v$VERSION" --verify-tag --title "BFPlot $VERSION" \
             --generate-notes "${prerelease[@]}" "$RUNNER_TEMP"/release/*
+
+  pypi:
+    name: Publish to PyPI
+    # Last, because a PyPI upload can't be undone or replaced. If only this fails, fix the
+    # cause and use "Re-run failed jobs".
+    needs: [python, release]
+    if: github.event_name == 'workflow_dispatch' && !inputs.dry-run
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/p/bfplot
+    permissions:
+      id-token: write # trusted publishing: PyPI checks this workflow's identity, no token
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          name: python-dist
+          path: dist
+      - uses: pypa/gh-action-pypi-publish@release/v1

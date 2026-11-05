@@ -23,7 +23,6 @@ classifiers = [
   "Programming Language :: Python :: 3 :: Only",
   "Topic :: Scientific/Engineering :: Visualization",
   "Typing :: Typed",
-  "Private :: Do Not Upload",
 ]
 dependencies = [
   "matplotlib>=3.7",

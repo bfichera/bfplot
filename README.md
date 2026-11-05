@@ -32,10 +32,10 @@ Install the `bfplot` app, which has the viewer built in, on macOS or Linux:
 $ curl -LsSf https://github.com/bfichera/bfplot/releases/latest/download/install.sh | sh
 ```
 
-Then install the Python interface (Python 3.10+) from GitHub:
+Then install the Python interface (Python 3.10+):
 
 ```console
-$ python -m pip install "bfplot @ git+https://github.com/bfichera/bfplot"
+$ python -m pip install bfplot
 ```
 
 See [Installation](https://bfichera.github.io/bfplot/getting-started/installation/) for uninstalling and other options.
