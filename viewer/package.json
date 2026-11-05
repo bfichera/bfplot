@@ -1,6 +1,6 @@
 {
   "name": "@bfplot/viewer",
-  "version": "1.0.0-rc.4",
+  "version": "1.0.0",
   "private": true,
   "license": "MIT",
   "description": "Dependency-light interactive browser viewer for BFPlot artifacts",
