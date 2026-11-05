@@ -11,8 +11,8 @@ version = "1.0.0rc4"
 description = "Interactive, reproducible scientific plots, with a Python implementation for Matplotlib"
 readme = "README.md"
 requires-python = ">=3.10"
-license = "Apache-2.0 OR MIT"
-license-files = ["LICENSE", "LICENSE-APACHE", "LICENSE-MIT"]
+license = "MIT"
+license-files = ["LICENSE"]
 authors = [{ name = "BFPlot contributors" }]
 keywords = ["plotting", "visualization", "matplotlib", "scientific", "reproducibility"]
 classifiers = [
@@ -51,7 +51,7 @@ packages = ["src/bfplot"]
 "src/bfplot/py.typed" = "bfplot/py.typed"
 
 [tool.hatch.build.targets.sdist]
-include = ["/src/bfplot", "/tests", "/examples", "/README.md", "/LICENSE*"]
+include = ["/src/bfplot", "/tests", "/examples", "/README.md", "/LICENSE"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

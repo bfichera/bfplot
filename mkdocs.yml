@@ -28,11 +28,7 @@ nav:
       - Python API: reference/python-api.md
       - Command-line interface: reference/cli.md
       - Supported plots: reference/supported-plots.md
-      - File format: format.md
-  - Project:
-      - What BFPlot is (and isn't): project/scope.md
-      - Contributing: project/contributing.md
-      - Architecture: project/architecture.md
+  - Contributing: project/contributing.md
 
 markdown_extensions:
   - tables

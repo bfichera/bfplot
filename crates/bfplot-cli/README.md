@@ -19,4 +19,4 @@ Or build it from a checkout with `cargo build --release -p bfplot-cli`.
 
 See the [command reference](https://bfichera.github.io/bfplot/reference/cli/).
 
-Licensed under either the Apache License, Version 2.0, or the MIT license, at your option.
+Licensed under the MIT License.

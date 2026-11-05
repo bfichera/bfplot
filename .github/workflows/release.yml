@@ -147,9 +147,9 @@ jobs:
       - name: Package the app for install.sh
         run: |
           mkdir -p "$RUNNER_TEMP/app" archives
-          cp "target/${{ matrix.target }}/release/bfplot" LICENSE-APACHE LICENSE-MIT "$RUNNER_TEMP/app/"
+          cp "target/${{ matrix.target }}/release/bfplot" LICENSE "$RUNNER_TEMP/app/"
           name="bfplot-${{ matrix.target }}.tar.gz"
-          tar -czf "archives/$name" -C "$RUNNER_TEMP/app" bfplot LICENSE-APACHE LICENSE-MIT
+          tar -czf "archives/$name" -C "$RUNNER_TEMP/app" bfplot LICENSE
           (cd archives && shasum -a 256 "$name" > "$name.sha256")
       - name: install.sh and uninstall.sh work
         if: ${{ !matrix.cross }}

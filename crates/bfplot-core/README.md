@@ -9,4 +9,4 @@ println!("verified {} objects, hash {}", report.object_count, report.hash);
 
 The format is described in the [format reference](https://bfichera.github.io/bfplot/format/).
 
-Licensed under either the Apache License, Version 2.0, or the MIT license, at your option.
+Licensed under the MIT License.

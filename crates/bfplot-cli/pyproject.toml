@@ -10,7 +10,7 @@ name = "bfplot-cli"
 dynamic = ["version"]
 description = "The bfplot app: view, serve and verify BFPlot results"
 readme = "README.md"
-license = "Apache-2.0 OR MIT"
+license = "MIT"
 classifiers = ["Private :: Do Not Upload"]
 
 [project.urls]

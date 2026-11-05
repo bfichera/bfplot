@@ -191,4 +191,4 @@ Only open bfplot results from sources you trust.
 
 ## License
 
-Apache License 2.0 or MIT License, at your option: [LICENSE-APACHE](https://github.com/bfichera/bfplot/blob/main/LICENSE-APACHE), [LICENSE-MIT](https://github.com/bfichera/bfplot/blob/main/LICENSE-MIT).
+MIT License: [LICENSE](https://github.com/bfichera/bfplot/blob/main/LICENSE).

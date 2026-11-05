@@ -8,7 +8,7 @@ resolver = "2"
 [workspace.package]
 version = "1.0.0-rc.4"
 edition = "2024"
-license = "Apache-2.0 OR MIT"
+license = "MIT"
 rust-version = "1.88"
 repository = "https://github.com/bfichera/bfplot"
 homepage = "https://bfichera.github.io/bfplot/"
