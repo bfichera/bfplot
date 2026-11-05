@@ -29,6 +29,7 @@ nav:
       - Command-line interface: reference/cli.md
       - Supported plots: reference/supported-plots.md
   - Contributing: project/contributing.md
+  - GitHub: https://github.com/bfichera/bfplot
 
 markdown_extensions:
   - tables
